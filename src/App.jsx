@@ -1545,7 +1545,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     const oKey = `${oDate}_|_${oSession}`;
 
                     if (sessionsToRelease.has(oKey) && isPending && o.isReleasedToProduction !== true) {
-                        batchDel.update(docSnap.ref, { isReleasedToProduction: true });
+                        batchDel.update(docSnap.ref, { isReleasedToProduction: true, poReleasedTimestamp: Date.now() });
                     }
                 });
             } catch (e) { }
@@ -1654,7 +1654,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             try {
                 const batchDel = window.db.batch();
                 const qcSnap = await window.db.collection('qc_orders').where('poDate', '==', batch.targetDate).where('session', '==', batch.session).where('isReleasedToProduction', '==', false).get();
-                qcSnap.forEach(d => batchDel.update(d.ref, { isReleasedToProduction: true }));
+                qcSnap.forEach(d => batchDel.update(d.ref, { isReleasedToProduction: true, poReleasedTimestamp: Date.now() }));
                 await batchDel.commit();
             } catch (e) { }
 
@@ -6039,8 +6039,13 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                 if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform) || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
                     totalPesananClosedOrder += totalPcs;
                 }
+            }
 
-                // Hitung "Pesanan Online" (HANYA barang yang PO / stok kosong / dikirim ke Produksi)
+            // Hitung "Pesanan Online" (HANYA barang yang PO / stok kosong / dikirim ke Produksi)
+            // Menggunakan poReleasedTimestamp (saat klik Kirim ke Produksi) atau fallback ke batchTimestamp
+            const poTimestamp = o.poReleasedTimestamp || importTimestamp;
+            const poDateVal = new Date(poTimestamp);
+            if (poTimestamp !== 0 && poDateVal >= start && poDateVal <= end) {
                 if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform)) {
                     const poItems = (o.items || []).filter(item => item.status === 'PO' || item.status === 'UNRECOGNIZED');
                     const poQty = poItems.reduce((sum, item) => sum + item.qty, 0);
@@ -9173,7 +9178,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             if (releasedOrderIds.size > 0) {
                 const batch = window.db.batch();
                 releasedOrderIds.forEach(orderId => {
-                    batch.update(window.db.collection('qc_orders').doc(orderId), { isReleasedToProduction: true });
+                    batch.update(window.db.collection('qc_orders').doc(orderId), { isReleasedToProduction: true, poReleasedTimestamp: Date.now() });
                 });
                 await batch.commit();
             }
