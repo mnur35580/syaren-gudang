@@ -6039,6 +6039,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                 if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform) || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
                     totalPesananClosedOrder += totalPcs;
                 }
+
+                // Hitung "Pesanan Online" (HANYA barang yang PO / stok kosong / dikirim ke Produksi)
+                if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform)) {
+                    const poItems = (o.items || []).filter(item => item.status === 'PO' || item.status === 'UNRECOGNIZED');
+                    const poQty = poItems.reduce((sum, item) => sum + item.qty, 0);
+                    onlinePcs += poQty;
+                    if (poQty > 0) onlineResi += 1;
+                }
             }
 
             // 2. Hitung Detail Scan Out (Hanya untuk yang sudah PACKED/SHIPPED)
@@ -6062,18 +6070,18 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                             outDetails['Endors & Affiliate'] += totalPcs;
                         } else if (o.platform === 'MANUAL' && o.sumber === 'Resize') {
                             outDetails['Resize'] += totalPcs;
-                        } else {
-                            onlineResi += 1;
-                            onlinePcs += totalPcs;
                         }
+                        // onlineResi dan onlinePcs TIDAK dihitung di sini, karena 'Pesanan Online' 
+                        // dimaksudkan untuk barang PO, bukan barang ready yang di-scan out.
                     }
                 }
             }
         });
 
         // PENGURANGAN MATEMATIS
-        // Total Penjualan (Off + Online) murni = (Total Scan Keluar) - (Lainnya) - (Affiliate + Reject + Resize)
-        const purePenjualan = outDetails['Penjualan (Off + Online)'] - outDetails['Endors & Affiliate'] - outDetails['Reject'] - outDetails['Resize'];
+        // Sesuai rule: Reject dan Resize TETAP masuk ke laporan penjualan offline dan online.
+        // HANYA Affiliate/Endorse yang dipisah (dikurangi) dari Penjualan.
+        const purePenjualan = outDetails['Penjualan (Off + Online)'] - outDetails['Endors & Affiliate'];
         outDetails['Penjualan (Off + Online)'] = purePenjualan < 0 ? 0 : purePenjualan;
 
         const formatDateHeader = (d) => d.toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
