@@ -6448,12 +6448,34 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Waktu Mulai</label>
-                                    <input type="datetime-local" value={laporanMulai} onChange={e => { setLaporanMulai(e.target.value); }} onBlur={generateLaporan} className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-sm outline-none" />
+                                    <div className="flex items-center w-full rounded-xl border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
+                                        <input type="date" value={laporanMulai.split('T')[0]} onChange={e => setLaporanMulai(e.target.value + 'T' + (laporanMulai.split('T')[1] || '09:00'))} onBlur={generateLaporan} className="flex-1 p-2 bg-transparent font-bold text-sm outline-none cursor-pointer" />
+                                        <div className="flex items-center bg-slate-200/50 px-2 py-2 border-l border-slate-300">
+                                            <select value={laporanMulai.split('T')[1]?.split(':')[0] || '09'} onChange={e => setLaporanMulai(laporanMulai.split('T')[0] + 'T' + e.target.value + ':' + (laporanMulai.split('T')[1]?.split(':')[1] || '00'))} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
+                                                {Array.from({length: 24}).map((_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                            </select>
+                                            <span className="mx-1 font-black text-slate-400">:</span>
+                                            <select value={laporanMulai.split('T')[1]?.split(':')[1] || '00'} onChange={e => setLaporanMulai(laporanMulai.split('T')[0] + 'T' + (laporanMulai.split('T')[1]?.split(':')[0] || '09') + ':' + e.target.value)} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
+                                                {Array.from({length: 60}).map((_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="text-slate-300 font-black mt-4">-</div>
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Waktu Selesai</label>
-                                    <input type="datetime-local" value={laporanSelesai} onChange={e => { setLaporanSelesai(e.target.value); }} onBlur={generateLaporan} className="w-full p-2.5 rounded-xl border border-slate-300 bg-slate-50 font-bold text-sm outline-none" />
+                                    <div className="flex items-center w-full rounded-xl border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
+                                        <input type="date" value={laporanSelesai.split('T')[0]} onChange={e => setLaporanSelesai(e.target.value + 'T' + (laporanSelesai.split('T')[1] || '08:30'))} onBlur={generateLaporan} className="flex-1 p-2 bg-transparent font-bold text-sm outline-none cursor-pointer" />
+                                        <div className="flex items-center bg-slate-200/50 px-2 py-2 border-l border-slate-300">
+                                            <select value={laporanSelesai.split('T')[1]?.split(':')[0] || '08'} onChange={e => setLaporanSelesai(laporanSelesai.split('T')[0] + 'T' + e.target.value + ':' + (laporanSelesai.split('T')[1]?.split(':')[1] || '30'))} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
+                                                {Array.from({length: 24}).map((_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                            </select>
+                                            <span className="mx-1 font-black text-slate-400">:</span>
+                                            <select value={laporanSelesai.split('T')[1]?.split(':')[1] || '30'} onChange={e => setLaporanSelesai(laporanSelesai.split('T')[0] + 'T' + (laporanSelesai.split('T')[1]?.split(':')[0] || '08') + ':' + e.target.value)} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
+                                                {Array.from({length: 60}).map((_, i) => <option key={i} value={i.toString().padStart(2, '0')}>{i.toString().padStart(2, '0')}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <button onClick={generateLaporan} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-xs py-2 rounded-lg mb-4 shadow-sm transition-colors">GENERATE ULANG</button>
