@@ -6902,24 +6902,15 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         const cleanBarcode = scannedText.trim().toUpperCase();
         if (!cleanBarcode) return;
 
-        let skuCandidate = cleanBarcode;
-        let isDateSuffix = false;
+        const isShortcode = cleanBarcode.startsWith('$');
+        const isLegacySystemBarcode = cleanBarcode.length > 8 && !isNaN(cleanBarcode.split('*')[0].split('#')[0].slice(-8));
 
-        // EKSTRAK SKU ASLI (Abaikan Suffix * untuk Online atau # untuk PO)
-        let rawBase = cleanBarcode;
-        if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
-        if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-
-        if (rawBase.length > 8 && !isNaN(rawBase.slice(-8))) {
-            skuCandidate = rawBase.slice(0, -8);
-            isDateSuffix = true;
-        }
-
-        if (!isDateSuffix) {
+        if (!isShortcode && !isLegacySystemBarcode) {
             playError(); showToast('error', "Barcode ditolak! Harus dari label cetak sistem.");
             return;
         }
 
+        const skuCandidate = parseGlobalSku(cleanBarcode);
         const matched = variantsRef.current.find(v => v.sku === skuCandidate);
         if (matched && matched.isActive) {
             setScannedItems(prev => {
@@ -7197,18 +7188,15 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
         const cleanBarcode = scannedText.trim().toUpperCase();
         if (!cleanBarcode) return;
 
-        let skuCandidate = cleanBarcode; let isDateSuffix = false;
+        const isShortcode = cleanBarcode.startsWith('$');
+        const isLegacySystemBarcode = cleanBarcode.length > 8 && !isNaN(cleanBarcode.split('*')[0].split('#')[0].slice(-8));
 
-        let rawBase = cleanBarcode;
-        if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
-        if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-
-        if (rawBase.length > 8 && !isNaN(rawBase.slice(-8))) {
-            skuCandidate = rawBase.slice(0, -8); isDateSuffix = true;
+        if (!isShortcode && !isLegacySystemBarcode) {
+            playError(); showToast('error', "Hanya menerima barcode dari sistem!");
+            return;
         }
 
-        if (!isDateSuffix) { playError(); showToast('error', "Hanya menerima barcode dari sistem!"); return; }
-
+        const skuCandidate = parseGlobalSku(cleanBarcode);
         const matched = variantsRef.current.find(v => v.sku === skuCandidate);
         if (matched && matched.isActive) {
             playSuccess();
