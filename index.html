@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faradela Management Gudang</title>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Firebase SDK (Sementara masih dipertahankan sebelum migrasi backend API selesai) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-storage-compat.js"></script>
+
+    <!-- SheetJS untuk Export Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
+
+    <!-- PDF-Lib untuk Menggabungkan & Mengurutkan PDF Resi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <!-- JsBarcode & QRCode untuk Cetak Barcode Lokal -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+</head>
+<body class="bg-slate-50">
+    <!-- AUDIO DOM ELEMENTS -->
+    <audio id="audio-success" src="/assets/audio/dragon-studio-correct-472358.mp3" preload="auto" style="display:none;"></audio>
+    <audio id="audio-error" src="https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3" preload="auto" style="display:none;"></audio>
+    <audio id="audio-confirm" src="https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3" preload="auto" style="display:none;"></audio>
+    <audio id="audio-cekling" src="/freesound_community-correct-choice-43861.mp3" preload="auto" style="display:none;"></audio>
+
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+</body>
+</html>
