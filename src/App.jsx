@@ -7273,13 +7273,10 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             const allKeys = new Set([...Object.keys(sysStock), ...Object.keys(scanStock)]);
             allKeys.forEach(bc => {
                 const sysQty = sysStock[bc] || 0; const scanQty = scanStock[bc] || 0;
-                if (sysQty <= 0 && scanQty === 0) return;
+                if (sysQty === 0 && scanQty === 0) return;
                 const diff = scanQty - sysQty;
 
-                let rawBase = bc;
-                if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
-                if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-                const skuCandidate = rawBase.length > 8 ? rawBase.slice(0, -8) : rawBase;
+                const skuCandidate = parseGlobalSku(bc);
 
                 const variant = variants.find(v => v.sku === skuCandidate);
                 result.push({ fullBarcode: bc, variant, sysQty, scanQty, diff });
@@ -7331,11 +7328,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             const batch = db.batch();
             differences.forEach(c => {
                 const type = c.diff > 0 ? 'IN' : 'OUT'; const qty = Math.abs(c.diff);
-
-                let rawBase = c.fullBarcode;
-                if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
-                if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-                const fallbackSku = rawBase.length > 8 ? rawBase.slice(0, -8) : rawBase;
+                const fallbackSku = parseGlobalSku(c.fullBarcode);
 
                 const tData = {
                     id: 'SO' + Date.now() + Math.random().toString(36).substr(2, 5),
