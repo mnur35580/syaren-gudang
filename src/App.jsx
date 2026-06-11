@@ -6027,30 +6027,45 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
 
         let onlineResi = 0, onlinePcs = 0;
         let affiliateResi = 0, affiliatePcs = 0;
+        let totalPesananClosedOrder = 0;
 
         Object.values(qcOrders || {}).forEach(o => {
-            const oDate = new Date(o.createdAt || o.timestamp || o.date || new Date().toISOString());
-            if (oDate >= start && oDate <= end) {
+            // 1. Hitung Total Pesanan Closed Order (Berdasarkan waktu IMPORT / batchTimestamp)
+            // Hindari fallback ke Date() agar pesanan lama tanpa tanggal tidak terhitung di hari ini
+            const importTimestamp = o.batchTimestamp || o.createdAt || o.timestamp || o.date || 0;
+            const importDate = new Date(importTimestamp);
+            if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
                 const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
-                // Hitung Reject dari defect
-                const totalDefect = (o.items || []).reduce((sum, item) => sum + (item.defect || 0), 0);
-                outDetails['Reject'] += totalDefect;
-                // outTotal += totalDefect; // JANGAN ditambahkan ke outTotal karena outTotal diambil murni dari Scan Keluar
+                if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform) || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
+                    totalPesananClosedOrder += totalPcs;
+                }
+            }
 
-                if (o.platform && o.platform.toLowerCase().includes('affiliate')) {
-                    affiliateResi += 1;
-                    affiliatePcs += totalPcs;
-                    outDetails['Endors & Affiliate'] += totalPcs;
-                } else if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform)) {
-                    if (o.platform === 'MANUAL' && o.sumber === 'Endorse/Affiliate') {
+            // 2. Hitung Detail Scan Out (Hanya untuk yang sudah PACKED/SHIPPED)
+            if (o.status === 'PACKED' || o.status === 'SHIPPED') {
+                const actionTimestamp = o.packedAt || o.shippedAt || 0;
+                const actionDate = new Date(actionTimestamp);
+                if (actionTimestamp !== 0 && actionDate >= start && actionDate <= end) {
+                    const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
+                    // Hitung Reject dari defect
+                    const totalDefect = (o.items || []).reduce((sum, item) => sum + (item.defect || 0), 0);
+                    outDetails['Reject'] += totalDefect;
+
+                    if (o.platform && o.platform.toLowerCase().includes('affiliate')) {
                         affiliateResi += 1;
                         affiliatePcs += totalPcs;
                         outDetails['Endors & Affiliate'] += totalPcs;
-                    } else if (o.platform === 'MANUAL' && o.sumber === 'Resize') {
-                        outDetails['Resize'] += totalPcs;
-                    } else {
-                        onlineResi += 1;
-                        onlinePcs += totalPcs;
+                    } else if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform)) {
+                        if (o.platform === 'MANUAL' && o.sumber === 'Endorse/Affiliate') {
+                            affiliateResi += 1;
+                            affiliatePcs += totalPcs;
+                            outDetails['Endors & Affiliate'] += totalPcs;
+                        } else if (o.platform === 'MANUAL' && o.sumber === 'Resize') {
+                            outDetails['Resize'] += totalPcs;
+                        } else {
+                            onlineResi += 1;
+                            onlinePcs += totalPcs;
+                        }
                     }
                 }
             }
@@ -6065,7 +6080,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
         const teks = `Laporan Sinkronisasi ${formatDateHeader(start)}:
 
 1. Saldo Cash = ${saldoText}
-2. Total Pesanan Closed Order = ${onlinePcs}
+2. Total Pesanan Closed Order = ${totalPesananClosedOrder}
 3. Total Brg Masuk ( Scan In ) : 
 * PO Nota = ${inDetails['PO Nota']}
 * Resize = ${inDetails['Resize']}
