@@ -7328,6 +7328,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             const batchId = 'SO' + Date.now();
             const operatorName = currentUser.nama || currentUser.username || 'Admin';
 
+            const batch = db.batch();
             differences.forEach(c => {
                 const type = c.diff > 0 ? 'IN' : 'OUT'; const qty = Math.abs(c.diff);
 
