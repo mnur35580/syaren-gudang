@@ -6080,7 +6080,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
         const teks = `Laporan Sinkronisasi ${formatDateHeader(start)}:
 
 1. Saldo Cash = ${saldoText}
-2. Total Pesanan Closed Order = ${totalPesananClosedOrder}
+2. Total Pesanan Closed Order = ${totalPesananClosedOrder} Pcs
 3. Total Brg Masuk ( Scan In ) : 
 * PO Nota = ${inDetails['PO Nota']}
 * Resize = ${inDetails['Resize']}
@@ -6093,7 +6093,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
 * Lainnya (...) = ${outDetails['Lainnya']}
 * Reject = ${outDetails['Reject']}
 * Endors & Affiliate = ${outDetails['Endors & Affiliate']}
-5. Total Pesanan Online = ${onlineResi}
+5. Total Pesanan Online = ${onlinePcs} Pcs ( ${onlineResi} Resi )
 `;
         setLaporanTeks(teks);
     };
