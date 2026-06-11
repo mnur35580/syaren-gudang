@@ -6079,9 +6079,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
         });
 
         // PENGURANGAN MATEMATIS
-        // Sesuai rule: Reject dan Resize TETAP masuk ke laporan penjualan offline dan online.
-        // HANYA Affiliate/Endorse yang dipisah (dikurangi) dari Penjualan.
-        const purePenjualan = outDetails['Penjualan (Off + Online)'] - outDetails['Endors & Affiliate'];
+        // Sesuai rule: Reject TETAP masuk ke laporan penjualan offline dan online karena barang penggantinya di-scan ulang.
+        // Affiliate/Endorse dan Resize DIPISAH (dikurangi) dari Penjualan agar murni berada di barisnya sendiri.
+        const purePenjualan = outDetails['Penjualan (Off + Online)'] - outDetails['Endors & Affiliate'] - outDetails['Resize'];
         outDetails['Penjualan (Off + Online)'] = purePenjualan < 0 ? 0 : purePenjualan;
 
         const formatDateHeader = (d) => d.toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
