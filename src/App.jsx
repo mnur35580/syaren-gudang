@@ -6115,7 +6115,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                     else {
                         const cat = t.category || 'Penjualan (Off + Online)';
                         if (cat === 'Lainnya') outDetails['Lainnya'] += t.qty;
-                        else outDetails['Penjualan (Off + Online)'] += t.qty; // Semua scan ditampung ke Penjualan dulu
+                        else if (cat === 'Tukar (Resize)') outDetails['Resize'] += t.qty;
+                        else if (cat === 'Reject') outDetails['Reject'] += t.qty;
+                        else outDetails['Penjualan (Off + Online)'] += t.qty;
                     }
                 }
             }
