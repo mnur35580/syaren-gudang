@@ -6132,7 +6132,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
             const importDate = new Date(importTimestamp);
             if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
                 const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
-                if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform) || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
+                if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform) || (o.platform === 'MANUAL' && o.sumber !== 'Resize') || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
                     totalPesananClosedOrder += totalPcs;
                 }
             }
@@ -6195,7 +6195,6 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
 * Resize = ${inDetails['Resize']}
 * Retur = ${inDetails['Retur']}
 * Repair = ${inDetails['Repair']}
-* Revisi = ${inDetails['Revisi']}
 4. Total Brg Keluar ( Scan Out ) :
 * Penjualan ( Off + Online ) = ${outDetails['Penjualan (Off + Online)']}
 * Resize = ${outDetails['Resize']}
