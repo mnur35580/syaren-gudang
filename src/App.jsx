@@ -353,31 +353,51 @@ function App() {
                 return code;
             };
 
-            const batch = window.db.batch();
+            const chunkArray = (arr, size) => arr.length ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [];
+            const productChunks = chunkArray(products, 300);
 
-            products.forEach(p => {
-                let pShortCodes = p.shortCodes ? { ...p.shortCodes } : {};
-                let changed = false;
+            let hasUpdates = false;
 
-                (p.colors || []).forEach(c => {
-                    (p.sizes || []).forEach(s => {
-                        const key = `${c.code}${s.code}`;
-                        if (!pShortCodes[key]) {
-                            pShortCodes[key] = generateCode();
-                            changed = true;
+            const processChunks = async () => {
+                try {
+                    for (const chunk of productChunks) {
+                        const batch = window.db.batch();
+                        let batchHasUpdates = false;
+
+                        chunk.forEach(p => {
+                            let pShortCodes = p.shortCodes ? { ...p.shortCodes } : {};
+                            let changed = false;
+
+                            (p.colors || []).forEach(c => {
+                                (p.sizes || []).forEach(s => {
+                                    const key = `${c.code}${s.code}`;
+                                    if (!pShortCodes[key]) {
+                                        pShortCodes[key] = generateCode();
+                                        changed = true;
+                                    }
+                                });
+                            });
+
+                            if (changed) {
+                                batchHasUpdates = true;
+                                hasUpdates = true;
+                                batch.update(window.db.collection('products').doc(p.id), { shortCodes: pShortCodes });
+                            }
+                        });
+
+                        if (batchHasUpdates) {
+                            await batch.commit();
                         }
-                    });
-                });
-
-                if (changed) {
-                    updatesNeeded = true;
-                    batch.update(window.db.collection('products').doc(p.id), { shortCodes: pShortCodes });
+                    }
+                    if (hasUpdates) {
+                        console.log('✅ ShortCodes berhasil digenerate dan disimpan (chunked)!');
+                    }
+                } catch (err) {
+                    console.error('❌ Gagal memigrasi shortCodes:', err);
                 }
-            });
+            };
 
-            if (updatesNeeded) {
-                batch.commit().then(() => console.log('✅ ShortCodes berhasil digenerate untuk semua produk!'));
-            }
+            processChunks();
         }
     }, [products]);
 
@@ -6910,8 +6930,14 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
             return;
         }
 
-        const skuCandidate = parseGlobalSku(cleanBarcode);
-        const matched = variantsRef.current.find(v => v.sku === skuCandidate);
+        let matched;
+        if (isShortcode) {
+            const shortCode = cleanBarcode.substring(1, 5);
+            matched = variantsRef.current.find(v => v.shortCode === shortCode);
+        } else {
+            const skuCandidate = parseGlobalSku(cleanBarcode);
+            matched = variantsRef.current.find(v => v.sku === skuCandidate);
+        }
         if (matched && matched.isActive) {
             setScannedItems(prev => {
                 if (!isMasuk) {
@@ -7196,8 +7222,14 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             return;
         }
 
-        const skuCandidate = parseGlobalSku(cleanBarcode);
-        const matched = variantsRef.current.find(v => v.sku === skuCandidate);
+        let matched;
+        if (isShortcode) {
+            const shortCode = cleanBarcode.substring(1, 5);
+            matched = variantsRef.current.find(v => v.shortCode === shortCode);
+        } else {
+            const skuCandidate = parseGlobalSku(cleanBarcode);
+            matched = variantsRef.current.find(v => v.sku === skuCandidate);
+        }
         if (matched && matched.isActive) {
             playSuccess();
             setScannedItems(prev => {
