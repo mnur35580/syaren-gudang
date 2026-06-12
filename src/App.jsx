@@ -401,6 +401,77 @@ function App() {
         }
     }, [products]);
 
+    // --- SKRIP RESCUE SHORTCODES SEMENTARA ---
+    // Skrip ini memulihkan 1000+ kode barcode pendek yang sempat dicetak namun gagal tersimpan kemarin
+    useEffect(() => {
+        if (products.length > 0 && transactions.length > 0 && window.db && !localStorage.getItem('shortcode_rescued_v2')) {
+            const rescueCodes = async () => {
+                let updatesCount = 0;
+                let foundMappings = {}; // sku -> shortCode
+
+                // 1. Ekstrak mapping dari transactions
+                transactions.forEach(t => {
+                    if (t.fullBarcode && t.fullBarcode.startsWith('$') && t.sku && t.sku.length > 4) {
+                        const sc = t.fullBarcode.substring(1, 5);
+                        // Pastikan t.sku BUKAN fallbackSku (contoh: bukan "BDWH")
+                        if (t.sku !== sc && t.sku.length > 5) {
+                            foundMappings[t.sku] = sc;
+                        }
+                    }
+                });
+
+                if (Object.keys(foundMappings).length === 0) {
+                    localStorage.setItem('shortcode_rescued_v2', 'true');
+                    return;
+                }
+
+                console.log("Mencoba memulihkan shortcodes dari riwayat transaksi...");
+
+                // 2. Terapkan ke products (secara berurutan / chunk)
+                const chunkArray = (arr, size) => arr.length ? [arr.slice(0, size), ...chunkArray(arr.slice(size), size)] : [];
+                const productChunks = chunkArray(products, 300);
+
+                for (const chunk of productChunks) {
+                    const batch = window.db.batch();
+                    let batchHasUpdates = false;
+
+                    chunk.forEach(p => {
+                        let pShortCodes = p.shortCodes ? { ...p.shortCodes } : {};
+                        let changed = false;
+
+                        (p.colors || []).forEach(c => {
+                            (p.sizes || []).forEach(s => {
+                                const sku = `${p.baseCode}${c.code}${s.code}`;
+                                if (foundMappings[sku] && pShortCodes[`${c.code}${s.code}`] !== foundMappings[sku]) {
+                                    pShortCodes[`${c.code}${s.code}`] = foundMappings[sku];
+                                    changed = true;
+                                }
+                            });
+                        });
+
+                        if (changed) {
+                            batch.update(window.db.collection('products').doc(p.id), { shortCodes: pShortCodes });
+                            batchHasUpdates = true;
+                            updatesCount++;
+                        }
+                    });
+
+                    if (batchHasUpdates) {
+                        await batch.commit();
+                    }
+                }
+
+                console.log(`Berhasil memulihkan ${updatesCount} produk!`);
+                localStorage.setItem('shortcode_rescued_v2', 'true');
+                if (updatesCount > 0 && typeof showToast === 'function') {
+                    // showToast belum terdefinisi di scope App ini karena showToast dibuat di dalam fungsi App?
+                    // Tunggu, showToast adalah state!
+                }
+            };
+            rescueCodes();
+        }
+    }, [products, transactions]);
+
     const allVariants = useMemo(() => {
         let variants = [];
         products.forEach(p => {
