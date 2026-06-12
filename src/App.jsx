@@ -5253,14 +5253,15 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
 
         setIsLoading(true);
         try {
+            const batch = window.db.batch();
             const batchId = 'REV' + Date.now();
             const operatorName = currentUser.nama || currentUser.username || 'Admin';
 
             const inId = 'REV_IN' + Date.now();
-            batch.set(db.collection('transactions').doc(inId), { id: inId, sku: wVar.sku, fullBarcode: wrongBarcode.toUpperCase(), type: 'REVISI_IN', qty: 1, date: new Date().toISOString(), batchId, user: operatorName });
+            batch.set(window.db.collection('transactions').doc(inId), { id: inId, sku: wVar.sku, fullBarcode: wrongBarcode.toUpperCase(), type: 'REVISI_IN', qty: 1, date: new Date().toISOString(), batchId, user: operatorName });
 
             const outId = 'REV_OUT' + Date.now();
-            batch.set(db.collection('transactions').doc(outId), { id: outId, sku: rVar.sku, fullBarcode: rightBarcode.toUpperCase(), type: 'REVISI_OUT', qty: 1, date: new Date().toISOString(), batchId, user: operatorName });
+            batch.set(window.db.collection('transactions').doc(outId), { id: outId, sku: rVar.sku, fullBarcode: rightBarcode.toUpperCase(), type: 'REVISI_OUT', qty: 1, date: new Date().toISOString(), batchId, user: operatorName });
 
             await batch.commit();
             playSuccess();
