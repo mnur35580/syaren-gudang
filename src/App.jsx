@@ -65,14 +65,15 @@ const buildShortBarcode = (variant, printDate, type, sessionOrPo) => {
     return `$${variant.shortCode}${dateStr}`;
 };
 
-const parseGlobalSku = (raw) => {
+const parseGlobalSku = (raw, providedVariants = null) => {
     let text = raw.trim().toUpperCase();
     if (text.startsWith('$')) {
         // Barcode baru: $XXXX*1 (tanpa strip)
         const mainPart = text.substring(1);
         // ShortCode selalu 4 karakter PERTAMA!
         const shortCode = mainPart.substring(0, 4);
-        const v = (window.globalVariants || []).find(v => v.shortCode === shortCode);
+        const sourceVariants = providedVariants || window.globalVariants || [];
+        const v = sourceVariants.find(v => v.shortCode === shortCode);
         return v ? v.sku : shortCode;
     }
     // Legacy parsing
@@ -7367,7 +7368,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                 if (sysQty === 0 && scanQty === 0) return;
                 const diff = scanQty - sysQty;
 
-                const skuCandidate = parseGlobalSku(bc);
+                const skuCandidate = parseGlobalSku(bc, variants);
 
                 const variant = variants.find(v => v.sku === skuCandidate);
                 result.push({ fullBarcode: bc, variant, sysQty, scanQty, diff });
@@ -9853,7 +9854,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     const draftSJs = mpoOrders.filter(o => o.status === 'SHIPPED' || o.status === 'SJ_CONFIRMED');
 
-    const parseSku = parseGlobalSku;
+    const parseSku = (raw) => parseGlobalSku(raw, variants);
     const detectBarcodeType = detectGlobalBarcodeType;
 
     const beep = (ok) => {
