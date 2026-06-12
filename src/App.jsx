@@ -5231,11 +5231,14 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
 
     const getVariantByFullBarcode = (barcode) => {
         if (!barcode) return null;
-        let rawBase = barcode.toUpperCase();
-        if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
-        if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-        const skuCandidate = rawBase.length > 8 ? rawBase.slice(0, -8) : rawBase;
-        return variants.find(v => v.sku === skuCandidate);
+        const clean = barcode.trim().toUpperCase();
+        if (clean.startsWith('$')) {
+            const sc = clean.substring(1, 5);
+            return variants.find(v => v.shortCode === sc);
+        } else {
+            const sku = parseGlobalSku(clean, variants);
+            return variants.find(v => v.sku === sku);
+        }
     };
 
     const handleSwap = async (e) => {
