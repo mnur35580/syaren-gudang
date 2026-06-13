@@ -1677,7 +1677,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         shipDateStr = toLocalDateStr(order.shipDate.toDate());
                     } else {
                         try {
-                            shipDateStr = toLocalDateStr();
+                            shipDateStr = toLocalDateStr(order.shipDate);
                         } catch(e) {
                             shipDateStr = '';
                         }
@@ -2905,7 +2905,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             if (typeof order.shipDate === 'string') {
                                 shipDateStr = order.shipDate; // Sudah 'YYYY-MM-DD'
                             } else {
-                                shipDateStr = toLocalDateStr();
+                                shipDateStr = toLocalDateStr(order.shipDate);
                             }
                             if (shipDateStr <= todayCompareStr) {
                                 requiredMap[sysSku].isUrgent = true;
@@ -4463,7 +4463,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                             const editedData = editedResiItems[editKey] || {};
                                             const isEdited = !!editedResiItems[editKey];
                                             const shipDateEdit = editedResiItems[`${order.id}-shipDate`];
-                                            const shipDateDisplay = shipDateEdit || (order.shipDate ? toLocalDateStr() : '');
+                                            const shipDateDisplay = shipDateEdit || (order.shipDate ? toLocalDateStr(order.shipDate) : '');
 
                                             // Tentukan apakah resi ini ada item/tanggal yang diedit
                                             const isShipDateEdited = !!shipDateEdit;
