@@ -6180,20 +6180,20 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                     else if (t.type === 'REVISI_IN') inDetails['Revisi'] += t.qty;
                     else {
                         const cat = t.category || 'PO Nota';
-                        if (inDetails[cat] !== undefined) inDetails[cat] += t.qty;
-                        else if (cat === 'Tukar (Resize)') inDetails['Resize'] += t.qty;
+                        if (cat === 'Tukar (Resize)' || cat === 'Resize') inDetails['Resize'] += t.qty;
+                        else if (inDetails[cat] !== undefined) inDetails[cat] += t.qty;
                         else inDetails['PO Nota'] += t.qty;
                     }
                 }
                 if (t.type === 'OUT' || t.type === 'ONLINE_OUT' || t.type === 'REVISI_OUT') {
                     outTotal += t.qty;
                     if (t.type === 'ONLINE_OUT') outDetails['Penjualan (Off + Online)'] += t.qty;
-                    // Note: Usually REVISI_OUT is not explicitly requested, but we can treat it as part of outTotal
                     else {
                         const cat = t.category || 'Penjualan (Off + Online)';
                         if (cat === 'Lainnya') outDetails['Lainnya'] += t.qty;
-                        else if (cat === 'Tukar (Resize)') outDetails['Resize'] += t.qty;
+                        else if (cat === 'Tukar (Resize)' || cat === 'Resize') outDetails['Resize'] += t.qty;
                         else if (cat === 'Reject') outDetails['Reject'] += t.qty;
+                        else if (cat === 'Endorse/Affiliate' || cat === 'Endors') outDetails['Endors & Affiliate'] += t.qty;
                         else outDetails['Penjualan (Off + Online)'] += t.qty;
                     }
                 }
