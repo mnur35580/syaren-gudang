@@ -1669,8 +1669,19 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             qcSnap.docs.forEach(d => {
                 const order = d.data();
                 if (order.shipDate) {
-                    let shipDateStr = typeof order.shipDate === 'string' ? order.shipDate : new Date(order.shipDate).toISOString().split('T')[0];
-                    if (shipDateStr <= todayCompareStr) {
+                    let shipDateStr;
+                    if (typeof order.shipDate === 'string') {
+                        shipDateStr = order.shipDate;
+                    } else if (order.shipDate && typeof order.shipDate.toDate === 'function') {
+                        shipDateStr = order.shipDate.toDate().toISOString().split('T')[0];
+                    } else {
+                        try {
+                            shipDateStr = new Date(order.shipDate).toISOString().split('T')[0];
+                        } catch(e) {
+                            shipDateStr = '';
+                        }
+                    }
+                    if (shipDateStr && shipDateStr <= todayCompareStr) {
                         (order.items || []).forEach(item => {
                             if (item.status === 'PO' || item.status === 'UNRECOGNIZED') {
                                 const v = variants.find(v => v.sku === (item.sku || item.sysSku));
@@ -1838,35 +1849,30 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
         // Filter data yang akan dicetak
         let filteredTracking = pdfTrackingData;
         
-        // Logika untuk READY TERAKHIR
-        let excludeResiSet = new Set();
-        if (filterType === 'ready_latest') {
-            const prevBatch = onlineHistory.find(h => 
-                h.targetDate === batch.targetDate && 
-                h.session === batch.session && 
-                new Date(h.savedAt) < new Date(batch.savedAt)
-            );
-            if (prevBatch && prevBatch.pdfTrackingInfo) {
-                prevBatch.pdfTrackingInfo.forEach(t => excludeResiSet.add(t.resi));
-            }
-        }
-
         if (filterType !== 'all') {
             // Cek apakah data punya embedded itemStatus (data baru) atau tidak (data lama)
             const hasEmbeddedStatus = pdfTrackingData.some(t => t.itemStatus);
 
             if (hasEmbeddedStatus) {
                 // STRATEGI UTAMA: Gunakan itemStatus yang sudah tersimpan di pdfTrackingInfo
-                // Ini tidak perlu query ke qc_orders sama sekali (anti-gagal)
-                filteredTracking = pdfTrackingData.filter(track => {
-                    if (filterType === 'ready' || filterType === 'ready_latest') {
+                if (filterType === 'ready_latest') {
+                    // Cari max orderCreatedAt
+                    const maxCreatedAt = Math.max(...pdfTrackingData.filter(t => t.itemStatus === 'READY').map(t => t.orderCreatedAt || 0));
+                    // Beri toleransi 30 menit (karena order masuk secara asinkron atau batch berdekatan)
+                    const windowStart = maxCreatedAt > 0 ? maxCreatedAt - (30 * 60 * 1000) : 0;
+                    
+                    filteredTracking = pdfTrackingData.filter(track => {
                         if (track.itemStatus !== 'READY') return false;
-                        if (filterType === 'ready_latest' && excludeResiSet.has(track.resi)) return false;
+                        if ((track.orderCreatedAt || 0) < windowStart) return false;
                         return true;
-                    }
-                    if (filterType === 'po') return track.itemStatus === 'PO';
-                    return true;
-                });
+                    });
+                } else {
+                    filteredTracking = pdfTrackingData.filter(track => {
+                        if (filterType === 'ready') return track.itemStatus === 'READY';
+                        if (filterType === 'po') return track.itemStatus === 'PO';
+                        return true;
+                    });
+                }
             } else {
                 // STRATEGI FALLBACK: Untuk data lama tanpa itemStatus, query qc_orders
                 try {
@@ -1896,9 +1902,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             );
                             if (!order) return false;
                             const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
-                            if (filterType === 'ready' || filterType === 'ready_latest') {
+                            if (filterType === 'ready') {
                                 if (isPO) return false;
-                                if (filterType === 'ready_latest' && excludeResiSet.has(track.resi)) return false;
+                                return true;
+                            }
+                            if (filterType === 'ready_latest') {
+                                if (isPO) return false;
+                                // Fallback jika tidak ada orderCreatedAt, gunakan excludeResiSet dari logic sebelumnya
+                                // Karena prevBatch dihapus, kita fallback ke READY biasa saja untuk data sangat lama
                                 return true;
                             }
                             if (filterType === 'po') return isPO;
@@ -3872,15 +3883,25 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 const fName = t.uniqueFileName || (t.file ? t.file.name : '');
                 const matchedUrl = uploadedUrls.find(u => u.name === fName);
                 // Embed status READY/PO langsung ke tracking info supaya bisa filter tanpa query qc_orders
-                const order = analysisResult.qcOrdersQueue.find(o => o.id === t.resi);
+                const order = analysisResult.qcOrdersQueue.find(o => 
+                    o.id === t.resi || 
+                    o.awb === t.resi || 
+                    (o.items && o.items[0] && o.items[0].originalOrderId === t.resi)
+                );
                 const hasPO = order ? (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED') : false;
+                
+                // Jika order tidak ditemukan di antrean aktif, anggap sudah selesai/komplit
+                const itemStatus = order ? (hasPO ? 'PO' : 'READY') : 'COMPLETED';
+                const orderCreatedAt = order && order.createdAt ? new Date(order.createdAt).getTime() : 0;
+
                 return {
                     resi: t.resi,
                     platform: t.platform,
                     pageIndex: t.pageIndex,
                     fileName: fName,
                     url: matchedUrl ? matchedUrl.url : null,
-                    itemStatus: hasPO ? 'PO' : 'READY'
+                    itemStatus: itemStatus,
+                    orderCreatedAt: orderCreatedAt
                 };
             });
             setIsGeneratingPdf(false);
