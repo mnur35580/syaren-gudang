@@ -53,13 +53,13 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
     }, [onScan, videoId]);
 
     return (
-        <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative aspect-video flex items-center justify-center shadow-inner">
+        <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative aspect-square md:aspect-video flex items-center justify-center shadow-inner">
             <video id={videoId} className="w-full h-full object-cover"></video>
-            <div className="absolute inset-0 pointer-events-none border-2 border-green-500/50 m-6 rounded-lg shadow-[0_0_0_4000px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center">
-                 <div className="w-full h-0.5 bg-green-500/50 animate-pulse shadow-[0_0_10px_#22c55e]"></div>
+            <div className="absolute inset-0 pointer-events-none border-2 border-green-500/50 m-6 md:m-10 rounded-lg shadow-[0_0_0_4000px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center">
+                 <div className="w-full h-0.5 bg-green-500/50 animate-pulse shadow-[0_0_15px_#22c55e]"></div>
             </div>
-            <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded-md text-xs font-bold z-20 flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> Kamera Aktif (Zxing)
+            <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1.5 rounded-lg text-xs font-bold z-20 flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> Kamera Aktif (Zxing)
             </div>
         </div>
     );
