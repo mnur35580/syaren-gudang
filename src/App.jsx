@@ -7,6 +7,7 @@ import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 // ==========================================
 const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
     const lastScanRef = React.useRef({ text: '', time: 0 });
+    const [flashOn, setFlashOn] = React.useState(false);
     
     React.useEffect(() => {
         let codeReader = null;
@@ -52,6 +53,39 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
         };
     }, [onScan, videoId]);
 
+    const toggleFlash = async () => {
+        try {
+            const videoEl = document.getElementById(videoId);
+            if (!videoEl || !videoEl.srcObject) return;
+            const track = videoEl.srcObject.getVideoTracks()[0];
+            if (!track) return;
+            
+            const capabilities = track.getCapabilities && track.getCapabilities();
+            if (capabilities && !capabilities.torch) {
+                alert('Fitur Senter (Flash) tidak didukung di perangkat ini/browser ini.');
+                return;
+            }
+            
+            const newState = !flashOn;
+            await track.applyConstraints({
+                advanced: [{ torch: newState }]
+            });
+            setFlashOn(newState);
+        } catch (err) {
+            console.error('Error toggling flash:', err);
+            // Fallback for some browsers that don't support getCapabilities well
+            try {
+                const videoEl = document.getElementById(videoId);
+                const track = videoEl.srcObject.getVideoTracks()[0];
+                const newState = !flashOn;
+                await track.applyConstraints({ advanced: [{ torch: newState }] });
+                setFlashOn(newState);
+            } catch (err2) {
+                alert('Gagal menyalakan flash: ' + err.message);
+            }
+        }
+    };
+
     return (
         <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
             <video id={videoId} className="w-full absolute inset-0 h-full object-cover"></video>
@@ -61,6 +95,14 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
             <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1.5 rounded-lg text-xs font-bold z-20 flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> Kamera Aktif (Zxing)
             </div>
+            <button 
+                type="button" 
+                onClick={toggleFlash}
+                className={`absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${flashOn ? 'bg-yellow-400 text-black' : 'bg-black/60 text-white hover:bg-black/80'}`}
+                title="Nyalakan/Matikan Flash"
+            >
+                <i className={`fa-solid ${flashOn ? 'fa-bolt' : 'fa-bolt-lightning'} text-xl`}></i>
+            </button>
         </div>
     );
 };
