@@ -5278,34 +5278,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
     const [cameraTarget, setCameraTarget] = useState(null);
     const lastScanRef = useRef({ text: '', time: 0 });
 
-    useEffect(() => {
-        let scanner = null;
-        if (showCamera) {
-            const initScanner = () => {
-                if (!window.Html5QrcodeScanner) return;
-                scanner = new window.Html5QrcodeScanner('reader-revisi', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-                scanner.render((text) => {
-                    const now = Date.now();
-                    if (lastScanRef.current.text === text && now - lastScanRef.current.time < 2000) return;
-                    lastScanRef.current = { text, time: now };
 
-                    playCekling();
-                    if (cameraTarget === 'wrong') {
-                        setWrongBarcode(text);
-                        setShowCamera(false);
-                        if (inputRight.current) setTimeout(() => inputRight.current.focus(), 500);
-                    } else if (cameraTarget === 'right') {
-                        setRightBarcode(text);
-                        setShowCamera(false);
-                    }
-                }, (err) => { });
-            };
-            if (!window.Html5QrcodeScanner) {
-                const script = document.createElement('script'); script.src = 'https://unpkg.com/html5-qrcode'; script.onload = initScanner; document.head.appendChild(script);
-            } else initScanner();
-        }
-        return () => { if (scanner) scanner.clear().catch(e => console.log(e)); };
-    }, [showCamera, cameraTarget]);
 
     const getVariantByFullBarcode = (barcode) => {
         if (!barcode) return null;
@@ -5359,7 +5332,17 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-orange-500"></i> Scan Kamera ({cameraTarget === 'wrong' ? 'Barang Salah' : 'Barang Benar'})</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
-                        <div id="reader-revisi" className="w-full rounded-xl overflow-hidden border-2 border-slate-300"></div>
+                        <ZxingScanner videoId="video-revisi" onScan={(text) => {
+                            playCekling();
+                            if (cameraTarget === 'wrong') {
+                                setWrongBarcode(text);
+                                setShowCamera(false);
+                                if (inputRight.current) setTimeout(() => inputRight.current.focus(), 500);
+                            } else if (cameraTarget === 'right') {
+                                setRightBarcode(text);
+                                setShowCamera(false);
+                            }
+                        }} />
                     </div>
                 </div>
             )}
@@ -5414,25 +5397,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
     const [showCamera, setShowCamera] = useState(false);
     const lastScanRef = useRef({ text: '', time: 0 });
 
-    useEffect(() => {
-        let scanner = null;
-        if (showCamera && isWorking) {
-            const initScanner = () => {
-                if (!window.Html5QrcodeScanner) return;
-                scanner = new window.Html5QrcodeScanner('reader-handover', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-                scanner.render((text) => {
-                    const now = Date.now();
-                    if (lastScanRef.current.text === text && now - lastScanRef.current.time < 2000) return;
-                    lastScanRef.current = { text, time: now };
-                    processScannerResi(text); // Langsung proses tanpa tutup kamera
-                }, (err) => { });
-            };
-            if (!window.Html5QrcodeScanner) {
-                const script = document.createElement('script'); script.src = 'https://unpkg.com/html5-qrcode'; script.onload = initScanner; document.head.appendChild(script);
-            } else initScanner();
-        }
-        return () => { if (scanner) scanner.clear().catch(e => console.log(e)); };
-    }, [showCamera, isWorking]);
+
 
     const handleIdSubmit = async (e) => {
         e.preventDefault();
@@ -5589,7 +5554,9 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                                     <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-emerald-600"></i> Scan Resi (Continuous)</h3>
                                     <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                                 </div>
-                                <div id="reader-handover" className="w-full rounded-xl overflow-hidden border-2 border-slate-300"></div>
+                                <ZxingScanner videoId="video-handover" onScan={(text) => {
+                                    processScannerResi(text); // Langsung proses tanpa tutup kamera
+                                }} />
                             </div>
                         </div>
                     )}
@@ -7125,29 +7092,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         }
     };
 
-    useEffect(() => {
-        let scanner = null;
-        if (showCamera) {
-            const initScanner = () => {
-                if (!window.Html5QrcodeScanner) return;
-                scanner = new window.Html5QrcodeScanner('reader', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-                scanner.render((text) => {
-                    const now = Date.now();
-                    if (lastScanRef.current.text === text && now - lastScanRef.current.time < 2000) return;
-                    lastScanRef.current = { text, time: now };
 
-                    processBarcode(text);
-                }, (err) => { });
-            };
-            if (!window.Html5QrcodeScanner) {
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/html5-qrcode';
-                script.onload = initScanner;
-                document.head.appendChild(script);
-            } else initScanner();
-        }
-        return () => { if (scanner) scanner.clear().catch(e => console.log(e)); };
-    }, [showCamera]);
 
     const handleSimpanDraft = () => {
         const dataTerbaru = scannedItemsRef.current;
@@ -7240,7 +7185,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-orange-500"></i> Scan Kamera</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
-                        <div id="reader" className="w-full rounded-xl overflow-hidden border-2 border-slate-300"></div>
+                        <ZxingScanner videoId="video-main" onScan={(text) => processBarcode(text)} />
                     </div>
                 </div>
             )}
@@ -7395,28 +7340,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
         } else { playError(); showToast('error', "Barang tidak ditemukan di master data!"); }
     };
 
-    useEffect(() => {
-        let scanner = null;
-        if (showCamera && step === 1) {
-            const initScanner = () => {
-                if (!window.Html5QrcodeScanner) return;
-                scanner = new window.Html5QrcodeScanner('reader-opname', { fps: 10, qrbox: { width: 250, height: 250 } }, false);
-                scanner.render((text) => {
-                    const now = Date.now();
-                    // Mencegah scan barcode yang SAMA PERSIS dalam rentang 2 detik
-                    if (lastScanRef.current.text === text && now - lastScanRef.current.time < 2000) return;
-                    lastScanRef.current = { text, time: now };
 
-                    // Proses scan tanpa mematikan kamera
-                    processBarcode(text);
-                }, (err) => { });
-            };
-            if (!window.Html5QrcodeScanner) {
-                const script = document.createElement('script'); script.src = 'https://unpkg.com/html5-qrcode'; script.onload = initScanner; document.head.appendChild(script);
-            } else initScanner();
-        }
-        return () => { if (scanner) scanner.clear().catch(e => console.log(e)); };
-    }, [showCamera, step]);
 
     const handleSimpanDraft = () => {
         const dataTerbaru = scannedItemsRef.current;
@@ -7535,7 +7459,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                                 <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-purple-600"></i> Kamera Opname</h3>
                                 <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                             </div>
-                            <div id="reader-opname" className="w-full rounded-xl overflow-hidden border-2 border-slate-300"></div>
+                            <ZxingScanner videoId="video-opname" onScan={(text) => processBarcode(text)} />
                         </div>
                     </div>
                 )}
@@ -9987,40 +9911,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         setShowScanner(true);
     };
 
-    useEffect(() => {
-        let scanner = null;
-        if (showScanner) {
-            const initScanner = () => {
-                if (!window.Html5QrcodeScanner) return;
-                scanner = new window.Html5QrcodeScanner('reader-surat-jalan', {
-                    fps: 10,
-                    qrbox: { width: 250, height: 250 },
-                    aspectRatio: 1.0
-                }, false);
 
-                scanner.render((text) => {
-                    const now = Date.now();
-                    if (lastScanRef.current.text === text && now - lastScanRef.current.time < 2000) return;
-                    lastScanRef.current = { text, time: now };
-
-                    if (scannerType === 'senderId') handleScanSenderId(null, text);
-                    else if (scannerType === 'receiverId') handleScanReceiverId(null, text);
-                    else if (scannerType === 'itemsPengirim') processScanPengirim(text);
-                    else if (scannerType === 'itemsPenerima') processScanPenerima(text);
-                }, (err) => { });
-            };
-
-            if (!window.Html5QrcodeScanner) {
-                const script = document.createElement('script');
-                script.src = 'https://unpkg.com/html5-qrcode';
-                script.onload = initScanner;
-                document.head.appendChild(script);
-            } else {
-                setTimeout(initScanner, 100);
-            }
-        }
-        return () => { if (scanner) scanner.clear().catch(e => console.log(e)); };
-    }, [showScanner, scannerType]);
 
 
     // LOGIKA PENGIRIM (DILENGKAPI PROTEKSI F01 / F07)
@@ -10576,7 +10467,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 <i className="fa-solid fa-xmark text-xl"></i>
                             </button>
                         </div>
-                        <div id="reader-surat-jalan" className="w-full rounded-xl overflow-hidden border-2 border-slate-300"></div>
+                        <ZxingScanner videoId="video-surat-jalan" onScan={(text) => {
+                            if (scannerType === 'senderId') handleScanSenderId(null, text);
+                            else if (scannerType === 'receiverId') handleScanReceiverId(null, text);
+                            else if (scannerType === 'itemsPengirim') processScanPengirim(text);
+                            else if (scannerType === 'itemsPenerima') processScanPenerima(text);
+                        }} />
                     </div>
                 </div>
             )}
