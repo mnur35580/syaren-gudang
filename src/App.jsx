@@ -53,8 +53,8 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
     }, [onScan, videoId]);
 
     return (
-        <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative aspect-square md:aspect-video flex items-center justify-center shadow-inner">
-            <video id={videoId} className="w-full h-full object-cover"></video>
+        <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
+            <video id={videoId} className="w-full absolute inset-0 h-full object-cover"></video>
             <div className="absolute inset-0 pointer-events-none border-2 border-green-500/50 m-6 md:m-10 rounded-lg shadow-[0_0_0_4000px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center">
                  <div className="w-full h-0.5 bg-green-500/50 animate-pulse shadow-[0_0_15px_#22c55e]"></div>
             </div>
