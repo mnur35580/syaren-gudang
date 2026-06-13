@@ -6224,28 +6224,31 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
             }
 
             // 2. Hitung Scan Out, Reject, dan Affiliate/Endorse
-            const releasedTimestamp = o.poReleasedTimestamp || 0;
             const completedTimestamp = o.completedTimestamp || 0;
             
+            // Hitung Reject dari defect HANYA JIKA sudah masuk tahap gudang (sudah Siapkan QC atau lebih)
             if (o.status === 'COMPLETED' || o.status === 'PACKED' || o.status === 'READY') {
                 const actionTime = new Date(completedTimestamp || importTimestamp);
                 if (actionTime >= start && actionTime <= end) {
-                    const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
                     const totalDefect = (o.items || []).reduce((sum, item) => sum + (item.defect || 0), 0);
                     outDetails['Reject'] += totalDefect;
+                }
+            }
 
-                    if (o.platform && o.platform.toLowerCase().includes('affiliate')) {
+            // Hitung Resize dan Affiliate berdasar importTimestamp
+            if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
+                const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
+                if (o.platform && o.platform.toLowerCase().includes('affiliate')) {
+                    affiliateResi += 1;
+                    affiliatePcs += totalPcs;
+                    outDetails['Endors & Affiliate'] += totalPcs;
+                } else if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform)) {
+                    if (o.platform === 'MANUAL' && (o.sumber === 'Endorse/Affiliate' || o.sumber === 'Endors & Affiliate')) {
                         affiliateResi += 1;
                         affiliatePcs += totalPcs;
                         outDetails['Endors & Affiliate'] += totalPcs;
-                    } else if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform)) {
-                        if (o.platform === 'MANUAL' && (o.sumber === 'Endorse/Affiliate' || o.sumber === 'Endors & Affiliate')) {
-                            affiliateResi += 1;
-                            affiliatePcs += totalPcs;
-                            outDetails['Endors & Affiliate'] += totalPcs;
-                        } else if (o.platform === 'MANUAL' && (o.sumber === 'Resize' || o.sumber === 'Tukar (Resize)')) {
-                            outDetails['Resize'] += totalPcs;
-                        }
+                    } else if (o.platform === 'MANUAL' && (o.sumber === 'Resize' || o.sumber === 'Tukar (Resize)')) {
+                        outDetails['Resize'] += totalPcs;
                     }
                 }
             }
