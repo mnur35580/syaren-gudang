@@ -6187,10 +6187,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                 }
                 if (t.type === 'OUT' || t.type === 'ONLINE_OUT' || t.type === 'REVISI_OUT') {
                     outTotal += t.qty;
-                    // CAMPUR SEMUA SCAN KELUAR! (Hitung pengecualian kecil saja)
-                    const cat = t.category || '';
+                    
+                    const cat = t.category || 'Penjualan (Off + Online)';
                     if (cat === 'Lainnya') outDetails['Lainnya'] += t.qty;
                     else if (cat === 'Reject') outDetails['Reject'] += t.qty;
+                    else if (cat === 'Tukar (Resize)' || cat === 'Resize') outDetails['Resize'] += t.qty;
+                    else if (cat === 'Endorse/Affiliate' || cat === 'Endors') outDetails['Endors & Affiliate'] += t.qty;
                 }
             }
         });
