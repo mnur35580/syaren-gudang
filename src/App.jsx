@@ -6187,15 +6187,10 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                 }
                 if (t.type === 'OUT' || t.type === 'ONLINE_OUT' || t.type === 'REVISI_OUT') {
                     outTotal += t.qty;
-                    if (t.type === 'ONLINE_OUT') outDetails['Penjualan (Off + Online)'] += t.qty;
-                    else {
-                        const cat = t.category || 'Penjualan (Off + Online)';
-                        if (cat === 'Lainnya') outDetails['Lainnya'] += t.qty;
-                        else if (cat === 'Tukar (Resize)' || cat === 'Resize') outDetails['Resize'] += t.qty;
-                        else if (cat === 'Reject') outDetails['Reject'] += t.qty;
-                        else if (cat === 'Endorse/Affiliate' || cat === 'Endors') outDetails['Endors & Affiliate'] += t.qty;
-                        else outDetails['Penjualan (Off + Online)'] += t.qty;
-                    }
+                    // CAMPUR SEMUA SCAN KELUAR! (Hitung pengecualian kecil saja)
+                    const cat = t.category || '';
+                    if (cat === 'Lainnya') outDetails['Lainnya'] += t.qty;
+                    else if (cat === 'Reject') outDetails['Reject'] += t.qty;
                 }
             }
         });
@@ -6206,18 +6201,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
 
         Object.values(qcOrders || {}).forEach(o => {
             // 1. Hitung Total Pesanan Closed Order (Berdasarkan waktu IMPORT / batchTimestamp)
-            // Hindari fallback ke Date() agar pesanan lama tanpa tanggal tidak terhitung di hari ini
             const importTimestamp = o.batchTimestamp || o.createdAt || o.timestamp || o.date || 0;
             const importDate = new Date(importTimestamp);
             if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
                 const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
-                if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform) || (o.platform === 'MANUAL' && o.sumber !== 'Resize' && o.sumber !== 'Tukar (Resize)') || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
+                if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform) || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
+                    // CAMPUR SEMUA TOTAL PESANAN (Akan dikurangi di bawah)
                     totalPesananClosedOrder += totalPcs;
                 }
             }
 
             // Hitung "Pesanan Online" (HANYA barang yang PO / stok kosong / dikirim ke Produksi)
-            // Menggunakan poReleasedTimestamp (saat klik Kirim ke Produksi) atau fallback ke batchTimestamp
             const poTimestamp = o.poReleasedTimestamp || importTimestamp;
             const poDateVal = new Date(poTimestamp);
             if (poTimestamp !== 0 && poDateVal >= start && poDateVal <= end) {
@@ -6229,13 +6223,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                 }
             }
 
-            // 2. Hitung Detail Scan Out (Hanya untuk yang sudah PACKED/SHIPPED)
-            if (o.status === 'PACKED' || o.status === 'SHIPPED') {
-                const actionTimestamp = o.packedAt || o.shippedAt || 0;
-                const actionDate = new Date(actionTimestamp);
-                if (actionTimestamp !== 0 && actionDate >= start && actionDate <= end) {
+            // 2. Hitung Scan Out, Reject, dan Affiliate/Endorse
+            const releasedTimestamp = o.poReleasedTimestamp || 0;
+            const completedTimestamp = o.completedTimestamp || 0;
+            
+            if (o.status === 'COMPLETED' || o.status === 'PACKED' || o.status === 'READY') {
+                const actionTime = new Date(completedTimestamp || importTimestamp);
+                if (actionTime >= start && actionTime <= end) {
                     const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
-                    // Hitung Reject dari defect
                     const totalDefect = (o.items || []).reduce((sum, item) => sum + (item.defect || 0), 0);
                     outDetails['Reject'] += totalDefect;
 
@@ -6251,17 +6246,18 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                         } else if (o.platform === 'MANUAL' && (o.sumber === 'Resize' || o.sumber === 'Tukar (Resize)')) {
                             outDetails['Resize'] += totalPcs;
                         }
-                        // onlineResi dan onlinePcs TIDAK dihitung di sini, karena 'Pesanan Online' 
-                        // dimaksudkan untuk barang PO, bukan barang ready yang di-scan out.
                     }
                 }
             }
         });
 
-        // PENGURANGAN MATEMATIS
-        // Sesuai rule: Reject TETAP masuk ke laporan penjualan offline dan online karena barang penggantinya di-scan ulang.
-        // Affiliate/Endorse dan Resize DIPISAH (dikurangi) dari Penjualan agar murni berada di barisnya sendiri.
-        const purePenjualan = outDetails['Penjualan (Off + Online)'] - outDetails['Endors & Affiliate'] - outDetails['Resize'];
+        // PENGURANGAN MATEMATIS SESUAI INSTRUKSI SUPER SIMPLE
+        // 1. Closed Order = Semua Pesanan Masuk - Resize - Affiliate
+        const pureClosedOrder = totalPesananClosedOrder - outDetails['Resize'] - outDetails['Endors & Affiliate'];
+        totalPesananClosedOrder = pureClosedOrder < 0 ? 0 : pureClosedOrder;
+
+        // 2. Scan Keluar = Semua Scan Keluar - Resize - Affiliate - Lainnya - Reject
+        const purePenjualan = outTotal - outDetails['Endors & Affiliate'] - outDetails['Resize'] - outDetails['Reject'] - outDetails['Lainnya'];
         outDetails['Penjualan (Off + Online)'] = purePenjualan < 0 ? 0 : purePenjualan;
 
         const formatDateHeader = (d) => d.toLocaleString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
