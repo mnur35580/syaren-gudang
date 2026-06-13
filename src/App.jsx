@@ -3817,9 +3817,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 batch.set(docRef, {
                     ...order,
                     status: 'PENDING',
-                    poDate: poDraftDate,
-                    session: poSession,
-                    batchTimestamp: batchTimestamp,
+                    poDate: order.poDate || poDraftDate,
+                    session: order.session || poSession,
+                    batchTimestamp: order.batchTimestamp || batchTimestamp,
                     isReleasedToProduction: false,
                     isCanceled: false
                 }, { merge: true });
