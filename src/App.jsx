@@ -6211,7 +6211,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
             const importDate = new Date(importTimestamp);
             if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
                 const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
-                if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform) || (o.platform === 'MANUAL' && o.sumber !== 'Resize') || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
+                if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform) || (o.platform === 'MANUAL' && o.sumber !== 'Resize' && o.sumber !== 'Tukar (Resize)') || (o.platform && o.platform.toLowerCase().includes('affiliate'))) {
                     totalPesananClosedOrder += totalPcs;
                 }
             }
@@ -6244,11 +6244,11 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                         affiliatePcs += totalPcs;
                         outDetails['Endors & Affiliate'] += totalPcs;
                     } else if (['SHOPEE', 'TIKTOK', 'LAZADA', 'MANUAL'].includes(o.platform)) {
-                        if (o.platform === 'MANUAL' && o.sumber === 'Endorse/Affiliate') {
+                        if (o.platform === 'MANUAL' && (o.sumber === 'Endorse/Affiliate' || o.sumber === 'Endors & Affiliate')) {
                             affiliateResi += 1;
                             affiliatePcs += totalPcs;
                             outDetails['Endors & Affiliate'] += totalPcs;
-                        } else if (o.platform === 'MANUAL' && o.sumber === 'Resize') {
+                        } else if (o.platform === 'MANUAL' && (o.sumber === 'Resize' || o.sumber === 'Tukar (Resize)')) {
                             outDetails['Resize'] += totalPcs;
                         }
                         // onlineResi dan onlinePcs TIDAK dihitung di sini, karena 'Pesanan Online' 
