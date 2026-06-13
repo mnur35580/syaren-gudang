@@ -6203,7 +6203,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
 
         Object.values(qcOrders || {}).forEach(o => {
             // 1. Hitung Total Pesanan Closed Order (Berdasarkan waktu IMPORT / batchTimestamp)
-            const importTimestamp = o.batchTimestamp || o.createdAt || o.timestamp || o.date || 0;
+            const importTimestamp = o.batchTimestamp || o.dateAdded || o.createdAt || o.timestamp || o.date || 0;
             const importDate = new Date(importTimestamp);
             if (importTimestamp !== 0 && importDate >= start && importDate <= end) {
                 const totalPcs = (o.items || []).reduce((sum, item) => sum + item.qty, 0);
