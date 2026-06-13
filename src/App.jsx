@@ -6222,7 +6222,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
             const poDateVal = new Date(poTimestamp);
             if (poTimestamp !== 0 && poDateVal >= start && poDateVal <= end) {
                 if (['SHOPEE', 'TIKTOK', 'LAZADA'].includes(o.platform)) {
-                    const poItems = (o.items || []).filter(item => item.status === 'PO' || item.status === 'UNRECOGNIZED');
+                    const poItems = (o.items || []).filter(item => item.status === 'PO' || item.status === 'UNRECOGNIZED' || item.fulfilledFromPO);
                     const poQty = poItems.reduce((sum, item) => sum + item.qty, 0);
                     onlinePcs += poQty;
                     if (poQty > 0) onlineResi += 1;
@@ -10298,7 +10298,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 // Gunakan prodStatus agar tidak terganggu proses QC ke depannya
                                 remainingToFulfill -= it.qty; // Biasanya 1, tapi bisa lebih
                                 orderUpdated = true;
-                                return { ...it, status: 'READY', prodStatus: 'READY' };
+                                return { ...it, status: 'READY', prodStatus: 'READY', fulfilledFromPO: true };
                             }
                             return it;
                         });
