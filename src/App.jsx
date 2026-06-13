@@ -7283,9 +7283,6 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                         <>
                             <option value="Penjualan (Off + Online)">Penjualan (Off + Online)</option>
                             <option value="Lainnya">Lainnya</option>
-                            <option value="Resize">Tukar (Resize)</option>
-                            <option value="Endorse/Affiliate">Endorse / Affiliate</option>
-                            <option value="Reject">Reject</option>
                         </>
                     )}
                 </select>
