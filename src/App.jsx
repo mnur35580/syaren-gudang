@@ -1,3 +1,4 @@
+const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 
@@ -655,7 +656,7 @@ const handleCetakResiManual = (order, variants) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return alert("Gagal membuka tab baru. Izinkan Pop-up Blocker!");
 
-    const dateStr = new Date().toISOString().split('T')[0];
+    const dateStr = toLocalDateStr();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
     let itemsHtml = '';
@@ -1307,7 +1308,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
     // State untuk fitur antrian PO
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = toLocalDateStr();
     const [poDrafts, setPoDrafts] = useState([]);
     const [readyDrafts, setReadyDrafts] = useState([]);
     const [poDraftDate, setPoDraftDate] = useState(todayStr);
@@ -1624,7 +1625,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             try {
                 const sessionsToRelease = new Set();
                 poDrafts.forEach(d => {
-                    const dDate = d.targetDate || (d.savedAt ? d.savedAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+                    const dDate = d.targetDate || (d.savedAt ? d.savedAt.split('T')[0] : toLocalDateStr());
                     sessionsToRelease.add(`${dDate}_|_${d.session || 1}`);
                 });
 
@@ -1632,7 +1633,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 qcSnap.forEach(docSnap => {
                     const o = docSnap.data();
                     const isPending = o.status === 'PENDING' || o.status === 'TRANSIT';
-                    const oDate = o.poDate || (o.createdAt ? o.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]);
+                    const oDate = o.poDate || (o.createdAt ? o.createdAt.split('T')[0] : toLocalDateStr());
                     const oSession = o.session || 1;
                     const oKey = `${oDate}_|_${oSession}`;
 
@@ -1659,7 +1660,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
         setIsLoading(true);
         try {
             // Hitung ulang isUrgent secara dinamis berdasarkan tanggal hari ini
-            const todayCompareStr = new Date().toISOString().split('T')[0];
+            const todayCompareStr = toLocalDateStr();
             const qcSnap = await window.db.collection('qc_orders')
                 .where('poDate', '==', batch.targetDate)
                 .where('session', '==', batch.session)
@@ -1673,10 +1674,10 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     if (typeof order.shipDate === 'string') {
                         shipDateStr = order.shipDate;
                     } else if (order.shipDate && typeof order.shipDate.toDate === 'function') {
-                        shipDateStr = order.shipDate.toDate().toISOString().split('T')[0];
+                        shipDateStr = toLocalDateStr(order.shipDate.toDate());
                     } else {
                         try {
-                            shipDateStr = new Date(order.shipDate).toISOString().split('T')[0];
+                            shipDateStr = toLocalDateStr();
                         } catch(e) {
                             shipDateStr = '';
                         }
@@ -1963,7 +1964,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             const a = document.createElement('a');
             a.href = url;
-            const dateStr = new Date().toISOString().split('T')[0];
+            const dateStr = toLocalDateStr();
             a.download = `Resi_Berurutan_${filterType.toUpperCase()}_${dateStr}.pdf`;
             document.body.appendChild(a);
             a.click();
@@ -2465,7 +2466,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         const { jsPDF } = window.jspdf;
                         const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [100, 150] });
 
-                        const dateStr = new Date(order.createdAt || Date.now()).toISOString().split('T')[0];
+                        const dateStr = toLocalDateStr(order.createdAt || Date.now());
                         const timeStr = new Date(order.createdAt || Date.now()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
                         doc.setFontSize(16); doc.setFont('helvetica', 'bold');
@@ -2876,7 +2877,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             const normalizeSku = (str) => str ? str.replace(/[\s\-_]+/g, '').toUpperCase() : '';
 
             // FIX: Gunakan string 'YYYY-MM-DD' untuk perbandingan agar shipDate yang diedit (string) terdeteksi benar
-            const todayCompareStr = new Date().toISOString().split('T')[0];
+            const todayCompareStr = toLocalDateStr();
 
             const sortedUpdatedOrders = Object.values(updatedExtractedOrders).sort((a, b) => {
                 const dateA = a.shipDate ? new Date(a.shipDate).getTime() : Infinity;
@@ -2904,7 +2905,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             if (typeof order.shipDate === 'string') {
                                 shipDateStr = order.shipDate; // Sudah 'YYYY-MM-DD'
                             } else {
-                                shipDateStr = new Date(order.shipDate).toISOString().split('T')[0];
+                                shipDateStr = toLocalDateStr();
                             }
                             if (shipDateStr <= todayCompareStr) {
                                 requiredMap[sysSku].isUrgent = true;
@@ -3265,7 +3266,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             const a = document.createElement('a');
             a.href = url;
-            const dateStr = new Date().toISOString().split('T')[0];
+            const dateStr = toLocalDateStr();
             a.download = `Resi_Berurutan_${dateStr}.pdf`;
             document.body.appendChild(a);
             a.click();
@@ -4040,7 +4041,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
 
-            const dateStr = new Date().toISOString().split('T')[0];
+            const dateStr = toLocalDateStr();
             const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
             doc.setFontSize(16);
@@ -4208,7 +4209,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             await loadJsPdf();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
-            const dateStr = new Date().toISOString().split('T')[0];
+            const dateStr = toLocalDateStr();
 
             doc.setFontSize(22);
             doc.setTextColor(220, 38, 38); // Warna Merah
@@ -4462,7 +4463,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                             const editedData = editedResiItems[editKey] || {};
                                             const isEdited = !!editedResiItems[editKey];
                                             const shipDateEdit = editedResiItems[`${order.id}-shipDate`];
-                                            const shipDateDisplay = shipDateEdit || (order.shipDate ? new Date(order.shipDate).toISOString().split('T')[0] : '');
+                                            const shipDateDisplay = shipDateEdit || (order.shipDate ? toLocalDateStr() : '');
 
                                             // Tentukan apakah resi ini ada item/tanggal yang diedit
                                             const isShipDateEdited = !!shipDateEdit;
@@ -5997,12 +5998,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
     const getLaporanDefaultStart = () => {
         const now = new Date();
         if (now.getHours() < 9) now.setDate(now.getDate() - 1);
-        return now.toISOString().split('T')[0] + 'T09:00';
+        return toLocalDateStr(now) + 'T09:00';
     };
     const getLaporanDefaultEnd = () => {
         const now = new Date();
         if (now.getHours() >= 9) now.setDate(now.getDate() + 1);
-        return now.toISOString().split('T')[0] + 'T08:30';
+        return toLocalDateStr(now) + 'T08:30';
     };
 
     const [laporanModal, setLaporanModal] = useState(false);
@@ -6036,11 +6037,11 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
         const now = new Date();
         return kasData.filter(d => {
             const tDate = new Date(d.tanggal);
-            if (range === 'hari') return d.tanggal === now.toISOString().split('T')[0];
+            if (range === 'hari') return d.tanggal === toLocalDateStr(now);
             if (range === 'kemarin') {
                 const yesterday = new Date(now);
                 yesterday.setDate(now.getDate() - 1);
-                return d.tanggal === yesterday.toISOString().split('T')[0];
+                return d.tanggal === toLocalDateStr(yesterday);
             }
             if (range === 'minggu') return (now - tDate) / 864e5 <= 7;
             if (range === 'bulan') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
@@ -6447,7 +6448,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                                                 <td className="p-4 font-black text-slate-800">{po.id}</td>
                                                 <td className="p-4 font-bold text-slate-600">
                                                     {(() => {
-                                                        const curDate = new Date().toISOString().split('T')[0];
+                                                        const curDate = toLocalDateStr();
                                                         const dt = po.targetDate || curDate;
                                                         if (dt === curDate) return <span className="text-rose-600 font-black animate-pulse">HARI INI</span>;
                                                         if (dt < curDate) return <span className="text-red-500 font-black">TERLAMBAT ({dt})</span>;
@@ -7633,7 +7634,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 // 4. Cetak Label Massal & Pratinjau (Kode Sama Percis)
 function CetakLabel({ products, variants, showToast }) {
     const [printList, setPrintList] = useState([]);
-    const [printDate, setPrintDate] = useState(new Date().toISOString().split('T')[0]);
+    const [printDate, setPrintDate] = useState(toLocalDateStr());
     const [searchQuery, setSearchQuery] = useState('');
     const [qtys, setQtys] = useState({});
 
@@ -8374,7 +8375,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     const [showForm, setShowForm] = useState(false);
     const [targetDate, setTargetDate] = useState('');
-    const [poDate, setPoDate] = useState(new Date().toISOString().split('T')[0]);
+    const [poDate, setPoDate] = useState(toLocalDateStr());
     const [mpoDraftList, setMpoDraftList] = useState(() => {
         try {
             const saved = localStorage.getItem('smart_mpo_draft');
@@ -8684,7 +8685,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         const BATCH_SIZE = 80;
         const allLabelHtmls = [];
 
-        const targetDateStr = po.targetDate || new Date().toISOString().split('T')[0];
+        const targetDateStr = po.targetDate || toLocalDateStr();
         const suffixDate = targetDateStr.replace(/-/g, '');
         const prodCode = getProductionCode(targetDateStr);
 
@@ -9380,7 +9381,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             const targets = (qcOrders || []).filter(o => {
                 const isPending = (o.status === 'PENDING' || o.status === 'TRANSIT') && o.isReleasedToProduction !== false;
                 const hasSku = (o.items || []).some(item => (item.sysSku || item.sku || '').trim().toUpperCase() === sku);
-                const matchPoDate = (o.poDate || new Date().toISOString().split('T')[0]) === poDate;
+                const matchPoDate = (o.poDate || toLocalDateStr()) === poDate;
                 const matchSession = (o.session || 1) === session;
                 return isPending && hasSku && matchPoDate && matchSession && !o.isCanceled;
             });
@@ -9465,7 +9466,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             const batch = window.db.batch();
             const targets = (qcOrders || []).filter(o => {
                 const isPending = (o.status === 'PENDING' || o.status === 'TRANSIT') && o.isReleasedToProduction !== false;
-                const matchPoDate = (o.poDate || new Date().toISOString().split('T')[0]) === poDate;
+                const matchPoDate = (o.poDate || toLocalDateStr()) === poDate;
                 const matchSession = (o.session || 1) === session;
                 return isPending && matchPoDate && matchSession && !o.isCanceled;
             });
@@ -9916,7 +9917,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     // ---- PENGIRIM STATE (Lery & Samin) ----
     const [activeSender, setActiveSender] = useState(null);
     const [senderIdInput, setSenderIdInput] = useState('');
-    const [tglKirim, setTglKirim] = useState(new Date().toISOString().split('T')[0]);
+    const [tglKirim, setTglKirim] = useState(toLocalDateStr());
     const [scanInputPengirim, setScanInputPengirim] = useState('');
     const [scanCategoryPengirim, setScanCategoryPengirim] = useState('Penjualan (Off + Online)'); // Default kategori OUT
     const [scannedItemsPengirim, setScannedItemsPengirim] = useState({});
@@ -10271,7 +10272,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 const txRef = db.collection('transactions').doc();
 
                 if (isOnline) {
-                    const finalBarcode = `${cleanSku}${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
+                    const finalBarcode = `${cleanSku}${toLocalDateStr().replace(/-/g, '')}`;
                     batch.set(txRef, {
                         sku: cleanSku, qty: qty, type: 'ONLINE_IN',
                         fullBarcode: finalBarcode, date: new Date().toISOString(),
@@ -10507,7 +10508,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     if (isOnline) continue;
 
                     const txRef = db.collection('transactions').doc();
-                    const finalBarcode = `${cleanSku}${new Date().toISOString().split('T')[0].replace(/-/g, '')}`;
+                    const finalBarcode = `${cleanSku}${toLocalDateStr().replace(/-/g, '')}`;
 
                     batch.set(txRef, {
                         sku: cleanSku, qty: qty, type: 'IN',
@@ -10860,7 +10861,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 // FITUR: KAS OPERASIONAL (VERSI KAMERA IN-APP + ANTI LOADING)
 // ==========================================
 function KasOperasional({ showToast }) {
-    const [tanggal, setTanggal] = React.useState(new Date().toISOString().split('T'));
+    const [tanggal, setTanggal] = React.useState(toLocalDateStr(new Date()));
     const [dataKas, setDataKas] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [form, setForm] = React.useState({ jenis: 'keluar', nominal: '', keterangan: '' });
