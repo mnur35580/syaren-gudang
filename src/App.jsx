@@ -1658,6 +1658,31 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     const handleRePrintSPO = async (batch) => {
         setIsLoading(true);
         try {
+            // Hitung ulang isUrgent secara dinamis berdasarkan tanggal hari ini
+            const todayCompareStr = new Date().toISOString().split('T')[0];
+            const qcSnap = await window.db.collection('qc_orders')
+                .where('poDate', '==', batch.targetDate)
+                .where('session', '==', batch.session)
+                .get();
+            
+            const urgentKeys = new Set();
+            qcSnap.docs.forEach(d => {
+                const order = d.data();
+                if (order.shipDate) {
+                    let shipDateStr = typeof order.shipDate === 'string' ? order.shipDate : new Date(order.shipDate).toISOString().split('T')[0];
+                    if (shipDateStr <= todayCompareStr) {
+                        (order.items || []).forEach(item => {
+                            if (item.status === 'PO' || item.status === 'UNRECOGNIZED') {
+                                const v = variants.find(v => v.sku === (item.sku || item.sysSku));
+                                if (v) {
+                                    urgentKeys.add(`${v.article}-${v.colorName}-${v.sizeName}`);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
             await loadJsPdf();
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF('p', 'mm', 'a4');
@@ -1670,6 +1695,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             const groupedItemsMap = {};
             batch.items.forEach(item => {
                 const key = `${item.article}-${item.colorName}-${item.sizeName}`;
+                
+                // Override isUrgent jika hari ini sudah masuk deadline
+                if (urgentKeys.has(key)) {
+                    item.isUrgent = true;
+                }
+
                 if (!groupedItemsMap[key]) {
                     groupedItemsMap[key] = { ...item };
                 } else {
@@ -1806,6 +1837,20 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
         // Filter data yang akan dicetak
         let filteredTracking = pdfTrackingData;
+        
+        // Logika untuk READY TERAKHIR
+        let excludeResiSet = new Set();
+        if (filterType === 'ready_latest') {
+            const prevBatch = onlineHistory.find(h => 
+                h.targetDate === batch.targetDate && 
+                h.session === batch.session && 
+                new Date(h.savedAt) < new Date(batch.savedAt)
+            );
+            if (prevBatch && prevBatch.pdfTrackingInfo) {
+                prevBatch.pdfTrackingInfo.forEach(t => excludeResiSet.add(t.resi));
+            }
+        }
+
         if (filterType !== 'all') {
             // Cek apakah data punya embedded itemStatus (data baru) atau tidak (data lama)
             const hasEmbeddedStatus = pdfTrackingData.some(t => t.itemStatus);
@@ -1814,7 +1859,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 // STRATEGI UTAMA: Gunakan itemStatus yang sudah tersimpan di pdfTrackingInfo
                 // Ini tidak perlu query ke qc_orders sama sekali (anti-gagal)
                 filteredTracking = pdfTrackingData.filter(track => {
-                    if (filterType === 'ready') return track.itemStatus === 'READY';
+                    if (filterType === 'ready' || filterType === 'ready_latest') {
+                        if (track.itemStatus !== 'READY') return false;
+                        if (filterType === 'ready_latest' && excludeResiSet.has(track.resi)) return false;
+                        return true;
+                    }
                     if (filterType === 'po') return track.itemStatus === 'PO';
                     return true;
                 });
@@ -1847,7 +1896,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             );
                             if (!order) return false;
                             const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
-                            if (filterType === 'ready') return !isPO;
+                            if (filterType === 'ready' || filterType === 'ready_latest') {
+                                if (isPO) return false;
+                                if (filterType === 'ready_latest' && excludeResiSet.has(track.resi)) return false;
+                                return true;
+                            }
                             if (filterType === 'po') return isPO;
                             return true;
                         });
@@ -4772,6 +4825,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                     </button>
                                                     <button type="button" title="Cetak Resi Barang Ready Saja" onClick={() => handleRePrintResi(batch, 'ready')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-box-open mr-1"></i> READY
+                                                    </button>
+                                                    <button type="button" title="Cetak Resi Ready Terakhir (Sesi Ini)" onClick={() => handleRePrintResi(batch, 'ready_latest')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter">
+                                                        <i className="fa-solid fa-bolt mr-1"></i> LATEST
                                                     </button>
                                                     <button type="button" title="Cetak Resi Pesanan Online Saja" onClick={() => handleRePrintResi(batch, 'po')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-clock mr-1"></i> PO
