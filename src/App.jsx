@@ -7119,6 +7119,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
     const [kategoriScan, setKategoriScan] = useState(isMasuk ? 'PO Nota' : 'Penjualan (Off + Online)');
     const [unmappedBarcode, setUnmappedBarcode] = useState(null);
     const [unmappedSku, setUnmappedSku] = useState('');
+    const tempShortCodesRef = useRef({}); // Cache pemetaan manual agar instan
 
     const [scannedItems, setScannedItems] = useState(() => {
         try {
@@ -7164,6 +7165,14 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         if (isShortcode) {
             const shortCode = cleanBarcode.substring(1, 5);
             matched = variantsRef.current.find(v => v.shortCode && v.shortCode.toUpperCase() === shortCode.toUpperCase());
+            
+            // 1. Cek cache mapping sementara (jika barusan dimapping tapi db belum sync)
+            if (!matched) {
+                const tempSku = tempShortCodesRef.current[shortCode.toUpperCase()];
+                if (tempSku) matched = variantsRef.current.find(v => v.sku === tempSku);
+            }
+            
+            // 2. Cek transaksi history
             if (!matched && transactions) {
                 const pastTx = transactions.find(t => t.fullBarcode === cleanBarcode);
                 if (pastTx && pastTx.sku) matched = variantsRef.current.find(v => v.sku === pastTx.sku);
@@ -7353,13 +7362,16 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                         newShortCodes[`${v.colorCode}${v.sizeCode}`] = unmappedBarcode.shortCode;
                                         await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
                                         
+                                        // Simpan ke cache lokal agar INSTAN tanpa nunggu Firebase
+                                        tempShortCodesRef.current[unmappedBarcode.shortCode.toUpperCase()] = v.sku;
+
                                         showToast('success', 'Kode berhasil disambungkan permanen!');
                                         const barcodeToProcess = unmappedBarcode.fullBarcode;
                                         setUnmappedBarcode(null);
                                         setUnmappedSku('');
                                         
-                                        // Proses otomatis
-                                        setTimeout(() => processBarcode(barcodeToProcess), 500);
+                                        // Proses otomatis langsung
+                                        processBarcode(barcodeToProcess);
                                     }
                                 } catch (e) {
                                     showToast('error', 'Gagal menyambungkan: ' + e.message);
