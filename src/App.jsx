@@ -7117,6 +7117,8 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
     const [showCamera, setShowCamera] = useState(false);
     const lastScanRef = useRef({ text: '', time: 0 }); // TAMBAHAN UNTUK KAMERA CONTINUOUS
     const [kategoriScan, setKategoriScan] = useState(isMasuk ? 'PO Nota' : 'Penjualan (Off + Online)');
+    const [unmappedBarcode, setUnmappedBarcode] = useState(null);
+    const [unmappedSku, setUnmappedSku] = useState('');
 
     const [scannedItems, setScannedItems] = useState(() => {
         try {
@@ -7197,7 +7199,34 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 return newState;
             });
         } else {
-            playError(); showToast('error', "Barang tidak ditemukan di database!");
+            if (isMasuk && isShortcode && cleanBarcode.includes('#')) {
+                const extractedCode = cleanBarcode.substring(1, 5);
+                const poNumStr = cleanBarcode.split('#')[1];
+                const poNum = parseInt(poNumStr, 36);
+                
+                if (!isNaN(poNum)) {
+                    setIsLoading(true);
+                    window.db.collection('purchase_orders').where('poNumber', '==', poNum).get().then(snap => {
+                        if (!snap.empty) {
+                            const poData = snap.docs[0].data();
+                            const skus = poData.items.map(i => i.sku);
+                            setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: skus });
+                        } else {
+                            setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: [] });
+                        }
+                        playError();
+                        showToast('warning', 'Tautan kode terputus, butuh perbaikan manual.');
+                        setIsLoading(false);
+                    }).catch(err => {
+                        setIsLoading(false);
+                        playError(); showToast('error', `Barang tidak ditemukan! (Kode: ${extractedCode})`);
+                    });
+                    return;
+                }
+            }
+
+            const extractedCode = isShortcode ? cleanBarcode.substring(1, 5) : cleanBarcode;
+            playError(); showToast('error', `Barang tidak ditemukan! (Kode: ${extractedCode})`);
         }
     };
 
@@ -7287,6 +7316,61 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
     return (
         <div className="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-3xl border border-slate-200 shadow-xl relative">
+            {unmappedBarcode && (
+                <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
+                    <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
+                        <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-5xl text-orange-500"></i></div>
+                        <h3 className="text-2xl font-black text-slate-800 text-center mb-2">Barcode Terputus!</h3>
+                        <p className="text-slate-600 text-center text-sm mb-6">Sistem mendeteksi label <b>{unmappedBarcode.fullBarcode}</b> menggunakan kode usang (<b>{unmappedBarcode.shortCode}</b>). Pilih barang yang sesuai agar kode ini dapat tersambung kembali selamanya.</p>
+                        
+                        <div className="mb-6">
+                            <label className="block text-sm font-black text-slate-700 mb-2">Pilih Barang yang Sesuai:</label>
+                            <select value={unmappedSku} onChange={e => setUnmappedSku(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold bg-slate-50 focus:border-orange-500 outline-none text-sm">
+                                <option value="">-- Ketuk untuk memilih --</option>
+                                {unmappedBarcode.poSkus && unmappedBarcode.poSkus.length > 0 ? (
+                                    variants.filter(v => unmappedBarcode.poSkus.includes(v.sku)).map(v => (
+                                        <option key={v.sku} value={v.sku}>{v.article} ({v.colorName} - {v.sizeName})</option>
+                                    ))
+                                ) : (
+                                    variants.map(v => (
+                                        <option key={v.sku} value={v.sku}>{v.article} ({v.colorName} - {v.sizeName})</option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
+                            <button onClick={async () => {
+                                if (!unmappedSku) return showToast('error', 'Pilih barang terlebih dahulu!');
+                                setIsLoading(true);
+                                try {
+                                    const v = variants.find(v => v.sku === unmappedSku);
+                                    if (v) {
+                                        const pDoc = await window.db.collection('products').doc(v.productId).get();
+                                        const pData = pDoc.data();
+                                        const newShortCodes = pData.shortCodes || {};
+                                        newShortCodes[`${v.colorCode}${v.sizeCode}`] = unmappedBarcode.shortCode;
+                                        await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
+                                        
+                                        showToast('success', 'Kode berhasil disambungkan permanen!');
+                                        const barcodeToProcess = unmappedBarcode.fullBarcode;
+                                        setUnmappedBarcode(null);
+                                        setUnmappedSku('');
+                                        
+                                        // Proses otomatis
+                                        setTimeout(() => processBarcode(barcodeToProcess), 500);
+                                    }
+                                } catch (e) {
+                                    showToast('error', 'Gagal menyambungkan: ' + e.message);
+                                }
+                                setIsLoading(false);
+                            }} className="flex-1 py-4 bg-orange-500 text-white rounded-xl font-black hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/30">Sambungkan & Scan</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {showCamera && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
                     <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
