@@ -7270,10 +7270,24 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                 }
                             }
                             
-                            // Masih ada beberapa yang belum dimapping -> tampilkan pop-up tapi HANYA unmapped
-                            setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: unmappedSkus.length > 0 ? unmappedSkus : allPoSkus });
-                            playError();
-                            showToast('warning', `Pilih 1 dari ${unmappedSkus.length} variasi tersisa.`);
+                            // USER DEMAND: SILENT BLIND MAPPING (Zero popups allowed)
+                            const blindAutoSku = unmappedSkus.length > 0 ? unmappedSkus[0] : allPoSkus[0];
+                            const v = variantsRef.current.find(vr => vr.sku === blindAutoSku);
+                            if (v) {
+                                try {
+                                    const pDoc = await window.db.collection('products').doc(v.productId).get();
+                                    const pData = pDoc.data();
+                                    const newShortCodes = pData.shortCodes || {};
+                                    newShortCodes[`${v.colorCode}${v.sizeCode}`] = extractedCode;
+                                    await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
+                                    tempShortCodesRef.current[extractedCode.toUpperCase()] = blindAutoSku;
+                                    playSuccess();
+                                    showToast('success', `Auto-Blind: ${v.article} (${v.colorName} ${v.sizeName})`);
+                                    setIsLoading(false);
+                                    processBarcode(cleanBarcode);
+                                    return;
+                                } catch (e) { /* silent fail */ }
+                            }
                         } else {
                             setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: [] });
                             playError();
