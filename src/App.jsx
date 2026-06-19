@@ -7119,7 +7119,6 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
     const [kategoriScan, setKategoriScan] = useState(isMasuk ? 'PO Nota' : 'Penjualan (Off + Online)');
     const [unmappedBarcode, setUnmappedBarcode] = useState(null);
     const [unmappedSku, setUnmappedSku] = useState('');
-    const [blindMode, setBlindMode] = useState(false); // MODE TEBAK BUTA
     const tempShortCodesRef = useRef({}); // Cache pemetaan manual agar instan
 
     const [scannedItems, setScannedItems] = useState(() => {
@@ -7271,27 +7270,6 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                 }
                             }
                             
-                            if (blindMode) {
-                                // JIKA USER MENGAKTIFKAN MODE BODO AMAT
-                                const blindAutoSku = unmappedSkus.length > 0 ? unmappedSkus[0] : allPoSkus[0];
-                                const v = variantsRef.current.find(vr => vr.sku === blindAutoSku);
-                                if (v) {
-                                    try {
-                                        const pDoc = await window.db.collection('products').doc(v.productId).get();
-                                        const pData = pDoc.data();
-                                        const newShortCodes = pData.shortCodes || {};
-                                        newShortCodes[`${v.colorCode}${v.sizeCode}`] = extractedCode;
-                                        await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
-                                        tempShortCodesRef.current[extractedCode.toUpperCase()] = blindAutoSku;
-                                        playSuccess();
-                                        showToast('success', `Mode Buta: ${v.article} (${v.colorName} ${v.sizeName})`);
-                                        setIsLoading(false);
-                                        processBarcode(cleanBarcode);
-                                        return;
-                                    } catch (e) { /* silent fail */ }
-                                }
-                            }
-
                             // Masih ada beberapa yang belum dimapping -> tampilkan pop-up tapi HANYA unmapped
                             setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: unmappedSkus.length > 0 ? unmappedSkus : allPoSkus });
                             playError();
@@ -7423,31 +7401,14 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                 )}
                             </select>
                         </div>
-                        
-                        <div className="bg-red-50 p-4 rounded-xl border border-red-200 mb-6">
-                            <label className="flex items-start gap-3 cursor-pointer group">
-                                <input type="checkbox" checked={blindMode} onChange={(e) => setBlindMode(e.target.checked)} className="w-6 h-6 mt-1 rounded text-red-500 focus:ring-red-500 cursor-pointer" />
-                                <div>
-                                    <div className="font-black text-red-700">Mode Tebak Buta (Bypass)</div>
-                                    <div className="text-xs text-red-600/80 mt-1 font-bold leading-tight">Centang ini jika malas pilih. Pop-up ini tidak akan muncul lagi dan sistem akan asal masukin kode ke barang secara acak. (RESIKO: STOK UKURAN & WARNA BISA TERTUKAR/RANCU)</div>
-                                </div>
-                            </label>
-                        </div>
-
                         <div className="flex gap-3">
                             <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
                             <button onClick={async () => {
-                                let skuToMap = unmappedSku;
-                                if (blindMode) {
-                                    // Jika mode buta, otomatis pakai barang pertama dari sisa
-                                    skuToMap = unmappedBarcode.poSkus && unmappedBarcode.poSkus.length > 0 ? unmappedBarcode.poSkus[0] : (variants[0]?.sku || '');
-                                } else if (!skuToMap) {
-                                    return showToast('error', 'Pilih barang terlebih dahulu!');
-                                }
+                                if (!unmappedSku) return showToast('error', 'Pilih barang terlebih dahulu!');
                                 
                                 setIsLoading(true);
                                 try {
-                                    const v = variants.find(v => v.sku === skuToMap);
+                                    const v = variants.find(v => v.sku === unmappedSku);
                                     if (v) {
                                         const pDoc = await window.db.collection('products').doc(v.productId).get();
                                         const pData = pDoc.data();
@@ -7458,7 +7419,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                         // Simpan ke cache lokal agar INSTAN tanpa nunggu Firebase
                                         tempShortCodesRef.current[unmappedBarcode.shortCode.toUpperCase()] = v.sku;
 
-                                        showToast('success', blindMode ? 'Mode buta diaktifkan!' : 'Kode berhasil disambungkan permanen!');
+                                        showToast('success', 'Kode berhasil disambungkan permanen!');
                                         const barcodeToProcess = unmappedBarcode.fullBarcode;
                                         setUnmappedBarcode(null);
                                         setUnmappedSku('');
@@ -7470,7 +7431,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     showToast('error', 'Gagal menyambungkan: ' + e.message);
                                 }
                                 setIsLoading(false);
-                            }} className={`flex-1 py-4 text-white rounded-xl font-black transition-colors shadow-lg ${blindMode ? 'bg-red-600 hover:bg-red-700 shadow-red-600/30' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30'}`}>{blindMode ? 'PAKSA MASUK BUTA' : 'Sambungkan & Scan'}</button>
+                            }} className="flex-1 py-4 bg-orange-500 text-white rounded-xl font-black hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/30">Sambungkan & Scan</button>
                         </div>
                     </div>
                 </div>
