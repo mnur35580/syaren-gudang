@@ -9257,8 +9257,6 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
 }
 
 // ==========================================
-    );
-}
 // ==========================================
 // KOMPONEN DASHBOARD PRODUKSI (BENGKEL)
 // ==========================================
