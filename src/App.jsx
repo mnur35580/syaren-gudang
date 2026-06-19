@@ -8714,6 +8714,36 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         setIsLoading(false);
     };
 
+    const handleDuplicatePO = (po) => {
+        if (!window.confirm(`Duplikat PO ${po.id}? Seluruh pesanan barangnya akan disalin ke keranjang MPO saat ini.`)) return;
+        
+        const existingList = [...mpoDraftList];
+        po.items.forEach(newItem => {
+            const variantRef = variants.find(v => v.sku === newItem.sku) || {};
+            const existingIdx = existingList.findIndex(x => x.sku === newItem.sku);
+            if (existingIdx > -1) {
+                existingList[existingIdx].qty += newItem.qty;
+            } else {
+                existingList.push({
+                    sku: newItem.sku,
+                    article: newItem.article,
+                    colorName: newItem.colorName,
+                    sizeName: newItem.sizeName,
+                    baseCode: variantRef.baseCode || '',
+                    photo: variantRef.photo || '',
+                    qty: newItem.qty,
+                    received: 0,
+                    shipped: 0
+                });
+            }
+        });
+
+        setMpoDraftList(existingList);
+        setShowForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        showToast('success', `Berhasil! Isi PO ${po.id} disalin ke keranjang. Silakan simpan untuk membuat PO baru.`);
+    };
+
     const getFlatItems = () => mpoDraftList;
 
     const askPreview = (e) => {
@@ -9308,6 +9338,9 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                             </button>
                                             <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-3 py-2 rounded-xl border bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white shadow-sm transition-colors text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
                                                 <i className="fa-solid fa-barcode mr-1"></i> LBL
+                                            </button>
+                                            <button type="button" onClick={() => handleDuplicatePO(po)} className="px-3 py-2 rounded-xl border bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Duplikat PO ke Keranjang">
+                                                <i className="fa-solid fa-copy mr-1"></i> DUP
                                             </button>
                                             {!isArrived && <button type="button" onClick={() => startRepairPO(po)} className="px-3 py-2 rounded-xl border bg-purple-100 text-purple-700 hover:bg-purple-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Perbaiki Label Lama (Sambungkan kode barcode yatim)">
                                                 <i className="fa-solid fa-wrench mr-1"></i> FIX
