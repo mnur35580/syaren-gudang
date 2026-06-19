@@ -7161,12 +7161,16 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         let matched;
         if (isShortcode) {
             const shortCode = cleanBarcode.substring(1, 5);
-            matched = variantsRef.current.find(v => v.shortCode === shortCode);
+            matched = variantsRef.current.find(v => v.shortCode && v.shortCode.toUpperCase() === shortCode.toUpperCase());
+            if (!matched && transactions) {
+                const pastTx = transactions.find(t => t.fullBarcode === cleanBarcode);
+                if (pastTx && pastTx.sku) matched = variantsRef.current.find(v => v.sku === pastTx.sku);
+            }
         } else {
             const skuCandidate = parseGlobalSku(cleanBarcode);
             matched = variantsRef.current.find(v => v.sku === skuCandidate);
         }
-        if (matched && matched.isActive) {
+        if (matched) {
             setScannedItems(prev => {
                 if (!isMasuk) {
                     const sysSisa = stockRef.current[cleanBarcode] || 0;
@@ -7431,12 +7435,16 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
         let matched;
         if (isShortcode) {
             const shortCode = cleanBarcode.substring(1, 5);
-            matched = variantsRef.current.find(v => v.shortCode === shortCode);
+            matched = variantsRef.current.find(v => v.shortCode && v.shortCode.toUpperCase() === shortCode.toUpperCase());
+            if (!matched && transactions) {
+                const pastTx = transactions.find(t => t.fullBarcode === cleanBarcode);
+                if (pastTx && pastTx.sku) matched = variantsRef.current.find(v => v.sku === pastTx.sku);
+            }
         } else {
             const skuCandidate = parseGlobalSku(cleanBarcode);
             matched = variantsRef.current.find(v => v.sku === skuCandidate);
         }
-        if (matched && matched.isActive) {
+        if (matched) {
             playSuccess();
             setScannedItems(prev => {
                 const newItem = { id: 'SO' + Date.now() + Math.random().toString(36).substr(2, 5), sku: matched.sku, fullBarcode: cleanBarcode, variantInfo: { article: matched.article, colorName: matched.colorName, sizeName: matched.sizeName } };
