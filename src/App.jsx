@@ -7215,16 +7215,70 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 
                 if (!isNaN(poNum)) {
                     setIsLoading(true);
-                    window.db.collection('purchase_orders').where('poNumber', '==', poNum).get().then(snap => {
+                    window.db.collection('purchase_orders').where('poNumber', '==', poNum).get().then(async (snap) => {
                         if (!snap.empty) {
                             const poData = snap.docs[0].data();
-                            const skus = poData.items.map(i => i.sku);
-                            setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: skus });
+                            const allPoSkus = poData.items.map(i => i.sku);
+                            
+                            // --- ELIMINASI OTOMATIS ---
+                            // SKU dianggap "sudah ter-mapping" HANYA jika kode orphan-nya sudah 
+                            // pernah disambungkan di sesi ini (ada di tempShortCodesRef)
+                            const alreadyLinkedSkus = new Set(Object.values(tempShortCodesRef.current));
+                            const uniquePoSkus = [...new Set(allPoSkus)];
+                            const unmappedSkus = uniquePoSkus.filter(sku => !alreadyLinkedSkus.has(sku));
+                            
+                            if (unmappedSkus.length === 1) {
+                                // HANYA 1 TERSISA -> AUTO-MAP LANGSUNG! Tidak perlu pilih!
+                                const autoSku = unmappedSkus[0];
+                                const v = variantsRef.current.find(vr => vr.sku === autoSku);
+                                if (v) {
+                                    try {
+                                        const pDoc = await window.db.collection('products').doc(v.productId).get();
+                                        const pData = pDoc.data();
+                                        const newShortCodes = pData.shortCodes || {};
+                                        newShortCodes[`${v.colorCode}${v.sizeCode}`] = extractedCode;
+                                        await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
+                                        tempShortCodesRef.current[extractedCode.toUpperCase()] = autoSku;
+                                        playSuccess();
+                                        showToast('success', `Auto: ${v.article} (${v.colorName} ${v.sizeName})`);
+                                        setIsLoading(false);
+                                        processBarcode(cleanBarcode);
+                                        return;
+                                    } catch (e) { /* fallback ke popup */ }
+                                }
+                            }
+                            
+                            if (unmappedSkus.length === 0) {
+                                // Semua sudah dimapping, tapi kode ini tetap tidak dikenali?
+                                // Coba paksa auto-map ke SKU pertama di PO yang cocok
+                                const fallbackSku = allPoSkus[0];
+                                const v = variantsRef.current.find(vr => vr.sku === fallbackSku);
+                                if (v) {
+                                    try {
+                                        const pDoc = await window.db.collection('products').doc(v.productId).get();
+                                        const pData = pDoc.data();
+                                        const newShortCodes = pData.shortCodes || {};
+                                        newShortCodes[`${v.colorCode}${v.sizeCode}`] = extractedCode;
+                                        await window.db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
+                                        tempShortCodesRef.current[extractedCode.toUpperCase()] = fallbackSku;
+                                        playSuccess();
+                                        showToast('success', `Auto: ${v.article} (${v.colorName} ${v.sizeName})`);
+                                        setIsLoading(false);
+                                        processBarcode(cleanBarcode);
+                                        return;
+                                    } catch (e) { /* fallback ke popup */ }
+                                }
+                            }
+                            
+                            // Masih ada beberapa yang belum dimapping -> tampilkan pop-up tapi HANYA unmapped
+                            setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: unmappedSkus.length > 0 ? unmappedSkus : allPoSkus });
+                            playError();
+                            showToast('warning', `Pilih 1 dari ${unmappedSkus.length} variasi tersisa.`);
                         } else {
                             setUnmappedBarcode({ shortCode: extractedCode, fullBarcode: cleanBarcode, poSkus: [] });
+                            playError();
+                            showToast('warning', 'Tautan kode terputus.');
                         }
-                        playError();
-                        showToast('warning', 'Tautan kode terputus, butuh perbaikan manual.');
                         setIsLoading(false);
                     }).catch(err => {
                         setIsLoading(false);
