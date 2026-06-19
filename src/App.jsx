@@ -8577,6 +8577,10 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
+    const [repairPo, setRepairPo] = useState(null); // PO yang sedang diperbaiki
+    const [repairMappings, setRepairMappings] = useState({}); // {sku: shortCode}
+    const [repairActiveIdx, setRepairActiveIdx] = useState(0);
+    const repairInputRef = useRef(null);
 
     const nextPoNumber = mpoOrders.length > 0 ? Math.max(...mpoOrders.map(o => o.poNumber)) + 1 : 1;
     const newPoId = 'PO' + nextPoNumber;
@@ -8606,6 +8610,69 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
 
     const removeDraft = (sku) => {
         setMpoDraftList(mpoDraftList.filter(x => x.sku !== sku));
+    };
+
+    // --- FUNGSI PERBAIKI LABEL PO ---
+    const startRepairPO = (po) => {
+        // Ambil daftar variasi unik dari PO
+        const uniqueItems = [];
+        const seenSkus = new Set();
+        po.items.forEach(item => {
+            if (!seenSkus.has(item.sku)) {
+                seenSkus.add(item.sku);
+                uniqueItems.push(item);
+            }
+        });
+        setRepairPo({ ...po, uniqueItems });
+        setRepairMappings({});
+        setRepairActiveIdx(0);
+        setTimeout(() => { if (repairInputRef.current) repairInputRef.current.focus(); }, 300);
+    };
+
+    const handleRepairScan = (scannedText) => {
+        if (!repairPo) return;
+        const clean = scannedText.trim().toUpperCase();
+        if (!clean || !clean.startsWith('$')) return;
+        const shortCode = clean.substring(1, 5);
+        const currentItem = repairPo.uniqueItems[repairActiveIdx];
+        if (!currentItem) return;
+
+        // Simpan mapping
+        const newMappings = { ...repairMappings, [currentItem.sku]: shortCode };
+        setRepairMappings(newMappings);
+
+        // Pindah ke variasi berikutnya
+        const nextIdx = repairActiveIdx + 1;
+        if (nextIdx < repairPo.uniqueItems.length) {
+            setRepairActiveIdx(nextIdx);
+            setTimeout(() => { if (repairInputRef.current) { repairInputRef.current.value = ''; repairInputRef.current.focus(); } }, 100);
+        } else {
+            // SEMUA sudah di-scan! Simpan ke database
+            saveAllRepairMappings(newMappings);
+        }
+    };
+
+    const saveAllRepairMappings = async (mappings) => {
+        setIsLoading(true);
+        try {
+            for (const [sku, shortCode] of Object.entries(mappings)) {
+                const v = variants.find(vr => vr.sku === sku);
+                if (v && v.productId) {
+                    const pDoc = await db.collection('products').doc(v.productId).get();
+                    if (pDoc.exists) {
+                        const pData = pDoc.data();
+                        const newShortCodes = pData.shortCodes || {};
+                        newShortCodes[`${v.colorCode}${v.sizeCode}`] = shortCode;
+                        await db.collection('products').doc(v.productId).update({ shortCodes: newShortCodes });
+                    }
+                }
+            }
+            showToast('success', `Berhasil! ${Object.keys(mappings).length} variasi disambungkan. Scan Masuk siap digunakan!`);
+            setRepairPo(null);
+        } catch (err) {
+            showToast('error', 'Gagal menyimpan: ' + err.message);
+        }
+        setIsLoading(false);
     };
 
     const getFlatItems = () => mpoDraftList;
@@ -8978,6 +9045,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     });
 
     return (
+        <>
         <div className="space-y-6">
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex justify-between items-center">
                 <div>
@@ -9202,6 +9270,9 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                             <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-3 py-2 rounded-xl border bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white shadow-sm transition-colors text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
                                                 <i className="fa-solid fa-barcode mr-1"></i> LBL
                                             </button>
+                                            {!isArrived && <button type="button" onClick={() => startRepairPO(po)} className="px-3 py-2 rounded-xl border bg-purple-100 text-purple-700 hover:bg-purple-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Perbaiki Label Lama (Sambungkan kode barcode yatim)">
+                                                <i className="fa-solid fa-wrench mr-1"></i> FIX
+                                            </button>}
                                         </td>
                                         <td className="p-5 text-right whitespace-nowrap">
                                             <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-xl hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
@@ -9217,9 +9288,96 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                 </div>
             </div>
         </div>
+
+        {repairPo && <RepairLabelModal repairPo={repairPo} repairMappings={repairMappings} repairActiveIdx={repairActiveIdx} repairInputRef={repairInputRef} handleRepairScan={handleRepairScan} setRepairPo={setRepairPo} setRepairMappings={setRepairMappings} setRepairActiveIdx={setRepairActiveIdx} variants={variants} saveAllRepairMappings={saveAllRepairMappings} />}
+        </>
     )
 }
 
+// ==========================================
+// MODAL PERBAIKI LABEL PO (REPAIR)
+// ==========================================
+function RepairLabelModal({ repairPo, repairMappings, repairActiveIdx, repairInputRef, handleRepairScan, setRepairPo, setRepairMappings, setRepairActiveIdx, variants, saveAllRepairMappings }) {
+    if (!repairPo) return null;
+    const { uniqueItems } = repairPo;
+    const allDone = Object.keys(repairMappings).length >= uniqueItems.length;
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div className="bg-purple-600 text-white p-6 rounded-t-3xl">
+                    <div className="flex justify-between items-center">
+                        <div>
+                            <h3 className="text-xl font-black flex items-center gap-2"><i className="fa-solid fa-wrench"></i> Perbaiki Label {repairPo.id}</h3>
+                            <p className="text-purple-200 text-xs mt-1 font-bold">Scan 1 label per variasi. Tanpa pilih-pilih!</p>
+                        </div>
+                        <button onClick={() => setRepairPo(null)} className="bg-white/20 hover:bg-white/30 w-10 h-10 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-xl"></i></button>
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                    {uniqueItems.map((item, idx) => {
+                        const mapped = repairMappings[item.sku];
+                        const isActive = idx === repairActiveIdx && !allDone;
+                        const v = variants.find(vr => vr.sku === item.sku);
+                        return (
+                            <div key={item.sku} className={`p-4 rounded-2xl border-2 transition-all ${mapped ? 'bg-teal-50 border-teal-300' : isActive ? 'bg-purple-50 border-purple-400 shadow-lg ring-2 ring-purple-300' : 'bg-slate-50 border-slate-200 opacity-60'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        {v && v.photo ? <img src={v.photo} className="w-10 h-10 rounded-lg object-contain bg-white border" /> : <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center"><i className="fa-solid fa-shoe-prints text-slate-400"></i></div>}
+                                        <div>
+                                            <div className="font-black text-slate-800">{item.article}</div>
+                                            <div className="text-xs font-bold text-slate-500">{item.colorName} - {item.sizeName}</div>
+                                        </div>
+                                    </div>
+                                    {mapped ? (
+                                        <div className="flex items-center gap-2 bg-teal-100 px-3 py-1.5 rounded-xl">
+                                            <i className="fa-solid fa-check-circle text-teal-600"></i>
+                                            <span className="font-black text-teal-700 text-sm">{mapped}</span>
+                                        </div>
+                                    ) : isActive ? (
+                                        <div className="bg-purple-500 text-white px-3 py-1.5 rounded-xl text-xs font-black animate-pulse">SCAN!</div>
+                                    ) : (
+                                        <div className="text-slate-400 text-xs font-bold">Menunggu...</div>
+                                    )}
+                                </div>
+                                {isActive && (
+                                    <div className="mt-3">
+                                        <input
+                                            ref={repairInputRef}
+                                            type="text"
+                                            autoFocus
+                                            className="w-full p-3 border-2 border-purple-300 rounded-xl font-mono text-center text-lg focus:border-purple-500 outline-none bg-white"
+                                            placeholder="Arahkan scanner ke label ini..."
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    handleRepairScan(e.target.value);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {allDone && (
+                    <div className="p-6 border-t bg-teal-50">
+                        <div className="text-center mb-3">
+                            <i className="fa-solid fa-circle-check text-4xl text-teal-500"></i>
+                            <p className="font-black text-teal-800 mt-2">Semua variasi berhasil dipetakan!</p>
+                        </div>
+                        <button onClick={() => saveAllRepairMappings(repairMappings)} className="w-full py-4 bg-teal-500 text-white rounded-xl font-black text-lg hover:bg-teal-600 transition-colors shadow-lg shadow-teal-500/30">
+                            <i className="fa-solid fa-save mr-2"></i> Simpan & Selesai
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 // ==========================================
 // KOMPONEN DASHBOARD PRODUKSI (BENGKEL)
 // ==========================================
