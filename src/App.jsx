@@ -818,7 +818,7 @@ const handleCetakResiManual = (order, variants) => {
 
     let itemsHtml = '';
     order.list_produk.forEach(item => {
-        const variantInfo = variants.find(v => v.sku === item.sku);
+        const variantInfo = variants.find(v => v.sku === item.sku || (v.legacySkus || []).includes(item.sku));
         const displayArt = variantInfo ? variantInfo.article : item.sku;
         const displayColor = variantInfo ? variantInfo.colorName : '-';
         const displaySize = variantInfo ? variantInfo.sizeName : '-';
@@ -1009,7 +1009,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
     const calculateAvailable = (sku) => {
         let inQty = 0; let outQty = 0;
-        const variant = variants.find(v => v.sku === sku);
+        const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
         const legacy = variant ? (variant.legacySkus || []) : [];
         transactions.forEach(t => {
             if (t.sku === sku || legacy.includes(t.sku)) {
@@ -1225,7 +1225,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-200 pb-1">Daftar Produk (${order.list_produk.reduce((a, c) => a + c.qty, 0)} Pcs)</div>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             {order.list_produk.map((item, idx) => {
-                                                const varInfo = variants.find(v => v.sku === item.sku);
+                                                const varInfo = variants.find(v => v.sku === item.sku || (v.legacySkus || []).includes(item.sku));
                                                 return (
                                                     <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-slate-100 shadow-sm">
                                                         <div className="font-semibold text-slate-700 overflow-hidden text-ellipsis whitespace-nowrap" title={varInfo ? varInfo.article : item.sku}>
@@ -1409,7 +1409,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                                 <div className="text-center text-slate-400 text-sm py-10 font-semibold italic">Belum ada produk yang dipilih.</div>
                                             ) : (
                                                 listProduk.map(item => {
-                                                    const varInfo = variants.find(v => v.sku === item.sku);
+                                                    const varInfo = variants.find(v => v.sku === item.sku || (v.legacySkus || []).includes(item.sku));
                                                     return (
                                                         <div key={item.sku} className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between shadow-sm">
                                                             <div className="min-w-0 flex-1 pr-3">
@@ -1844,7 +1844,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     if (shipDateStr && shipDateStr <= todayCompareStr) {
                         (order.items || []).forEach(item => {
                             if (item.status === 'PO' || item.status === 'UNRECOGNIZED') {
-                                const v = variants.find(v => v.sku === (item.sku || item.sysSku));
+                                const v = variants.find(v => v.sku === (item.sku || item.sysSku) || (v.legacySkus || []).includes(item.sku || item.sysSku));
                                 if (v) {
                                     urgentKeys.add(`${v.article}-${v.colorName}-${v.sizeName}`);
                                 }
@@ -3856,7 +3856,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             draft.items.forEach(item => {
                 // Karena draft item tidak simpan sku lengkap, sellPrice & photo, kita harus mencarinya dari Master Variant
-                const matchedVariant = variants.find(v => v.sku === (item.sku || item.sysSku)) || 
+                const matchedVariant = variants.find(v => v.sku === (item.sku || item.sysSku) || (v.legacySkus || []).includes(item.sku || item.sysSku)) || 
                                        variants.find(v => String(v.article).trim().toUpperCase() === String(item.article).trim().toUpperCase() && 
                                                           String(v.colorName).trim().toUpperCase() === String(item.colorName).trim().toUpperCase() && 
                                                           String(v.sizeName).trim().toUpperCase() === String(item.sizeName).trim().toUpperCase());
@@ -4152,7 +4152,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     };
 
     const getFifoBatches = (sku, neededQty) => {
-        const variant = variants.find(v => v.sku === sku);
+        const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
         const legacy = variant ? (variant.legacySkus || []) : [];
         const stockMap = {};
         transactions.forEach(t => {
@@ -5397,7 +5397,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
                     <div className="space-y-4">
                         {activeOrder.items.map((item, idx) => {
-                            const variant = variants.find(v => v.sku === item.sysSku || v.sku === item.sku);
+                            const variant = variants.find(v => v.sku === item.sysSku || v.sku === item.sku || (v.legacySkus || []).includes(item.sysSku) || (v.legacySkus || []).includes(item.sku));
                             const itemDone = item.scanned >= item.qty;
                             return (
                                 <div key={idx} className={`p-3 md:p-4 rounded-xl border-2 flex items-center justify-between transition-all duration-300 ${itemDone ? 'bg-teal-50 border-teal-400 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
@@ -6294,7 +6294,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
         let kekurangan = 0;
         Object.keys(demandMap).forEach(sku => {
             const demand = demandMap[sku];
-            const variant = (variants || []).find(v => v.sku === sku);
+            const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
             const realStock = variant ? Number(variant.stock || variant.stok || 0) : 0;
             const crossDockStock = virtualStock[sku] || 0;
 
@@ -6743,7 +6743,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {selectedSession.items.map((t, idx) => {
-                                                        const variant = variants.find(v => v.sku === t.sku);
+                                                        const variant = variants.find(v => v.sku === t.sku || (v.legacySkus || []).includes(t.sku));
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                                 <td className="py-3 md:py-4 px-2">
@@ -8438,7 +8438,7 @@ function PantauStok({ variants, transactions, showToast }) {
                 }
             }
 
-            if (!stockMap[t.fullBarcode]) stockMap[t.fullBarcode] = { variant: variants.find(v => v.sku === t.sku), inQty: 0, outQty: 0, recordDateStr };
+            if (!stockMap[t.fullBarcode]) stockMap[t.fullBarcode] = { variant: variants.find(v => v.sku === t.sku || (v.legacySkus || []).includes(t.sku)), inQty: 0, outQty: 0, recordDateStr };
             if (t.type === 'IN' || t.type === 'REVISI_IN') stockMap[t.fullBarcode].inQty += t.qty;
             if (t.type === 'OUT' || t.type === 'REVISI_OUT') stockMap[t.fullBarcode].outQty += t.qty;
         });
@@ -8751,7 +8751,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         
         const existingList = [...mpoDraftList];
         po.items.forEach(newItem => {
-            const variantRef = variants.find(v => v.sku === newItem.sku) || {};
+            const variantRef = variants.find(v => v.sku === newItem.sku || (v.legacySkus || []).includes(newItem.sku)) || {};
             const existingIdx = existingList.findIndex(x => x.sku === newItem.sku);
             if (existingIdx > -1) {
                 existingList[existingIdx].qty += newItem.qty;
@@ -9857,7 +9857,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
     const filteredMpo = useMemo(() => {
         return (mpoOrders || []).map(po => {
             const fItems = (po.items || []).filter(item => {
-                const variant = (variants || []).find(v => v.sku === item.sku);
+                const variant = (variants || []).find(v => v.sku === item.sku || (v.legacySkus || []).includes(item.sku));
                 const article = variant ? (variant.article || '') : (item.article || '');
                 const isF07 = article.toUpperCase().startsWith('F07');
                 if (activeTab === 'samin' && !isF07) return false;
@@ -9916,7 +9916,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             (order.items || []).forEach(item => {
                 const sku = (item.sysSku || item.sku || '').trim().toUpperCase();
                 const cleanSku = sku.split('*')[0].split('#')[0];
-                const variant = (variants || []).find(v => v.sku === cleanSku);
+                const variant = (variants || []).find(v => v.sku === cleanSku || (v.legacySkus || []).includes(cleanSku));
                 const article = variant ? (variant.article || '') : (item.article || '');
                 const isF07 = article.toUpperCase().startsWith('F07');
 
@@ -11013,7 +11013,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                                 {Object.keys(scannedItemsPengirim).length > 0 ? Object.entries(scannedItemsPengirim).map(([barcode, qty]) => {
                                     const sku = parseSku(barcode);
-                                    const variant = variants.find(v => v.sku === sku);
+                                    const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
                                     const itemType = scannedTypePengirim[barcode] || 'UNKNOWN';
                                     return (
                                         <div key={barcode} className="p-4 rounded-xl border-2 border-slate-200 bg-white flex justify-between items-center">
