@@ -1009,8 +1009,10 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
     const calculateAvailable = (sku) => {
         let inQty = 0; let outQty = 0;
+        const variant = variants.find(v => v.sku === sku);
+        const legacy = variant ? (variant.legacySkus || []) : [];
         transactions.forEach(t => {
-            if (t.sku === sku) {
+            if (t.sku === sku || legacy.includes(t.sku)) {
                 if (t.type === 'IN' || t.type === 'REVISI_IN') inQty += t.qty;
                 if (t.type === 'OUT' || t.type === 'REVISI_OUT') outQty += t.qty;
             }
@@ -2777,9 +2779,16 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             // Kalkulasi Ketersediaan Berdasarkan Data Stok Detail (Master Produk)
             const stockGlobalMap = {};
+            const legacyToCurrentSku = {};
+            (variants || []).forEach(v => {
+                (v.legacySkus || []).forEach(old => {
+                    legacyToCurrentSku[old] = v.sku;
+                });
+            });
             transactions.forEach(t => {
-                if (t.type === 'IN' || t.type === 'REVISI_IN') { stockGlobalMap[t.sku] = (stockGlobalMap[t.sku] || 0) + t.qty; }
-                if (t.type === 'OUT' || t.type === 'REVISI_OUT') { stockGlobalMap[t.sku] = (stockGlobalMap[t.sku] || 0) - t.qty; }
+                const currentSku = legacyToCurrentSku[t.sku] || t.sku;
+                if (t.type === 'IN' || t.type === 'REVISI_IN') { stockGlobalMap[currentSku] = (stockGlobalMap[currentSku] || 0) + t.qty; }
+                if (t.type === 'OUT' || t.type === 'REVISI_OUT') { stockGlobalMap[currentSku] = (stockGlobalMap[currentSku] || 0) - t.qty; }
             });
 
             const availableStockMap = {};
@@ -3023,9 +3032,16 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             // Kalkulasi ulang Ketersediaan
             const stockGlobalMap = {};
+            const legacyToCurrentSku = {};
+            (variants || []).forEach(v => {
+                (v.legacySkus || []).forEach(old => {
+                    legacyToCurrentSku[old] = v.sku;
+                });
+            });
             transactions.forEach(t => {
-                if (t.type === 'IN' || t.type === 'REVISI_IN') { stockGlobalMap[t.sku] = (stockGlobalMap[t.sku] || 0) + t.qty; }
-                if (t.type === 'OUT' || t.type === 'REVISI_OUT') { stockGlobalMap[t.sku] = (stockGlobalMap[t.sku] || 0) - t.qty; }
+                const currentSku = legacyToCurrentSku[t.sku] || t.sku;
+                if (t.type === 'IN' || t.type === 'REVISI_IN') { stockGlobalMap[currentSku] = (stockGlobalMap[currentSku] || 0) + t.qty; }
+                if (t.type === 'OUT' || t.type === 'REVISI_OUT') { stockGlobalMap[currentSku] = (stockGlobalMap[currentSku] || 0) - t.qty; }
             });
 
             const availableStockMap = {};
@@ -4136,9 +4152,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     };
 
     const getFifoBatches = (sku, neededQty) => {
+        const variant = variants.find(v => v.sku === sku);
+        const legacy = variant ? (variant.legacySkus || []) : [];
         const stockMap = {};
         transactions.forEach(t => {
-            if (t.sku !== sku || !t.fullBarcode) return;
+            if ((t.sku !== sku && !legacy.includes(t.sku)) || !t.fullBarcode) return;
 
             // EKSTRAK TANGGAL ASLI DARI BARCODE (Abaikan Suffix * atau #)
             let rawBase = t.fullBarcode;
@@ -8190,7 +8208,8 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const [resetPass, setResetPass] = useState('');
 
     const calculatedStock = variants.map(v => {
-        const stock = transactions.filter(t => t.sku === v.sku).reduce((sum, t) => {
+        const legacy = v.legacySkus || [];
+        const stock = transactions.filter(t => t.sku === v.sku || legacy.includes(t.sku)).reduce((sum, t) => {
             if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
             if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
             return sum;
