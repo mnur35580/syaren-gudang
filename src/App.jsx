@@ -147,15 +147,29 @@ try {
 // --- HELPER UNTUK BARCODE (GENERASI 3: PENDEK & TERBACA MANUSIA) ---
 // Format Gen3: [SKU][DDMMYY]#[nomorPO] atau [SKU][DDMMYY]*[sesi]
 // Contoh PO: 1136220626#4   Contoh Online: 1136220626*1
-const buildShortBarcode = (variant, printDate, type, sessionOrPo, isLegacy = false) => {
-    const sku = variant.sku || '';
+const buildShortBarcode = (variantInfo, printDate, type, sessionOrPo, isLegacy = false) => {
+    const sku = variantInfo.sku || '';
     
     if (isLegacy) {
-        // Format Lama Gen1 (YYYYMMDD)
-        const dateSuffix = printDate ? printDate.split('T')[0].replace(/-/g, '') : '';
-        if (type === 'ONLINE') return `${sku}${dateSuffix}*${sessionOrPo}`;
-        if (type === 'PO') return `${sku}${dateSuffix}#${sessionOrPo}`;
-        return `${sku}${dateSuffix}`;
+        if (variantInfo.shortCode) {
+            // Format Gen 2 ($ABCD)
+            let dateStrGen2 = '';
+            if (printDate) {
+                const parts = printDate.split('T')[0].split('-');
+                if (parts.length === 3) {
+                    dateStrGen2 = `-${parts[2]}${parts[1]}${parts[0].slice(-2)}`;
+                }
+            }
+            if (type === 'ONLINE') return `$${variantInfo.shortCode}${dateStrGen2}*${sessionOrPo}`;
+            if (type === 'PO') return `$${variantInfo.shortCode}${dateStrGen2}#${sessionOrPo}`;
+            return `$${variantInfo.shortCode}${dateStrGen2}`;
+        } else {
+            // Format Gen 1 (YYYYMMDD)
+            const dateSuffix = printDate ? printDate.split('T')[0].replace(/-/g, '') : '';
+            if (type === 'ONLINE') return `${sku}${dateSuffix}*${sessionOrPo}`;
+            if (type === 'PO') return `${sku}${dateSuffix}#${sessionOrPo}`;
+            return `${sku}${dateSuffix}`;
+        }
     }
 
     // Build 6-digit date string (DDMMYY)
@@ -2153,6 +2167,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     article: item.article, colorName: item.colorName, sizeName: item.sizeName,
                     printDate, sessionCodeInt, isLegacy,
                     sku: skuToPrint,
+                    shortCode: matchedVariant ? matchedVariant.shortCode : '',
                     photo: matchedVariant ? matchedVariant.photo : '',
                     sellPrice: matchedVariant ? matchedVariant.sellPrice : 0
                 });
@@ -2191,7 +2206,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             `;
 
         printList.forEach(item => {
-            const fullBarcode = buildShortBarcode({sku: item.sku}, item.printDate, 'ONLINE', item.sessionCodeInt, item.isLegacy);
+            const fullBarcode = buildShortBarcode({ ...item, sku: item.sku }, item.printDate, 'ONLINE', item.sessionCodeInt, item.isLegacy);
             const prodCode = getProductionCode(item.printDate);
             const photoHtml = item.photo ? `<img class="photo" src="${item.photo}" />` : `<div style="font-size:10px;">No Img</div>`;
             const dateMarkerText = item.printDate.split('-')[2]; // Hanya tanggal (DD)
@@ -9020,7 +9035,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             if (!variantRef) variantRef = { sku: item.sku }; // Fallback
             
             const skuToPrint = isLegacy ? item.sku : variantRef.sku;
-            const fullBarcode = buildShortBarcode({ sku: skuToPrint }, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber, isLegacy);
+            const fullBarcode = buildShortBarcode({ ...variantRef, sku: skuToPrint }, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber, isLegacy);
             const toPrint = item.qty - (item.received || 0);
 
             for (let i = 0; i < toPrint; i++) {
