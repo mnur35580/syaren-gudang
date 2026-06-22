@@ -23,95 +23,127 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
         localStorage.setItem('vendorCapacity', val);
     };
 
-    // --- FETCH DATA DARI FIREBASE ---
+        const [timeFilter, setTimeFilter] = useState("Mingguan");
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+    
+    // Generate array of years (from 2020 to current year + 1)
+    const availableYears = useMemo(() => {
+        const currentY = new Date().getFullYear();
+        return Array.from({ length: currentY - 2020 + 2 }, (_, i) => 2020 + i);
+    }, []);
+    
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     useEffect(() => {
-        const fetchAnalyticsData = async () => {
-            setIsLoading(true);
-            try {
-                const db = window.db; // Menggunakan instance database global yang sudah di-init di App.jsx
-                if (!db) throw new Error("Firebase belum siap");
-
-                // 1. AMBIL DATA STOK RIIL
-                // Cek apakah ada data dari prop 'variants' (dari App.jsx). Jika ada, langsung gunakan!
-                let fetchedStok = [];
-                if (variants && variants.length > 0) {
-                    fetchedStok = variants;
-                } else {
-                    // Kalau tidak ada prop, fetch manual dari Firebase
-                    // TODO: Sesuaikan 'products' dengan nama collection stok kamu jika berbeda
-                    const stokSnapshot = await db.collection('products').get();
-                    
-                    // Flatten variants jika formatnya nested di dalam products
-                    stokSnapshot.docs.forEach(doc => {
-                        const data = doc.data();
-                        if (data.variants && Array.isArray(data.variants)) {
-                            data.variants.forEach(v => {
-                                fetchedStok.push({ ...v, productName: data.name || 'Produk' });
-                            });
-                        } else {
-                            fetchedStok.push({ id: doc.id, ...data });
-                        }
-                    });
-                }
-
-                // 2. AMBIL DATA PENJUALAN (GRPA) & ANTREAN PO
-                // TODO: Sesuaikan 'transactions' dengan nama collection GRPA kamu
-                const today = new Date();
-                const sevenDaysAgo = new Date(today);
-                sevenDaysAgo.setDate(today.getDate() - 7);
-                const fourteenDaysAgo = new Date(today);
-                fourteenDaysAgo.setDate(today.getDate() - 14);
-
-                // Fetch semua transaksi/grpa
-                const txSnapshot = await db.collection('transactions').get();
-                const allTx = txSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-                // Cek MPO Orders dari props dan hitung secara akurat
-                const calculatedPOQueue = (mpoOrders || []).filter(o => o.status === 'OPEN' || o.status === 'SHIPPED')
-                    .reduce((acc, po) => acc + (po.items || []).reduce((s, i) => s + Math.max(0, (i.qty || 0) - (i.received || 0)), 0), 0);
-
-                // Proses Tren Penjualan 14 Hari Terakhir (Contoh pengolahan harian)
-                // TODO: Sesuaikan logika filter tanggal dengan field timestamp di tabel GRPA kamu
-                let mockSalesHistory = [
-                    { day: 'Senin', prevWeek: 0, currWeek: 0 },
-                    { day: 'Selasa', prevWeek: 0, currWeek: 0 },
-                    { day: 'Rabu', prevWeek: 0, currWeek: 0 },
-                    { day: 'Kamis', prevWeek: 0, currWeek: 0 },
-                    { day: 'Jumat', prevWeek: 0, currWeek: 0 },
-                    { day: 'Sabtu', prevWeek: 0, currWeek: 0 },
-                    { day: 'Minggu', prevWeek: 0, currWeek: 0 },
-                ];
-
-                // *Catatan: Di sini idealnya ada logika mapping dari allTx ke mockSalesHistory berdasarkan tx.date*
-                // Untuk amannya (agar grafik tidak error jika struktur tanggal berbeda), kita isi dengan kalkulasi dummy sementara
-                // TODO: Tuliskan logika mapping tanggal dari data GRPA ke struktur salesHistory di atas
-                mockSalesHistory = mockSalesHistory.map(day => ({
-                    ...day,
-                    currWeek: Math.floor(Math.random() * 50) + 10,
-                    prevWeek: Math.floor(Math.random() * 50) + 10
-                }));
-
-                // Simpan ke State
-                setGlobalMetrics(prev => ({ ...prev, totalPOQueue: calculatedPOQueue }));
-                setInventoryData(fetchedStok);
-                setSalesHistory(mockSalesHistory);
-
-            } catch (error) {
-                console.error("Gagal mengambil data analytics:", error);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        fetchAnalyticsData();
-    }, [variants]);
+        setIsLoading(true);
+        const calculatedPOQueue = (mpoOrders || []).filter(o => o.status === "OPEN" || o.status === "SHIPPED")
+            .reduce((acc, po) => acc + (po.items || []).reduce((s, i) => s + Math.max(0, (i.qty || 0) - (i.received || 0)), 0), 0);
+        setGlobalMetrics(prev => ({ ...prev, totalPOQueue: calculatedPOQueue }));
+        setInventoryData(variants);
+        setIsLoading(false);
+    }, [variants, mpoOrders]);
 
     // --- CALCULATIONS (GROWTH, LEAD TIME, ROP) ---
-    const totalPrevWeek = useMemo(() => salesHistory.reduce((acc, curr) => acc + curr.prevWeek, 0), [salesHistory]);
-    const totalCurrWeek = useMemo(() => salesHistory.reduce((acc, curr) => acc + curr.currWeek, 0), [salesHistory]);
+    const chartData = useMemo(() => {
+        if (!transactions || transactions.length === 0) return [];
+        
+        const now = new Date();
+        const data = [];
+        
+        const getMonday = (d) => {
+          const dt = new Date(d);
+          const day = dt.getDay(), diff = dt.getDate() - day + (day === 0 ? -6 : 1);
+          return new Date(dt.setDate(diff));
+        };
+
+        if (timeFilter === "Mingguan") {
+            const days = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Minggu"];
+            const currMonday = getMonday(now);
+            currMonday.setHours(0,0,0,0);
+            
+            const prevMonday = new Date(currMonday);
+            prevMonday.setDate(prevMonday.getDate() - 7);
+            
+            days.forEach((day) => data.push({ label: day, prev: 0, curr: 0 }));
+
+            transactions.forEach(tx => {
+                if (tx.type !== "OUT" && tx.type !== "REVISI_OUT" || !tx.date) return;
+                const txDate = new Date(tx.date);
+                const dayIndex = txDate.getDay() === 0 ? 6 : txDate.getDay() - 1;
+                
+                if (txDate >= currMonday) {
+                    const diffDays = Math.floor((txDate - currMonday) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 0 && diffDays < 7) {
+                        data[dayIndex].curr += Number(tx.qty || 0);
+                    }
+                } else if (txDate >= prevMonday && txDate < currMonday) {
+                    const diffDays = Math.floor((txDate - prevMonday) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 0 && diffDays < 7) {
+                        data[dayIndex].prev += Number(tx.qty || 0);
+                    }
+                }
+            });
+            return data;
+        }
+
+        if (timeFilter === "Bulanan") {
+            const currYear = selectedYear;
+            const currMonth = selectedMonth;
+            const prevMonthDate = new Date(currYear, currMonth - 1, 1);
+            const prevMonth = prevMonthDate.getMonth();
+            const prevMonthYear = prevMonthDate.getFullYear();
+
+            const daysInCurrMonth = new Date(currYear, currMonth + 1, 0).getDate();
+            const daysInPrevMonth = new Date(prevMonthYear, prevMonth + 1, 0).getDate();
+            const maxDays = Math.max(daysInCurrMonth, daysInPrevMonth);
+
+            for (let i = 1; i <= maxDays; i++) {
+                data.push({ label: i.toString(), prev: 0, curr: 0 });
+            }
+
+            transactions.forEach(tx => {
+                if (tx.type !== "OUT" && tx.type !== "REVISI_OUT" || !tx.date) return;
+                const txDate = new Date(tx.date);
+                const dateNum = txDate.getDate();
+
+                if (txDate.getFullYear() === currYear && txDate.getMonth() === currMonth) {
+                    data[dateNum - 1].curr += Number(tx.qty || 0);
+                } else if (txDate.getFullYear() === prevMonthYear && txDate.getMonth() === prevMonth) {
+                    data[dateNum - 1].prev += Number(tx.qty || 0);
+                }
+            });
+            return data;
+        }
+
+        if (timeFilter === "Tahunan") {
+            const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+            const currYear = selectedYear;
+            const prevYear = currYear - 1;
+
+            months.forEach(m => data.push({ label: m, prev: 0, curr: 0 }));
+
+            transactions.forEach(tx => {
+                if (tx.type !== "OUT" && tx.type !== "REVISI_OUT" || !tx.date) return;
+                const txDate = new Date(tx.date);
+                const monthIndex = txDate.getMonth();
+
+                if (txDate.getFullYear() === currYear) {
+                    data[monthIndex].curr += Number(tx.qty || 0);
+                } else if (txDate.getFullYear() === prevYear) {
+                    data[monthIndex].prev += Number(tx.qty || 0);
+                }
+            });
+            return data;
+        }
+
+        return [];
+    }, [transactions, timeFilter]);
+
+    const totalPrevPeriod = useMemo(() => chartData.reduce((acc, curr) => acc + curr.prev, 0), [chartData]);
+    const totalCurrPeriod = useMemo(() => chartData.reduce((acc, curr) => acc + curr.curr, 0), [chartData]);
     
-    // Trend Growth (%) = ((Total Jual 7 Hari Terakhir - Total Jual 7 Hari Sebelumnya) / Total Jual 7 Hari Sebelumnya) * 100
-    const trendGrowth = totalPrevWeek > 0 ? (((totalCurrWeek - totalPrevWeek) / totalPrevWeek) * 100).toFixed(1) : "0.0";
+    // Trend Growth (%)
+    const trendGrowth = totalPrevPeriod > 0 ? (((totalCurrPeriod - totalPrevPeriod) / totalPrevPeriod) * 100).toFixed(1) : "0.0";
     const isTrendPositive = parseFloat(trendGrowth) > 0;
 
     // Lead Time (Hari) = Total Antrean PO di Bengkel / Kapasitas Produksi Harian
@@ -239,8 +271,8 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                     <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-arrow-trend-up text-blue-500"></i> Pertumbuhan Penjualan</p>
                     <div className="flex items-end gap-3">
                         <h3 className="text-4xl font-black text-slate-800">{isTrendPositive && trendGrowth !== "0.0" ? '+' : ''}{trendGrowth}%</h3>
-                        <span className={`text-sm font-bold pb-1 ${isTrendPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {isTrendPositive ? <i className="fa-solid fa-caret-up"></i> : <i className="fa-solid fa-caret-down"></i>} MINGGU INI
+                        <span className={`text-sm font-bold pb-1 ${isTrendPositive ? "text-emerald-500" : "text-rose-500"}`}>
+                            {isTrendPositive ? <i className="fa-solid fa-caret-up"></i> : <i className="fa-solid fa-caret-down"></i>} {timeFilter === "Mingguan" ? "MINGGU INI" : timeFilter === "Bulanan" ? "BULAN INI" : "TAHUN INI"}
                         </span>
                     </div>
                 </div>
@@ -288,17 +320,52 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* LINE CHART: TREND PENJUALAN */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                    <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2"><i className="fa-solid fa-chart-area text-blue-500"></i> Tren Penjualan Harian</h3>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                            <i className="fa-solid fa-chart-area text-blue-500"></i> Tren Penjualan
+                        </h3>
+                        <div className="flex items-center gap-3">
+                            {timeFilter === "Bulanan" && (
+                                <select 
+                                    value={selectedMonth} 
+                                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                                    className="px-2 py-1.5 text-xs font-bold rounded-md bg-white border border-slate-200 text-slate-600 outline-none focus:border-blue-500"
+                                >
+                                    {monthNames.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                                </select>
+                            )}
+                            {(timeFilter === "Bulanan" || timeFilter === "Tahunan") && (
+                                <select 
+                                    value={selectedYear} 
+                                    onChange={(e) => setSelectedYear(Number(e.target.value))}
+                                    className="px-2 py-1.5 text-xs font-bold rounded-md bg-white border border-slate-200 text-slate-600 outline-none focus:border-blue-500"
+                                >
+                                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                                </select>
+                            )}
+                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                            {["Mingguan", "Bulanan", "Tahunan"].map(tf => (
+                                <button 
+                                    key={tf}
+                                    onClick={() => setTimeFilter(tf)}
+                                    className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${timeFilter === tf ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                >
+                                    {tf}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
                     <div className="h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={salesHistory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                            <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} dx={-10} />
-                                <RechartsTooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} cursor={{ stroke: '#e2e8f0', strokeWidth: 2, strokeDasharray: '5 5' }} />
-                                <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="circle" />
-                                <Line type="monotone" name="Minggu Sebelumnya" dataKey="prevWeek" stroke="#cbd5e1" strokeWidth={3} dot={{r: 4, fill: '#cbd5e1', strokeWidth: 2}} activeDot={{r: 6}} />
-                                <Line type="monotone" name="Minggu Ini" dataKey="currWeek" stroke="#f97316" strokeWidth={4} dot={{r: 5, fill: '#f97316', strokeWidth: 2}} activeDot={{r: 7, stroke: '#fff'}} />
+                                <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: "#94a3b8", fontSize: 12}} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fill: "#94a3b8", fontSize: 12}} dx={-10} />
+                                <RechartsTooltip contentStyle={{ borderRadius: "12px", border: "none", boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)" }} cursor={{ stroke: "#e2e8f0", strokeWidth: 2, strokeDasharray: "5 5" }} />
+                                <Legend wrapperStyle={{ paddingTop: "20px" }} iconType="circle" />
+                                <Line type="monotone" name={timeFilter === "Mingguan" ? "Minggu Sebelumnya" : timeFilter === "Bulanan" ? "Bulan Sebelumnya" : "Tahun Sebelumnya"} dataKey="prev" stroke="#cbd5e1" strokeWidth={3} dot={{r: 4, fill: "#cbd5e1", strokeWidth: 2}} activeDot={{r: 6}} />
+                                <Line type="monotone" name={timeFilter === "Mingguan" ? "Minggu Ini" : timeFilter === "Bulanan" ? "Bulan Ini" : "Tahun Ini"} dataKey="curr" stroke="#f97316" strokeWidth={4} dot={{r: 5, fill: "#f97316", strokeWidth: 2}} activeDot={{r: 7, stroke: "#fff"}} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
