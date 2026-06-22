@@ -147,9 +147,17 @@ try {
 // --- HELPER UNTUK BARCODE (GENERASI 3: PENDEK & TERBACA MANUSIA) ---
 // Format Gen3: [SKU][DDMMYY]#[nomorPO] atau [SKU][DDMMYY]*[sesi]
 // Contoh PO: 1136220626#4   Contoh Online: 1136220626*1
-const buildShortBarcode = (variant, printDate, type, sessionOrPo) => {
+const buildShortBarcode = (variant, printDate, type, sessionOrPo, isLegacy = false) => {
     const sku = variant.sku || '';
     
+    if (isLegacy) {
+        // Format Lama Gen1 (YYYYMMDD)
+        const dateSuffix = printDate ? printDate.split('T')[0].replace(/-/g, '') : '';
+        if (type === 'ONLINE') return `${sku}${dateSuffix}*${sessionOrPo}`;
+        if (type === 'PO') return `${sku}${dateSuffix}#${sessionOrPo}`;
+        return `${sku}${dateSuffix}`;
+    }
+
     // Build 6-digit date string (DDMMYY)
     let dateStr = '';
     if (printDate) {
@@ -2128,15 +2136,23 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
         const sessionCodeInt = batch.session || 1;
 
         (batch.items || []).forEach(item => {
-            const matchedVariant = variants.find(v => v.sku === (item.sku || item.sysSku)) || 
-                                   variants.find(v => String(v.article).trim().toUpperCase() === String(item.article).trim().toUpperCase() && 
-                                                      String(v.colorName).trim().toUpperCase() === String(item.colorName).trim().toUpperCase() && 
-                                                      String(v.sizeName).trim().toUpperCase() === String(item.sizeName).trim().toUpperCase());
+            let isLegacy = false;
+            let matchedVariant = variants.find(v => v.sku === (item.sku || item.sysSku));
+            if (!matchedVariant) {
+                matchedVariant = variants.find(v => (v.legacySkus || []).includes(item.sku || item.sysSku));
+                if (matchedVariant) isLegacy = true;
+            }
+            if (!matchedVariant) {
+                matchedVariant = variants.find(v => String(v.article).trim().toUpperCase() === String(item.article).trim().toUpperCase() && 
+                                                   String(v.colorName).trim().toUpperCase() === String(item.colorName).trim().toUpperCase() && 
+                                                   String(v.sizeName).trim().toUpperCase() === String(item.sizeName).trim().toUpperCase());
+            }
+            const skuToPrint = isLegacy ? (item.sku || item.sysSku) : (matchedVariant ? matchedVariant.sku : `${item.article}-${item.colorName}-${item.sizeName}`);
             for (let i = 0; i < (item.missingQty || 0); i++) {
                 printList.push({
                     article: item.article, colorName: item.colorName, sizeName: item.sizeName,
-                    printDate, sessionCodeInt,
-                    sku: matchedVariant ? matchedVariant.sku : `${item.article}-${item.colorName}-${item.sizeName}`,
+                    printDate, sessionCodeInt, isLegacy,
+                    sku: skuToPrint,
                     photo: matchedVariant ? matchedVariant.photo : '',
                     sellPrice: matchedVariant ? matchedVariant.sellPrice : 0
                 });
@@ -2175,8 +2191,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             `;
 
         printList.forEach(item => {
-            const matchedVariant = variants.find(v => v.sku === item.sku);
-            const fullBarcode = buildShortBarcode(matchedVariant || item, item.printDate, 'ONLINE', item.sessionCodeInt);
+            const fullBarcode = buildShortBarcode({sku: item.sku}, item.printDate, 'ONLINE', item.sessionCodeInt, item.isLegacy);
             const prodCode = getProductionCode(item.printDate);
             const photoHtml = item.photo ? `<img class="photo" src="${item.photo}" />` : `<div style="font-size:10px;">No Img</div>`;
             const dateMarkerText = item.printDate.split('-')[2]; // Hanya tanggal (DD)
@@ -8996,8 +9011,16 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         const prodCode = getProductionCode(targetDateStr);
 
         po.items.forEach(item => {
-            const variantRef = variants.find(v => v.sku === item.sku) || {};
-            const fullBarcode = buildShortBarcode(variantRef, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber);
+            let isLegacy = false;
+            let variantRef = variants.find(v => v.sku === item.sku);
+            if (!variantRef) {
+                variantRef = variants.find(v => (v.legacySkus || []).includes(item.sku));
+                if (variantRef) isLegacy = true; // Jika ketemu di legacySkus, berarti ini PO lama
+            }
+            if (!variantRef) variantRef = { sku: item.sku }; // Fallback
+            
+            const skuToPrint = isLegacy ? item.sku : variantRef.sku;
+            const fullBarcode = buildShortBarcode({ sku: skuToPrint }, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber, isLegacy);
             const toPrint = item.qty - (item.received || 0);
 
             for (let i = 0; i < toPrint; i++) {
