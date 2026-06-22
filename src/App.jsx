@@ -144,50 +144,78 @@ try {
 
 // ===
 
-// --- HELPER UNTUK BARCODE PENDEK (SHORTCODE) ---
+// --- HELPER UNTUK BARCODE (GENERASI 3: PENDEK & TERBACA MANUSIA) ---
+// Format Gen3: [SKU][DDMMYY]#[nomorPO] atau [SKU][DDMMYY]*[sesi]
+// Contoh PO: 1136220626#4   Contoh Online: 1136220626*1
 const buildShortBarcode = (variant, printDate, type, sessionOrPo) => {
-    if (!variant || !variant.shortCode) {
-        // Fallback ke legacy jika belum ada shortcode
-        const dateSuffix = printDate ? printDate.replace(/-/g, '') : '';
-        if (type === 'ONLINE') return `${variant.sku}${dateSuffix}*${sessionOrPo}`;
-        if (type === 'PO') return `${variant.sku}${dateSuffix}#${sessionOrPo}`;
-        return `${variant.sku}${dateSuffix}`;
-    }
+    const sku = variant.sku || '';
     
-    // Format Baru: Dengan Tanggal Terbaca (DDMMYY)
+    // Build 6-digit date string (DDMMYY)
     let dateStr = '';
     if (printDate) {
         const parts = printDate.split('T')[0].split('-');
         if (parts.length === 3) {
-            dateStr = `-${parts[2]}${parts[1]}${parts[0].slice(-2)}`;
+            dateStr = `${parts[2]}${parts[1]}${parts[0].slice(-2)}`;
         }
     }
 
-    if (type === 'ONLINE') return `$${variant.shortCode}${dateStr}*${sessionOrPo}`;
-    if (type === 'PO') {
-        const poBase36 = parseInt(sessionOrPo, 10).toString(36).toLowerCase();
-        return `$${variant.shortCode}${dateStr}#${poBase36}`;
-    }
-    return `$${variant.shortCode}${dateStr}`;
+    if (type === 'ONLINE') return `${sku}${dateStr}*${sessionOrPo}`;
+    if (type === 'PO') return `${sku}${dateStr}#${sessionOrPo}`;
+    return `${sku}${dateStr}`;
 };
 
+// --- PARSER SKU UNIVERSAL (Mendukung 3 Generasi Barcode) ---
+// Gen1 (Legacy): 7010213620260622#PO4  → potong 8 digit tanggal
+// Gen2 ($ABCD): $ABCD-220626#4         → baca shortCode 4 huruf
+// Gen3 (Baru):  1136220626#4           → potong 6 digit tanggal
 const parseGlobalSku = (raw, providedVariants = null) => {
     let text = raw.trim().toUpperCase();
+    
+    // Gen2: dimulai dengan $
     if (text.startsWith('$')) {
-        // Barcode baru: $XXXX*1 (tanpa strip)
         const mainPart = text.substring(1);
-        // ShortCode selalu 4 karakter PERTAMA!
         const shortCode = mainPart.substring(0, 4);
         const sourceVariants = providedVariants || window.globalVariants || [];
         const v = sourceVariants.find(v => v.shortCode === shortCode);
         return v ? v.sku : shortCode;
     }
-    // Legacy parsing
-    let sku = text;
-    if (sku.includes('#')) { let s = sku.split('#')[0]; if (s.length > 8 && !isNaN(s.slice(-8))) s = s.slice(0, -8); return s; }
-    if (sku.includes('*')) { let s = sku.split('*')[0]; if (s.length > 8 && !isNaN(s.slice(-8))) s = s.slice(0, -8); return s; }
-    if (sku.length > 8 && !isNaN(sku.slice(-8))) return sku.slice(0, -8);
-    return sku;
+    
+    // Ambil bagian utama (buang suffix #PO4 atau *1)
+    let mainPart = text;
+    if (mainPart.includes('#')) mainPart = mainPart.split('#')[0];
+    if (mainPart.includes('*')) mainPart = mainPart.split('*')[0];
+    
+    const sourceVariants = providedVariants || window.globalVariants || [];
+    
+    // --- Strategi 1: Coba Gen3 (potong 6 digit tanggal DDMMYY) ---
+    if (mainPart.length >= 7 && mainPart.length <= 13 && !isNaN(mainPart.slice(-6))) {
+        const candidate = mainPart.slice(0, -6);
+        if (candidate) {
+            // Cek apakah SKU ini ada di database (baik sebagai SKU utama maupun legacy)
+            const found = sourceVariants.find(v => v.sku === candidate || (v.legacySkus || []).includes(candidate));
+            if (found) return found.sku;
+        }
+    }
+    
+    // --- Strategi 2: Coba Gen1 (potong 8 digit tanggal YYYYMMDD) ---
+    if (mainPart.length > 8 && !isNaN(mainPart.slice(-8))) {
+        const candidate = mainPart.slice(0, -8);
+        if (candidate) {
+            // Cek di database dulu
+            const found = sourceVariants.find(v => v.sku === candidate || (v.legacySkus || []).includes(candidate));
+            if (found) return found.sku;
+            // Kalau tidak ada di database, tetap kembalikan (backward compat)
+            return candidate;
+        }
+    }
+    
+    // --- Strategi 3: Coba Gen3 tanpa validasi database (untuk kasus pertama kali) ---
+    if (mainPart.length >= 7 && mainPart.length <= 13 && !isNaN(mainPart.slice(-6))) {
+        return mainPart.slice(0, -6);
+    }
+    
+    // Fallback: kembalikan apa adanya
+    return mainPart;
 };
 
 const detectGlobalBarcodeType = (raw) => {
@@ -595,7 +623,9 @@ function App() {
                         colorName: c.name, colorCode: c.code, sizeName: s.name, sizeCode: s.code,
                         sku: `${p.baseCode}${c.code}${s.code}`,
                         colorIndex: cIdx, sizeIndex: sIdx,
-                        shortCode: sc
+                        shortCode: sc,
+                        // Gen3: Daftar SKU lama agar stiker jadul tetap terbaca
+                        legacySkus: (p.legacySkus && p.legacySkus[key]) ? p.legacySkus[key] : []
                     });
                 });
             });
@@ -5141,19 +5171,10 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
         let skuCandidate = scannedVal;
 
-        // JIKA BARCODE BARU (Mulai dengan $)
-        if (skuCandidate.startsWith('$')) {
-            skuCandidate = parseGlobalSku(skuCandidate);
-        } else {
-            // LOGIKA LAMA
-            if (skuCandidate.includes('#')) skuCandidate = skuCandidate.split('#')[0];
-            if (skuCandidate.includes('*')) skuCandidate = skuCandidate.split('*')[0];
-            if (skuCandidate.length > 8 && !isNaN(skuCandidate.slice(-8))) {
-                skuCandidate = skuCandidate.slice(0, -8);
-            }
-        }
+        // PARSER UNIVERSAL: Mendukung Gen1, Gen2, dan Gen3
+        skuCandidate = parseGlobalSku(skuCandidate);
 
-        const itemIndex = activeOrder.items.findIndex(i => i.sysSku === skuCandidate || i.sku === skuCandidate);
+        const itemIndex = activeOrder.items.findIndex(i => i.sysSku === skuCandidate || i.sku === skuCandidate || (i.legacySkus || []).includes(skuCandidate));
 
         if (itemIndex === -1) {
             playError();
@@ -5393,7 +5414,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
             return variants.find(v => v.shortCode === sc);
         } else {
             const sku = parseGlobalSku(clean, variants);
-            return variants.find(v => v.sku === sku);
+            return variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
         }
     };
 
@@ -6931,6 +6952,16 @@ function StatCard({ title, value, icon, color, bg, onClick }) {
 
 // 2. Upload Produk (Master)
 function UploadProduk({ products, setIsLoading, showToast }) {
+    // Gen3: Auto-generate kode berurutan
+    const nextBaseCode = useMemo(() => {
+        let maxCode = 0;
+        products.forEach(p => {
+            const num = parseInt(p.baseCode, 10);
+            if (!isNaN(num) && num > maxCode) maxCode = num;
+        });
+        return String(maxCode + 1);
+    }, [products]);
+    
     const initialForm = { article: '', baseCode: '', photo: '', buyPrice: 0, sellPrice: 0 };
     const [form, setForm] = useState(initialForm);
     const [colors, setColors] = useState([{ name: '', code: '' }]);
@@ -6940,6 +6971,57 @@ function UploadProduk({ products, setIsLoading, showToast }) {
     const toggleStatus = async (id, currentStatus) => {
         setIsLoading(true); await db.collection('products').doc(id).update({ isActive: !currentStatus }); setIsLoading(false);
         showToast('success', 'Status produk berhasil diubah');
+    };
+
+    // Gen3: Fitur Robot Cuci Gudang (Migrasi SKU Lama ke Berurutan)
+    const runMigration = async () => {
+        if (!confirm("PERINGATAN: Fitur ini (Robot Cuci Gudang) akan mengubah baseCode semua produk lama menjadi format berurutan. Ini hanya boleh dilakukan SEKALI saat migrasi Gen3. Lanjutkan?")) return;
+        setIsLoading(true);
+        try {
+            let counter = 1;
+            let batch = db.batch();
+            let batchCount = 0;
+            
+            const sortedProducts = [...products].sort((a,b) => a.article.localeCompare(b.article));
+            
+            for (const p of sortedProducts) {
+                const oldBaseCode = p.baseCode;
+                const newBaseCode = String(counter++);
+                
+                const newLegacySkus = p.legacySkus || {};
+                
+                (p.colors || []).forEach(c => {
+                    (p.sizes || []).forEach(s => {
+                        const key = `${c.code}${s.code}`;
+                        const oldSku = `${oldBaseCode}${c.code}${s.code}`;
+                        if (!newLegacySkus[key]) newLegacySkus[key] = [];
+                        if (!newLegacySkus[key].includes(oldSku)) {
+                            newLegacySkus[key].push(oldSku);
+                        }
+                    });
+                });
+                
+                const docRef = db.collection('products').doc(p.id);
+                batch.update(docRef, {
+                    baseCode: newBaseCode,
+                    legacySkus: newLegacySkus
+                });
+                batchCount++;
+                
+                if (batchCount % 450 === 0) {
+                    await batch.commit();
+                    batch = db.batch();
+                }
+            }
+            
+            if (batchCount % 450 !== 0) {
+                await batch.commit();
+            }
+            showToast('success', `Migrasi berhasil! ${batchCount} produk telah diubah ke format Gen3.`);
+        } catch (e) {
+            showToast('error', 'Gagal migrasi: ' + e.message);
+        }
+        setIsLoading(false);
     };
 
     const handleEdit = (product) => {
@@ -6962,6 +7044,8 @@ function UploadProduk({ products, setIsLoading, showToast }) {
         if (form.photo && form.photo.length > 900000) return showToast('error', "Ukuran foto terlalu besar! Maksimal 800kb.");
         setIsLoading(true);
         const dataToSave = { ...form, colors: [...colors], sizes: [...sizes], isActive: true };
+        // Gen3: Untuk produk baru, pastikan pakai kode otomatis berurutan
+        if (!editId) dataToSave.baseCode = nextBaseCode;
         try {
             if (editId) { await db.collection('products').doc(editId).update(dataToSave); showToast('success', 'Produk berhasil diupdate!'); }
             else { dataToSave.id = 'P' + Date.now(); await db.collection('products').doc(dataToSave.id).set(dataToSave); playConfirm(); showToast('success', 'Produk baru ditambahkan!'); }
@@ -6987,7 +7071,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                             <h4 className="font-bold text-lg text-slate-800 flex items-center"><span className="bg-slate-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> Informasi Utama</h4>
                             <div className="space-y-4">
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Article</label><input required type="text" value={form.article} onChange={e => setForm({ ...form, article: e.target.value.toUpperCase() })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 uppercase bg-white shadow-inner font-bold text-slate-800" placeholder="CONTOH: F01-04.1" /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article)</label><input required type="text" value={form.baseCode} onChange={e => setForm({ ...form, baseCode: e.target.value })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 font-mono bg-white shadow-inner text-slate-800" placeholder="Contoh: 01041" /></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article) {!editId && <span className="text-emerald-600 text-xs font-bold ml-1">✅ Otomatis #{nextBaseCode}</span>}</label><input required type="text" value={editId ? form.baseCode : (form.baseCode || nextBaseCode)} onChange={e => editId ? setForm({ ...form, baseCode: e.target.value }) : null} readOnly={!editId} className={`w-full px-5 py-3.5 border-2 rounded-xl outline-none font-mono shadow-inner text-slate-800 ${editId ? 'border-slate-300 focus:border-orange-500 bg-white' : 'border-emerald-300 bg-emerald-50 cursor-not-allowed font-black text-emerald-700'}`} placeholder="Otomatis" /></div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Beli</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 bg-white shadow-inner font-bold text-slate-800" placeholder="0" /></div></div>
                                     <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Jual</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.sellPrice} onChange={e => setForm({ ...form, sellPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 bg-white shadow-inner font-bold text-slate-800" placeholder="0" /></div></div>
@@ -7065,7 +7149,10 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-xl text-slate-800"><i className="fa-solid fa-list-ul text-orange-500 mr-2"></i> Daftar Produk</h3>
+                    <h3 className="font-black text-xl text-slate-800 flex items-center">
+                        <i className="fa-solid fa-list-ul text-orange-500 mr-3"></i> Daftar Produk 
+                        <button onClick={runMigration} className="ml-4 text-[10px] bg-red-100 hover:bg-red-500 hover:text-white text-red-600 px-3 py-1 rounded-full font-bold transition-colors border border-red-200"><i className="fa-solid fa-robot mr-1"></i> Robot Cuci Gudang</button>
+                    </h3>
                     <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{products.length} Produk</span>
                 </div>
                 <div className="overflow-x-auto">
@@ -7154,7 +7241,8 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         if (!cleanBarcode) return;
 
         const isShortcode = cleanBarcode.startsWith('$');
-        const isLegacySystemBarcode = cleanBarcode.length > 8 && !isNaN(cleanBarcode.split('*')[0].split('#')[0].slice(-8));
+        const coreBarcode = cleanBarcode.split('*')[0].split('#')[0];
+        const isLegacySystemBarcode = coreBarcode.length > 6 && (!isNaN(coreBarcode.slice(-8)) || !isNaN(coreBarcode.slice(-6)));
 
         if (!isShortcode && !isLegacySystemBarcode) {
             playError(); showToast('error', "Barcode ditolak! Harus dari label cetak sistem.");
@@ -7179,7 +7267,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
             }
         } else {
             const skuCandidate = parseGlobalSku(cleanBarcode);
-            matched = variantsRef.current.find(v => v.sku === skuCandidate);
+            matched = variantsRef.current.find(v => v.sku === skuCandidate || (v.legacySkus || []).includes(skuCandidate));
         }
         if (matched) {
             setScannedItems(prev => {
@@ -7575,7 +7663,8 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
         if (!cleanBarcode) return;
 
         const isShortcode = cleanBarcode.startsWith('$');
-        const isLegacySystemBarcode = cleanBarcode.length > 8 && !isNaN(cleanBarcode.split('*')[0].split('#')[0].slice(-8));
+        const coreBarcode = cleanBarcode.split('*')[0].split('#')[0];
+        const isLegacySystemBarcode = coreBarcode.length > 6 && (!isNaN(coreBarcode.slice(-8)) || !isNaN(coreBarcode.slice(-6)));
 
         if (!isShortcode && !isLegacySystemBarcode) {
             playError(); showToast('error', "Hanya menerima barcode dari sistem!");
@@ -7592,7 +7681,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             }
         } else {
             const skuCandidate = parseGlobalSku(cleanBarcode);
-            matched = variantsRef.current.find(v => v.sku === skuCandidate);
+            matched = variantsRef.current.find(v => v.sku === skuCandidate || (v.legacySkus || []).includes(skuCandidate));
         }
         if (matched) {
             playSuccess();
@@ -7641,7 +7730,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
                 const skuCandidate = parseGlobalSku(bc, variants);
 
-                const variant = variants.find(v => v.sku === skuCandidate);
+                const variant = variants.find(v => v.sku === skuCandidate || (v.legacySkus || []).includes(skuCandidate));
                 result.push({ fullBarcode: bc, variant, sysQty, scanQty, diff });
             });
             result.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff) || (a.variant?.article || '').localeCompare(b.variant?.article || ''));
@@ -10227,7 +10316,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         }
 
         const sku = parseSku(fullBarcode);
-        const variantExists = (variants || []).find(v => v.sku === sku);
+        const variantExists = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
         if (!variantExists) {
             beep(false);
             showToast('error', `DITOLAK! Barang tidak terdaftar di Master Produk.`);
@@ -10287,7 +10376,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         try {
             const sjItems = Object.entries(scannedItemsPengirim).map(([barcode, qty]) => {
                 const sku = parseSku(barcode);
-                const variant = (variants || []).find(v => v.sku === sku);
+                const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
                 return {
                     fullBarcode: barcode, sku: sku, qty: qty,
                     itemType: scannedTypePengirim[barcode] || 'UNKNOWN',
@@ -10387,6 +10476,13 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         let matchedItem = (activeDraft.items || []).find(i => i.fullBarcode === fullBarcode);
         if (!matchedItem) {
             matchedItem = (activeDraft.items || []).find(i => i.sku === sku && i.itemType === itemType);
+        }
+        // Gen3 fallback: cek legacySkus jika belum ketemu
+        if (!matchedItem) {
+            const variantMatch = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
+            if (variantMatch) {
+                matchedItem = (activeDraft.items || []).find(i => i.sku === variantMatch.sku && i.itemType === itemType);
+            }
         }
 
         if (!matchedItem) {
