@@ -7199,7 +7199,6 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-xl text-slate-800 flex items-center">
                         <i className="fa-solid fa-list-ul text-orange-500 mr-3"></i> Daftar Produk 
-                        <button onClick={runMigration} className="ml-4 text-[10px] bg-red-100 hover:bg-red-500 hover:text-white text-red-600 px-3 py-1 rounded-full font-bold transition-colors border border-red-200"><i className="fa-solid fa-robot mr-1"></i> Robot Cuci Gudang</button>
                     </h3>
                     <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{products.length} Produk</span>
                 </div>
@@ -8086,7 +8085,8 @@ function CetakLabel({ products, variants, showToast }) {
                 safeLower(v.colorName).includes(word) ||
                 safeLower(v.sizeName).includes(word) ||
                 safeLower(v.sku).includes(word) ||
-                safeLower(v.baseCode).includes(word);
+                safeLower(v.baseCode).includes(word) ||
+                (v.legacySkus && v.legacySkus.some(ls => safeLower(ls).includes(word)));
         });
     });
 
@@ -8559,7 +8559,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 
     const handleSaveUser = async (e) => {
         e.preventDefault(); setIsLoading(true);
-        const emailFormat = formUser.username.toLowerCase() + '@faradela.id';
+        const emailFormat = formUser.username.toLowerCase() + '@faradela.com';
         try {
             let secondaryApp;
             const apps = firebase.apps.filter(app => app.name === "Secondary");
@@ -8725,7 +8725,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         if (!v.isActive || !query) return false;
         if (/^\d{8,}$/.test(query)) return safeLower(v.sku) === query || safeLower(v.baseCode) === query;
         const words = query.split(/\s+/);
-        return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
+        return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word) || (v.legacySkus && v.legacySkus.some(ls => safeLower(ls).includes(word))));
     }).slice(0, 30);
 
     const addToDraft = (variant) => {
@@ -11512,7 +11512,7 @@ function LoginPage({ onLogin }) {
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const emailFormat = username.toLowerCase() + '@faradela.id';
+        const emailFormat = username.toLowerCase() + '@faradela.com';
 
         try {
             // Animasi selama 2 detik sebelum cek ke database
@@ -11537,7 +11537,7 @@ function LoginPage({ onLogin }) {
                         throw new Error("Username atau Password salah!");
                     }
                 } else if (authError.code === 'auth/email-already-in-use') {
-                    throw new Error("Akun nyangkut! Hapus mindela@faradela.id di tab Authentication Firebase.");
+                    throw new Error("Akun nyangkut! Hapus mindela@faradela.com di tab Authentication Firebase.");
                 } else {
                     throw authError; // Lempar error lain
                 }
