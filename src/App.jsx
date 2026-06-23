@@ -8079,15 +8079,7 @@ function CetakLabel({ products, variants, showToast }) {
         }
 
         // Logika pencarian multi-kata (seperti "Hitam 36" atau "F07")
-        const words = query.split(/\s+/);
-        return words.every(word => {
-            return safeLower(v.article).includes(word) ||
-                safeLower(v.colorName).includes(word) ||
-                safeLower(v.sizeName).includes(word) ||
-                safeLower(v.sku).includes(word) ||
-                safeLower(v.baseCode).includes(word) ||
-                (v.legacySkus && v.legacySkus.some(ls => safeLower(ls).includes(word)));
-        });
+        return safeLower(v.article).includes(query) || safeLower(v.colorName).includes(query) || safeLower(v.sizeName).includes(query) || safeLower(v.sku).includes(query) || safeLower(v.baseCode).includes(query);
     });
 
     return (
@@ -8110,7 +8102,7 @@ function CetakLabel({ products, variants, showToast }) {
                             <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-orange-400 transition-colors gap-4">
                                 <div className="flex items-center gap-4">
                                     <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
-                                    <div><div className="text-base font-black text-slate-800">{v.article} <span className="text-xs text-orange-500 bg-orange-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span></div></div>
+                                    <div><div className="text-base font-black text-slate-800">{v.article} <span className="text-xs text-orange-500 bg-orange-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                 </div>
                                 <div className="flex items-center gap-2 w-full md:w-auto">
                                     <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-orange-500 bg-slate-50" />
@@ -8725,7 +8717,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         if (!v.isActive || !query) return false;
         if (/^\d{8,}$/.test(query)) return safeLower(v.sku) === query || safeLower(v.baseCode) === query;
         const words = query.split(/\s+/);
-        return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word) || (v.legacySkus && v.legacySkus.some(ls => safeLower(ls).includes(word))));
+        return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
     }).slice(0, 30);
 
     const addToDraft = (variant) => {
@@ -9297,7 +9289,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                 <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-orange-400 transition-colors gap-4">
                                     <div className="flex items-center gap-4">
                                         <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
-                                        <div><div className="text-base font-black text-slate-800">{v.article}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span></div></div>
+                                        <div><div className="text-base font-black text-slate-800">{v.article}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                     </div>
                                     <div className="flex items-center gap-2 w-full md:w-auto">
                                         <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-orange-500 bg-slate-50" />
