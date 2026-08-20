@@ -182,7 +182,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 return sum;
             }, 0) : 0;
 
-            // ATURAN BARU FARADELA: 
+            // ATURAN BARU SYAREN: 
             // - Stok standar minimum/maksimum untuk barang biasa/sepi adalah 20 pcs.
             // - Kalau barang laris, ROP akan membesar otomatis.
             const baseTargetStock = 20;
@@ -203,7 +203,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                     recommendedPO = baseTargetStock - stockRiil; // Mentok di 20
                 } else if (stockRiil > baseTargetStock) {
                     status = 'Overstock (Promosikan!)';
-                    statusColor = 'bg-orange-100 text-orange-700 font-bold';
+                    statusColor = 'bg-rose-100 text-rose-700 font-bold';
                 }
             } else {
                 // BARANG LARIS / FAST MOVING
@@ -236,6 +236,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 deficit,
                 status,
                 statusColor,
+
                 recommendedPO
             };
         });
@@ -247,22 +248,27 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
         return calculated.slice(0, 15);
 
     }, [inventoryData, leadTime]);
+    
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-slate-50 text-slate-500 font-bold">
-                <i className="fa-solid fa-circle-notch fa-spin text-3xl text-orange-500 mr-3"></i> Sedang Sinkronisasi Data Analytics...
+                <i className="fa-solid fa-circle-notch fa-spin text-3xl text-rose-500 mr-3"></i> Sedang Sinkronisasi Data Analytics...
             </div>
         );
     }
 
     return (
+
+        
         <div className="p-6 bg-slate-50 min-h-screen">
             <div className="mb-8">
-                <h1 className="text-3xl font-black text-slate-800 flex items-center gap-3">
-                    <i className="fa-solid fa-chart-line text-orange-500"></i> Analisis Tren & Peringatan Stok
+                <h1 className="text-3xl font-black text-rose-800 flex items-center gap-3">
+                    <i className="fa-solid fa-chart-line text-rose-500"></i> Analisis Tren & Peringatan Stok
                 </h1>
                 <p className="text-slate-500 font-medium mt-2">Data tersinkronisasi otomatis dari database Firebase</p>
+
+                
             </div>
 
             {/* SUMMARY CARDS */}
@@ -270,7 +276,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center">
                     <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-arrow-trend-up text-blue-500"></i> Pertumbuhan Penjualan</p>
                     <div className="flex items-end gap-3">
-                        <h3 className="text-4xl font-black text-slate-800">{isTrendPositive && trendGrowth !== "0.0" ? '+' : ''}{trendGrowth}%</h3>
+                        <h3 className="text-4xl font-black text-rose-800">{isTrendPositive && trendGrowth !== "0.0" ? '+' : ''}{trendGrowth}%</h3>
                         <span className={`text-sm font-bold pb-1 ${isTrendPositive ? "text-emerald-500" : "text-rose-500"}`}>
                             {isTrendPositive ? <i className="fa-solid fa-caret-up"></i> : <i className="fa-solid fa-caret-down"></i>} {timeFilter === "Mingguan" ? "MINGGU INI" : timeFilter === "Bulanan" ? "BULAN INI" : "TAHUN INI"}
                         </span>
@@ -280,7 +286,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center relative group">
                     <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center justify-between">
                         <span className="flex items-center gap-2"><i className="fa-solid fa-industry text-purple-500"></i> Kapasitas Harian (Vendor)</span>
-                        <button onClick={() => setIsEditingCapacity(!isEditingCapacity)} className="text-slate-300 hover:text-orange-500 transition-colors">
+                        <button onClick={() => setIsEditingCapacity(!isEditingCapacity)} className="text-slate-300 hover:text-rose-500 transition-colors">
                             <i className="fa-solid fa-pen-to-square"></i>
                         </button>
                     </p>
@@ -290,22 +296,22 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 type="number" 
                                 value={globalMetrics.dailyProductionCapacity} 
                                 onChange={handleCapacityChange}
-                                className="w-24 px-2 py-1 text-2xl font-black text-slate-800 border-b-2 border-orange-500 outline-none bg-slate-50"
+                                className="w-24 px-2 py-1 text-2xl font-black text-rose-800 border-b-2 border-rose-500 outline-none bg-slate-50"
                                 autoFocus
                                 onBlur={() => setIsEditingCapacity(false)}
                             />
                             <span className="text-base text-slate-400">Pcs/Hari</span>
                         </div>
                     ) : (
-                        <h3 className="text-3xl font-black text-slate-800 cursor-pointer" onClick={() => setIsEditingCapacity(true)}>
+                        <h3 className="text-3xl font-black text-rose-800 cursor-pointer" onClick={() => setIsEditingCapacity(true)}>
                             {globalMetrics.dailyProductionCapacity} <span className="text-base text-slate-400">Pcs/Hari</span>
                         </h3>
                     )}
                 </div>
 
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col justify-center">
-                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-boxes-stacked text-orange-500"></i> Total Antrean PO Pabrik</p>
-                    <h3 className="text-3xl font-black text-slate-800">{globalMetrics.totalPOQueue} <span className="text-base text-slate-400">Pcs</span></h3>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><i className="fa-solid fa-boxes-stacked text-rose-500"></i> Total Antrean PO Pabrik</p>
+                    <h3 className="text-3xl font-black text-rose-800">{globalMetrics.totalPOQueue} <span className="text-base text-slate-400">Pcs</span></h3>
                 </div>
 
                 <div className="bg-emerald-500 rounded-2xl p-6 shadow-lg shadow-emerald-500/20 text-white flex flex-col justify-center relative overflow-hidden">
@@ -321,7 +327,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 {/* LINE CHART: TREND PENJUALAN */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                        <h3 className="text-lg font-black text-rose-800 flex items-center gap-2">
                             <i className="fa-solid fa-chart-area text-blue-500"></i> Tren Penjualan
                         </h3>
                         <div className="flex items-center gap-3">
@@ -343,7 +349,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                     {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
                                 </select>
                             )}
-                            <div className="flex bg-slate-100 p-1 rounded-lg">
+                            <div className="flex bg-rose-50 p-1 rounded-lg">
                             {["Mingguan", "Bulanan", "Tahunan"].map(tf => (
                                 <button 
                                     key={tf}
@@ -373,7 +379,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
 
                 {/* BAR CHART: PERINGATAN STOK VS ROP */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
-                    <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2"><i className="fa-solid fa-triangle-exclamation text-rose-500"></i> Peringatan Stok Riil vs ROP</h3>
+                    <h3 className="text-lg font-black text-rose-800 mb-6 flex items-center gap-2"><i className="fa-solid fa-triangle-exclamation text-rose-500"></i> Peringatan Stok Riil vs ROP</h3>
                     <div className="h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={processedInventory} margin={{ top: 5, right: 20, bottom: 5, left: 0 }} barSize={30}>
@@ -397,7 +403,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
             {/* RECOMMENDATION TABLE */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative">
                 <div className="p-6 border-b-2 bg-slate-50 flex items-center justify-between">
-                    <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+                    <h3 className="text-xl font-black text-rose-800 flex items-center gap-3">
                         <i className="fa-solid fa-clipboard-list text-emerald-500"></i>
                         Tabel Rekomendasi Aksi
                     </h3>
@@ -431,7 +437,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 alert("Fitur navigasi belum diaktifkan di komponen induk");
                             }
                         }}
-                        className="bg-orange-500 hover:bg-orange-600 text-white font-black px-6 py-2.5 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 transform hover:scale-105"
+                        className="bg-rose-500 hover:bg-rose-600 text-white font-black px-6 py-2.5 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 transform hover:scale-105"
                     >
                         Buat PO MPO Sekarang <i className="fa-solid fa-arrow-right"></i>
                     </button>
@@ -454,7 +460,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                     <td className="p-4 font-black text-slate-700">{item.id}</td>
                                     <td className="p-4 font-semibold text-slate-600">{item.name}</td>
-                                    <td className="p-4 text-center font-black text-slate-800">{item.stock}</td>
+                                    <td className="p-4 text-center font-black text-rose-800">{item.stock}</td>
                                     <td className="p-4 text-center font-bold text-slate-400">{item.rop}</td>
                                     <td className="p-4 text-center">
                                         <span className={`px-3 py-1 rounded-full text-xs ${item.statusColor}`}>{item.status}</span>
@@ -463,7 +469,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                         {item.status === 'Segera Restock!' && <span className="text-rose-600 flex items-center gap-2"><i className="fa-solid fa-circle-exclamation"></i> Buat PO baru {item.recommendedPO} Pcs</span>}
                                         {item.status === 'Restock Sedikit' && <span className="text-yellow-600 flex items-center gap-2"><i className="fa-solid fa-cart-plus"></i> PO Santai {item.recommendedPO} Pcs</span>}
                                         {item.status === 'Aman' && <span className="text-emerald-600 flex items-center gap-2"><i className="fa-solid fa-check"></i> Tidak perlu PO</span>}
-                                        {item.status.includes('Overstock') && <span className="text-orange-600 flex items-center gap-2"><i className="fa-solid fa-fire"></i> Bikin Diskon / Obral!</span>}
+                                        {item.status.includes('Overstock') && <span className="text-rose-600 flex items-center gap-2"><i className="fa-solid fa-fire"></i> Bikin Diskon / Obral!</span>}
                                     </td>
                                 </tr>
                             ))}

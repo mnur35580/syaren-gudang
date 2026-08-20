@@ -1,5 +1,5 @@
 const fs = require('fs');
-let code = fs.readFileSync('d:/Ahmad/Project webapk/Web Faradela Official/faradela management gudang/src/App.jsx', 'utf8');
+let code = fs.readFileSync('d:/Ahmad/Project webapk/Web Syaren Official/syaren management gudang/src/App.jsx', 'utf8');
 
 const scannerComponent = `
 // ==========================================
@@ -63,5 +63,5 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
 
 code = code.replace('// ==========================================\nconst firebaseConfig', scannerComponent + '\n// ==========================================\nconst firebaseConfig');
 
-fs.writeFileSync('d:/Ahmad/Project webapk/Web Faradela Official/faradela management gudang/src/App.jsx', code);
+fs.writeFileSync('d:/Ahmad/Project webapk/Web Syaren Official/syaren management gudang/src/App.jsx', code);
 console.log('Injected ZxingScanner component');
