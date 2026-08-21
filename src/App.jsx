@@ -741,7 +741,7 @@ function App() {
 
             <aside className="hidden md:flex flex-col w-64 bg-white text-rose-900 shadow-xl z-20 flex-shrink-0">
                 <div className="flex flex-col items-center justify-center h-16 bg-[#d4c4b7] text-rose-950 font-bold text-sm py-2 border-b border-r border-[#d6909a] flex-shrink-0">
-                    <div className="flex items-center"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-6 h-6 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</div>
+                    <div className="flex items-center"><img src="/LogoV2.png" alt="Logo" className="w-6 h-6 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</div>
                     <div className="text-[10px] text-rose-800 font-normal mt-0 tracking-wider">(Versi 2.0 by Ahmad)</div>
                 </div>
                 <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-0.5 px-4 custom-scrollbar">
@@ -765,7 +765,7 @@ function App() {
                     <div className="w-64 h-full bg-white flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
                         <div className="flex items-center justify-between h-14 px-4 bg-[#d4c4b7] text-rose-950 border-b border-[#d6909a] flex-shrink-0">
                             <div className="flex flex-col justify-center">
-                                <span className="font-bold flex items-center text-sm"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-5 h-5 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</span>
+                                <span className="font-bold flex items-center text-sm"><img src="/LogoV2.png" alt="Logo" className="w-5 h-5 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</span>
                                 <span className="text-[9px] text-rose-800 font-normal mt-0">(Versi 2.0 by Ahmad)</span>
                             </div>
                             <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400 hover:text-rose-950"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -10915,7 +10915,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     <body>
                         <div class="super-compact-header">
                             <div class="brand-section">
-                                <img src="/duolaigudang/LogoV2.png" alt="Logo Syaren" />
+                                <img src="/LogoV2.png" alt="Logo Syaren" />
                                 <div class="brand-text">
                                     <h2>SYAREN OFFICIAL</h2>
                                     <p class="nota-title">TANDA TERIMA</p>
@@ -11708,7 +11708,7 @@ function LoginPage({ onLogin }) {
             <div className={`w-full max-w-md rounded-3xl relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-10 shadow-2xl' : ''}`}>
                 {!loading ? (
                     <>
-                        <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
+                        <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
                         <form onSubmit={handleLogin} action="javascript:void(0);" className="space-y-6">
                             <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
                             <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
@@ -11717,7 +11717,7 @@ function LoginPage({ onLogin }) {
                     </>
                 ) : (
                     <div className="flex items-center justify-center pointer-events-none scale-110">
-                        <img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-72 h-72 sm:w-80 sm:h-80 object-contain animate-logo-flip" />
+                        <img src="/LogoV2.png" alt="Logo" className="w-72 h-72 sm:w-80 sm:h-80 object-contain animate-logo-flip" />
                     </div>
                 )}
             </div>
