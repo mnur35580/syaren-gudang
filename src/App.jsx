@@ -4043,7 +4043,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     formData.append('file', file);
                     formData.append('upload_preset', 'gudang_pdf');
                     try {
-                        const response = await fetch('https://api.cloudinary.com/v1_1/dfcfebwrk/auto/upload', {
+                        const response = await fetch('https://api.cloudinary.com/v1_1/z7fzcccu/auto/upload', {
                             method: 'POST',
                             body: formData
                         });
