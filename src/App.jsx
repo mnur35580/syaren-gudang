@@ -11670,7 +11670,7 @@ function LoginPage({ onLogin }) {
                         await firebase.auth().createUserWithEmailAndPassword(emailFormat, password);
 
                         // PERBAIKAN FINAL: Gunakan variabel 'db' langsung bawaan aplikasi Anda!
-                        await db.collection('users').doc('mindela').set({ username: 'mindela', password: 'Sukses@2026', role: 'admin', access: [] });
+                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: 'Syaren@2026', role: 'admin', access: [] });
 
                         alert('âœ… Akun Berhasil Terdaftar! Silakan klik MASUK SEKARANG sekali lagi.');
                         setLoading(false);
@@ -11679,7 +11679,7 @@ function LoginPage({ onLogin }) {
                         throw new Error("Username atau Password salah!");
                     }
                 } else if (authError.code === 'auth/email-already-in-use') {
-                    throw new Error("Akun nyangkut! Hapus mindela@syaren.com di tab Authentication Firebase.");
+                    throw new Error("Akun nyangkut! Hapus minsyaren@syaren.com di tab Authentication Firebase.");
                 } else {
                     throw authError; // Lempar error lain
                 }
