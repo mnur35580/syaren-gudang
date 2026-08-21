@@ -11666,7 +11666,7 @@ function LoginPage({ onLogin }) {
             } catch (authError) {
                 // Jika akun belum ada, otomatis buatkan (Khusus Admin)
                 if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-login-credentials' || authError.code === 'auth/invalid-credential') {
-                    if (username === 'mindela' && password === 'Sukses@2026') {
+                    if (username === 'minsyaren' && password === 'Syaren@2026') {
                         await firebase.auth().createUserWithEmailAndPassword(emailFormat, password);
 
                         // PERBAIKAN FINAL: Gunakan variabel 'db' langsung bawaan aplikasi Anda!
