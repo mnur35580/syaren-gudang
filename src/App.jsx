@@ -1,4 +1,4 @@
-﻿const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
+const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 
@@ -733,7 +733,7 @@ function App() {
                 <div className={`fixed top-4 right-4 z-[99999] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-rose-950 animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
                     <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-3xl flex-shrink-0`}></i>
                     <div>
-                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'âš ï¸ Peringatan' : 'âœ… Berhasil'}</h4>
+                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'Peringatan!' : 'Berhasil'}</h4>
                         <p className="text-sm font-semibold mt-0.5 leading-snug">{toast.message}</p>
                     </div>
                 </div>
@@ -1980,7 +1980,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     const downloadedFiles = {};
                     for (const urlObj of batch.pdfUrls) {
                         const response = await fetch(urlObj.url);
+                        if (!response.ok) {
+                            throw new Error(`Gagal mengunduh file "${urlObj.name}" dari Cloud (HTTP ${response.status}). URL mungkin kedaluwarsa atau file tidak ditemukan.`);
+                        }
                         const arrayBuffer = await response.arrayBuffer();
+                        // Validasi: file PDF valid minimal berukuran beberapa ratus bytes
+                        if (arrayBuffer.byteLength < 100) {
+                            throw new Error(`File "${urlObj.name}" yang diunduh dari Cloud terlalu kecil (${arrayBuffer.byteLength} bytes) — kemungkinan file rusak atau bukan PDF. Pastikan upload_preset "gudang_pdf" di Cloudinary bertipe "Unsigned" dan resource type "Raw".`);
+                        }
                         downloadedFiles[urlObj.name] = arrayBuffer;
                     }
 
@@ -4042,8 +4049,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     const formData = new FormData();
                     formData.append('file', file);
                     formData.append('upload_preset', 'gudang_pdf');
+                    // PENTING: Gunakan /raw/upload (bukan /auto/upload) agar PDF tidak
+                    // dikonversi menjadi gambar oleh Cloudinary. /auto/upload bisa menyebabkan
+                    // PDF tersimpan sebagai gambar sehingga saat diunduh kembali, isinya kosong.
                     try {
-                        const response = await fetch('https://api.cloudinary.com/v1_1/z7fzcccu/auto/upload', {
+                        const response = await fetch('https://api.cloudinary.com/v1_1/z7fzcccu/raw/upload', {
                             method: 'POST',
                             body: formData
                         });
