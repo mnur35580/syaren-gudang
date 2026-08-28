@@ -8389,6 +8389,13 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const tableRows = [];
     sortedProducts.forEach(prod => {
         const colors = prod.colors || [];
+        
+        let articleTotalQty = 0;
+        colors.forEach(color => {
+            const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
+            articleTotalQty += sizesArray.reduce((acc, curr) => acc + curr.stock, 0);
+        });
+
         colors.forEach((color, idx) => {
             const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
             if (sizesArray.length > 0) {
@@ -8403,7 +8410,8 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 tableRows.push({
                     article: prod.article, colorName: color.name, isFirstRow: idx === 0, rowSpan: colors.length,
                     buyPrice: prod.buyPrice || 0, sellPrice: prod.sellPrice || 0, sizes: sizesArray,
-                    rowTotalBeli, rowTotalJual, photo: sizesArray.length > 0 ? sizesArray[0].photo : null
+                    rowTotalBeli, rowTotalJual, photo: sizesArray.length > 0 ? sizesArray[0].photo : null,
+                    articleTotalQty
                 });
             }
         });
@@ -8537,6 +8545,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                                     )}
                                                     <div className="w-full flex flex-col justify-between h-full">
                                                         <div className="font-extrabold text-rose-800 text-[10px] sm:text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
+                                                        <div className="mt-1 sm:hidden text-center bg-rose-100/70 text-rose-800 font-black rounded-md text-[9px] py-0.5 w-full border border-rose-200/50">{row.articleTotalQty} Pcs</div>
                                                         <div className="hidden sm:block mt-3 text-[10px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full text-left">
                                                             <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono tracking-tighter">{formatRp(row.buyPrice)}</span></div>
                                                             <div className="flex justify-between items-center gap-1 mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono tracking-tighter">{formatRp(row.sellPrice)}</span></div>
@@ -8545,7 +8554,10 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                                 </div>
                                             </td>
                                         )}
-                                        <td className="p-1.5 sm:p-5 font-bold text-slate-600 border-r border-slate-100 text-[9px] sm:text-sm">{row.colorName}</td>
+                                        <td className="p-1.5 sm:p-5 border-r border-slate-100">
+                                            <div className="font-bold text-slate-700 text-[9px] sm:text-sm whitespace-nowrap">{row.colorName}</div>
+                                            <div className="sm:hidden font-extrabold text-rose-600 text-[8px] mt-0.5">{totalPerColor} Pcs</div>
+                                        </td>
                                         {allSizeNames.map(sz => {
                                             const matchedSize = row.sizes.find(s => s.sizeName === sz);
                                             const qty = matchedSize ? matchedSize.stock : 0;
