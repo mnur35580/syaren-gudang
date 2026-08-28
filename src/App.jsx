@@ -720,7 +720,7 @@ function App() {
             case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'pantau_stok': return <PantauStok variants={allVariants} transactions={transactions} showToast={showToast} />;
             case 'stok_opname': return <StokOpname key="opname" variants={allVariants} transactions={transactions} setIsLoading={setIsLoading} showToast={showToast} currentUser={currentUser} />;
-            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} showToast={showToast} setIsLoading={setIsLoading} />;
+            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
             case 'pengaturan': return <Pengaturan currentUser={currentUser} setIsLoading={setIsLoading} setProducts={setProducts} setTransactions={setTransactions} setCurrentUser={setCurrentUser} showToast={showToast} />;
             case 'cek_surat_jalan': return <CekSuratJalan currentUser={currentUser} variants={allVariants} mpoOrders={mpoOrders} qcOrders={qcOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
             default: return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} setIsLoading={setIsLoading} showToast={showToast} />;
@@ -8877,7 +8877,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 // ==========================================
 // MPO PABRIK V2 (INPUT MATRIKS, PREVIEW, SCAN KIRIM)
 // ==========================================
-function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
+function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, setIsLoading }) {
     const [showForm, setShowForm] = useState(false);
     const [targetDate, setTargetDate] = useState('');
     const [poDate, setPoDate] = useState(toLocalDateStr());
@@ -9473,18 +9473,30 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
-                            {filteredVariants.map(v => (
-                                <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
-                                        <div><div className="text-base font-black text-rose-800">{v.article}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-rose-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
+                            {filteredVariants.map(v => {
+                                const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
+                                    if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
+                                    if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
+                                    return sum;
+                                }, 0);
+                                return (
+                                <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-4">
+                                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0" />
+                                        <div className="min-w-0 truncate">
+                                            <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
+                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 truncate">
+                                                {v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull; <span className="text-emerald-600 font-black">Stok: {variantStock}</span>
+                                                {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 w-full md:w-auto">
-                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-rose-500 bg-slate-50" />
-                                        <button type="button" onClick={() => addToDraft(v)} className="flex-1 md:flex-none bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> PO</button>
+                                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
+                                        <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                             {filteredVariants.length === 0 && (
                                 <div className="text-center text-sm font-bold text-slate-500 py-10">
                                     <i className="fa-solid fa-box-open text-4xl mb-3 text-slate-300 block"></i>
