@@ -8353,6 +8353,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
     const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
 
     const calculatedStock = variants.map(v => {
         const legacy = v.legacySkus || [];
@@ -8511,9 +8512,12 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                     <table className="w-full text-left text-sm border-collapse min-w-max">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-5 font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th><th className="p-5 font-black uppercase tracking-wider border-r bg-rose-50">Warna</th>
-                                {allSizeNames.map(s => <th key={s} className="p-5 text-center border-r font-black uppercase text-rose-600 tracking-wider w-16">{s}</th>)}
-                                <th className="p-5 text-center font-black uppercase tracking-wider bg-rose-100 text-blue-900 border-l-4 border-white">Total Qty</th><th className="p-5 text-right font-black uppercase tracking-wider border-r">Total Harga Beli</th><th className="p-5 text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Total Harga Jual</th>
+                                <th className="p-2 sm:p-5 text-[11px] sm:text-sm font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th>
+                                <th className="p-2 sm:p-5 text-[11px] sm:text-sm font-black uppercase tracking-wider border-r bg-rose-50">Warna</th>
+                                {allSizeNames.map(s => <th key={s} className="p-2 sm:p-5 text-[12px] sm:text-sm text-center border-r font-black uppercase text-rose-600 tracking-wider min-w-[40px] sm:w-16">{s}</th>)}
+                                <th className="p-2 sm:p-5 text-[11px] sm:text-sm text-center font-black uppercase tracking-wider bg-rose-100 text-blue-900 border-l-2 border-white">Qty</th>
+                                <th className="p-2 sm:p-5 text-[11px] sm:text-sm text-right font-black uppercase tracking-wider border-r">Beli</th>
+                                <th className="p-2 sm:p-5 text-[11px] sm:text-sm text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Jual</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -8524,32 +8528,32 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                 return (
                                     <tr key={`${row.article}-${row.colorName}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors whitespace-nowrap">
                                         {row.isFirstRow && (
-                                            <td className="p-4 border-r border-slate-200 align-top bg-white min-w-[140px] max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
-                                                <div className="flex flex-col items-center text-center gap-3">
+                                            <td className="p-2 sm:p-4 border-r border-slate-200 align-top bg-white min-w-[90px] max-w-[110px] sm:min-w-[140px] sm:max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
+                                                <div className="flex flex-col items-center text-center gap-2 sm:gap-3">
                                                     {row.photo && (
-                                                        <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md">
+                                                        <div className="w-12 h-12 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSelectedImage(row.photo)}>
                                                             <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
                                                         </div>
                                                     )}
                                                     <div className="w-full flex flex-col justify-between h-full">
-                                                        <div className="font-extrabold text-rose-800 text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
-                                                        <div className="mt-3 text-[10px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full text-left">
-                                                            <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
-                                                            <div className="flex justify-between items-center gap-1 mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
+                                                        <div className="font-extrabold text-rose-800 text-[11px] sm:text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
+                                                        <div className="mt-1 sm:mt-3 text-[9px] sm:text-[10px] font-normal text-slate-500 bg-slate-50 p-1.5 sm:p-2 rounded-lg border border-slate-100 w-full text-left">
+                                                            <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono tracking-tighter">{formatRp(row.buyPrice)}</span></div>
+                                                            <div className="flex justify-between items-center gap-1 mt-0.5 sm:mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono tracking-tighter">{formatRp(row.sellPrice)}</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
                                             </td>
                                         )}
-                                        <td className="p-5 font-bold text-slate-600 border-r border-slate-100">{row.colorName}</td>
+                                        <td className="p-2 sm:p-5 font-bold text-slate-600 border-r border-slate-100 text-[11px] sm:text-sm">{row.colorName}</td>
                                         {allSizeNames.map(sz => {
                                             const matchedSize = row.sizes.find(s => s.sizeName === sz);
                                             const qty = matchedSize ? matchedSize.stock : 0;
-                                            return <td key={sz} className={`p-5 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
+                                            return <td key={sz} className={`p-2 sm:p-5 text-center text-[13px] sm:text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
                                         })}
-                                        <td className="p-5 text-center font-black text-lg text-rose-600 bg-rose-50/50 border-l-4 border-white">{totalPerColor}</td>
-                                        <td className="p-5 text-right font-bold text-slate-600 border-r border-slate-100">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
-                                        <td className="p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
+                                        <td className="p-2 sm:p-5 text-center font-black text-[13px] sm:text-lg text-rose-600 bg-rose-50/50 border-l-2 border-white">{totalPerColor}</td>
+                                        <td className="p-2 sm:p-5 text-right font-bold text-slate-600 border-r border-slate-100 text-[11px] sm:text-sm">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
+                                        <td className="p-2 sm:p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50 text-[11px] sm:text-sm">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
                                     </tr>
                                 );
                             })}
@@ -8558,6 +8562,13 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                     </table>
                 </div>
             </div>
+            {/* Image Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </div>
     );
 }
