@@ -8511,7 +8511,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                     <table className="w-full text-left text-sm border-collapse min-w-max">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-5 font-black uppercase tracking-wider border-r">Article</th><th className="p-5 font-black uppercase tracking-wider border-r">Warna</th>
+                                <th className="p-5 font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th><th className="p-5 font-black uppercase tracking-wider border-r bg-rose-50">Warna</th>
                                 {allSizeNames.map(s => <th key={s} className="p-5 text-center border-r font-black uppercase text-rose-600 tracking-wider w-16">{s}</th>)}
                                 <th className="p-5 text-center font-black uppercase tracking-wider bg-rose-100 text-blue-900 border-l-4 border-white">Total Qty</th><th className="p-5 text-right font-black uppercase tracking-wider border-r">Total Harga Beli</th><th className="p-5 text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Total Harga Jual</th>
                             </tr>
@@ -8524,18 +8524,18 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                 return (
                                     <tr key={`${row.article}-${row.colorName}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors whitespace-nowrap">
                                         {row.isFirstRow && (
-                                            <td className="p-5 border-r border-slate-200 align-top bg-white min-w-[250px]" rowSpan={row.rowSpan}>
-                                                <div className="flex gap-4 items-start">
+                                            <td className="p-4 border-r border-slate-200 align-top bg-white min-w-[140px] max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
+                                                <div className="flex flex-col items-center text-center gap-3">
                                                     {row.photo && (
-                                                        <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-sm">
+                                                        <div className="w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md">
                                                             <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
                                                         </div>
                                                     )}
-                                                    <div>
-                                                        <div className="font-extrabold text-rose-800 text-base whitespace-normal break-words">{row.article}</div>
-                                                        <div className="mt-2 text-[11px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
-                                                            <div className="flex items-center gap-2"><span className="w-7 font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
-                                                            <div className="flex items-center gap-2 mt-1 text-emerald-600"><span className="w-7 font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
+                                                    <div className="w-full flex flex-col justify-between h-full">
+                                                        <div className="font-extrabold text-rose-800 text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
+                                                        <div className="mt-3 text-[10px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full text-left">
+                                                            <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
+                                                            <div className="flex justify-between items-center gap-1 mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
                                                         </div>
                                                     </div>
                                                 </div>
