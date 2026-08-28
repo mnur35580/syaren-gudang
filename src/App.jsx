@@ -8902,12 +8902,24 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
     const safeLower = (str) => (str || '').toString().toLowerCase();
     const query = (searchQuery || '').toLowerCase().trim();
-    const filteredVariants = variants.filter(v => {
+    let filteredVariants = variants.filter(v => {
         if (!v.isActive || !query) return false;
         if (/^\d{8,}$/.test(query)) return safeLower(v.sku) === query || safeLower(v.baseCode) === query;
         const words = query.split(/\s+/);
         return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
-    }).slice(0, 30);
+    });
+    
+    if (query) {
+        filteredVariants.sort((a, b) => {
+            const aExact = safeLower(a.sku) === query || safeLower(a.baseCode) === query;
+            const bExact = safeLower(b.sku) === query || safeLower(b.baseCode) === query;
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+            return 0;
+        });
+    }
+    
+    filteredVariants = filteredVariants.slice(0, 30);
 
     const addToDraft = (variant) => {
         if (!targetDate) return showToast('error', 'Silakan isi Target Tanggal Selesai terlebih dahulu!');
@@ -9507,13 +9519,13 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-8xl"></i></div>
-                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 relative z-10">
-                            <h3 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
-                            <span className="text-white font-black bg-rose-500 px-4 py-2 rounded-xl text-sm shadow-md">{mpoDraftList.length} Item</span>
+                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
+                        <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
+                            <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
+                            <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md">{mpoDraftList.length} Item</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-6 bg-slate-50 rounded-2xl p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-6 bg-slate-50 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                             {mpoDraftList.map((item) => (
                                 <div key={item.sku} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                     <div className="text-sm text-slate-600 flex items-center gap-3">
@@ -9528,24 +9540,24 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                             ))}
                             {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                         </div>
-                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-3"></i> LIHAT PREVIEW DAFTAR PO</button>
+                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-5 rounded-xl sm:rounded-2xl font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-list-ul text-rose-500 mr-2"></i> Riwayat Daftar PO</h3>
-                    <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{mpoOrders.length} PO</span>
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-black text-base sm:text-xl text-rose-800"><i className="fa-solid fa-list-ul text-rose-500 mr-2"></i> Riwayat Daftar PO</h3>
+                    <span className="bg-blue-200 text-blue-900 font-black px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm shadow-inner">{mpoOrders.length} PO</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 text-sm border-b-4 border-slate-200">
+                        <thead className="bg-rose-50 text-slate-700 text-[10px] sm:text-sm border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-5 font-black uppercase">No. PO</th>
-                                <th className="p-5 font-black uppercase">Info & Target</th>
-                                <th className="p-5 font-black text-center uppercase">Aksi MPO</th>
-                                <th className="p-5 font-black text-right uppercase">Setting</th>
+                                <th className="p-3 sm:p-5 font-black uppercase">No. PO</th>
+                                <th className="p-3 sm:p-5 font-black uppercase">Info & Target</th>
+                                <th className="p-3 sm:p-5 font-black text-center uppercase">Aksi MPO</th>
+                                <th className="p-3 sm:p-5 font-black text-right uppercase">Setting</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -9556,27 +9568,24 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
                                 return (
                                     <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-5">
-                                            <div className="font-black text-xl text-rose-900">{po.id}</div>
-                                            <span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-700 text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span>
+                                        <td className="p-3 sm:p-5 align-top">
+                                            <div className="font-black text-sm sm:text-xl text-rose-900">{po.id}</div>
+                                            <div className="mt-1"><span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-700 text-[8px] sm:text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span></div>
                                         </td>
-                                        <td className="p-5 leading-relaxed">
-                                            <div className="text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
-                                            <div className="text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
-                                            <div className="text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
+                                        <td className="p-3 sm:p-5 leading-relaxed align-top">
+                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
+                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
+                                            <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
-                                        <td className="p-5 text-center space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po)} className="px-3 py-2 rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-xs font-bold" title="Cetak Surat Pesanan">
-                                                <i className="fa-solid fa-print mr-1"></i> SP
+                                        <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
+                                            <button type="button" onClick={() => cetakMPO(po)} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
+                                                <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
                                             </button>
-                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-3 py-2 rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
-                                                <i className="fa-solid fa-barcode mr-1"></i> LBL
-                                            </button>
-                                            <button type="button" onClick={() => handleDuplicatePO(po)} className="px-3 py-2 rounded-xl border bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Duplikat PO ke Keranjang">
-                                                <i className="fa-solid fa-copy mr-1"></i> DUP
+                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
+                                                <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
                                             </button>
                                         </td>
-                                        <td className="p-5 text-right whitespace-nowrap">
+                                        <td className="p-3 sm:p-5 text-right whitespace-nowrap align-top">
                                             <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-xl hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
                                                 <i className="fa-solid fa-trash-can"></i>
                                             </button>
