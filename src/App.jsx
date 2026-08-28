@@ -2074,18 +2074,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                 (o.items && o.items[0] && o.items[0].originalOrderId === track.resi)
                             );
                             if (!order) return false;
-                            const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
-                            if (filterType === 'ready') {
-                                if (isPO) return false;
-                                return true;
-                            }
-                            if (filterType === 'ready_latest') {
-                                if (isPO) return false;
-                                // Fallback jika tidak ada orderCreatedAt, gunakan excludeResiSet dari logic sebelumnya
-                                // Karena prevBatch dihapus, kita fallback ke READY biasa saja untuk data sangat lama
-                                return true;
-                            }
-                            if (filterType === 'po') return isPO;
+                            // ATURAN BARU: Jika minimal ada 1 barang READY, cetak di batch READY
+                            const hasReady = (order.items || []).some(it => it.status === 'READY');
+                            if (filterType === 'ready') return hasReady;
+                            if (filterType === 'ready_latest') return hasReady;
+                            if (filterType === 'po') return !hasReady;
                             return true;
                         });
                     }
@@ -3498,11 +3491,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             if (!order) return false;
 
-            const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
-            const isReady = !isPO;
+            // ATURAN BARU: Jika minimal ada 1 barang READY, resi ikut cetak di batch READY
+            const hasReady = (order.items || []).some(it => it.status === 'READY');
 
-            if (filterType === 'ready') return isReady;
-            if (filterType === 'po') return isPO;
+            if (filterType === 'ready') return hasReady;
+            if (filterType === 'po') return !hasReady;
             return true;
         });
 
@@ -4086,10 +4079,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     o.awb === t.resi || 
                     (o.items && o.items[0] && o.items[0].originalOrderId === t.resi)
                 );
-                const hasPO = order ? (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED') : false;
+                // ATURAN BARU: Jika minimal ada 1 barang READY, set itemStatus menjadi READY agar bisa dicetak duluan
+                const hasReady = order ? (order.items || []).some(it => it.status === 'READY') : false;
                 
                 // Jika order tidak ditemukan di antrean aktif, anggap sudah selesai/komplit
-                const itemStatus = order ? (hasPO ? 'PO' : 'READY') : 'COMPLETED';
+                const itemStatus = order ? (hasReady ? 'READY' : 'PO') : 'COMPLETED';
                 const orderCreatedAt = order && order.createdAt ? new Date(order.createdAt).getTime() : 0;
 
                 return {
