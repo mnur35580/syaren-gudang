@@ -8352,6 +8352,7 @@ function CetakLabel({ products, variants, showToast }) {
 function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast }) {
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
+    const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
 
     const calculatedStock = variants.map(v => {
         const legacy = v.legacySkus || [];
@@ -8401,7 +8402,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 tableRows.push({
                     article: prod.article, colorName: color.name, isFirstRow: idx === 0, rowSpan: colors.length,
                     buyPrice: prod.buyPrice || 0, sellPrice: prod.sellPrice || 0, sizes: sizesArray,
-                    rowTotalBeli, rowTotalJual
+                    rowTotalBeli, rowTotalJual, photo: sizesArray.length > 0 ? sizesArray[0].photo : null
                 });
             }
         });
@@ -8497,16 +8498,17 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div><p className="text-3xl font-black text-rose-400">{formatRp(totalSellValue)}</p></div>
             </div>
 
-            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center">
+            <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-2xl overflow-hidden mt-8'}`}>
+                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center shrink-0">
                     <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-table-list text-rose-500 mr-3"></i> Detail Stok Per Article</h3>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button type="button" onClick={() => setShowResetModal(true)} className="flex-1 md:flex-none bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
-                        <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
+                    <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+                        <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
+                        <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
+                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
                     </div>
                 </div>
-                <div className="overflow-x-auto custom-scrollbar pb-4">
-                    <table className="w-full text-left text-sm border-collapse">
+                <div className={`overflow-auto custom-scrollbar ${isFullScreenLaporan ? 'flex-1 h-full' : 'pb-4'}`}>
+                    <table className="w-full text-left text-sm border-collapse min-w-max">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
                                 <th className="p-5 font-black uppercase tracking-wider border-r">Article</th><th className="p-5 font-black uppercase tracking-wider border-r">Warna</th>
@@ -8522,11 +8524,20 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                 return (
                                     <tr key={`${row.article}-${row.colorName}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors whitespace-nowrap">
                                         {row.isFirstRow && (
-                                            <td className="p-5 border-r border-slate-200 align-top bg-white" rowSpan={row.rowSpan}>
-                                                <div className="font-extrabold text-rose-800 text-base">{row.article}</div>
-                                                <div className="mt-2 text-xs font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
-                                                    <div className="flex items-center gap-2"><span className="w-8 font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
-                                                    <div className="flex items-center gap-2 mt-1 text-emerald-600"><span className="w-8 font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
+                                            <td className="p-5 border-r border-slate-200 align-top bg-white min-w-[250px]" rowSpan={row.rowSpan}>
+                                                <div className="flex gap-4 items-start">
+                                                    {row.photo && (
+                                                        <div className="w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-sm">
+                                                            <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <div className="font-extrabold text-rose-800 text-base whitespace-normal break-words">{row.article}</div>
+                                                        <div className="mt-2 text-[11px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
+                                                            <div className="flex items-center gap-2"><span className="w-7 font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
+                                                            <div className="flex items-center gap-2 mt-1 text-emerald-600"><span className="w-7 font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                         )}
