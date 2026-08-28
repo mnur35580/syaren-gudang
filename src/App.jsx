@@ -8881,6 +8881,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     const [showForm, setShowForm] = useState(false);
     const [targetDate, setTargetDate] = useState('');
     const [poDate, setPoDate] = useState(toLocalDateStr());
+    const [selectedImage, setSelectedImage] = useState(null);
     const [mpoDraftList, setMpoDraftList] = useState(() => {
         try {
             const saved = localStorage.getItem('smart_mpo_draft');
@@ -9454,22 +9455,22 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
             {showForm && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print mb-8">
-                    <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col h-[650px]">
-                        <h3 className="text-xl font-black mb-6 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-xl"></i> Cari Produk</h3>
-                        <div className="space-y-4 mb-4">
-                            <div className="flex gap-4">
+                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border shadow-sm flex flex-col h-[550px] sm:h-[650px]">
+                        <h3 className="text-sm sm:text-xl font-black mb-2 sm:mb-6 flex items-center gap-2 sm:gap-3 text-rose-800 border-b-2 border-slate-100 pb-2 sm:pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-2 sm:p-3 rounded-lg sm:rounded-xl"></i> Cari Produk</h3>
+                        <div className="space-y-2 sm:space-y-4 mb-2 sm:mb-4">
+                            <div className="flex gap-2 sm:gap-4">
                                 <div className="flex-1">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
-                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
+                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
-                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
+                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
                                 </div>
                             </div>
                             <div className="relative">
-                                <i className="fa-solid fa-search absolute left-5 top-4 text-slate-400 text-lg"></i>
-                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                                <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
+                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
@@ -9482,10 +9483,10 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                 return (
                                 <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-4">
                                     <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0" />
-                                        <div className="min-w-0 truncate">
+                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
+                                        <div className="min-w-0">
                                             <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
-                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 truncate">
+                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight">
                                                 {v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull; <span className="text-emerald-600 font-black">Stok: {variantStock}</span>
                                                 {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
                                             </div>
@@ -9590,6 +9591,13 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             </div>
         </div>
 
+            {/* Image Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </>
     )
 }
