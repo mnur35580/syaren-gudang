@@ -398,6 +398,9 @@ function App() {
     const [manualOrders, setManualOrders] = useState([]); // State untuk Pesanan Manual
     const [senderTemplates, setSenderTemplates] = useState([]); // State untuk Template Pengirim
     const [dbError, setDbError] = useState(false);
+    
+    const [omzetDiscount, setOmzetDiscount] = useState(0);
+    const [localDiscount, setLocalDiscount] = useState('');
 
     // ==========================================
     // FITUR: AUTO LOGIN & 6 JAM INACTIVITY
@@ -487,7 +490,14 @@ function App() {
             setSenderTemplates(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, err => console.log(err));
 
-        return () => { unsubProducts(); unsubTx(); unsubQc(); unsubMpo(); unsubOnline(); unsubManual(); unsubSenders(); };
+        const unsubSettings = db.collection('settings').doc('omzet').onSnapshot(snap => {
+            if (snap.exists) {
+                setOmzetDiscount(snap.data().discount || 0);
+                setLocalDiscount(snap.data().discount || '');
+            }
+        }, err => console.log(err));
+
+        return () => { unsubProducts(); unsubTx(); unsubQc(); unsubMpo(); unsubOnline(); unsubManual(); unsubSenders(); unsubSettings(); };
     }, [currentUser]);
     // --- SKRIP MIGRASI SHORTCODE OTOMATIS ---
     useEffect(() => {
@@ -8370,6 +8380,14 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const totalBuyValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.buyPrice), 0);
     const totalSellValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.sellPrice), 0);
 
+    const handleUpdateDiscount = async () => {
+        try {
+            await window.db.collection('settings').doc('omzet').set({ discount: Number(localDiscount) || 0 }, { merge: true });
+            showToast('success', 'Diskon Omzet berhasil disimpan secara global!');
+        } catch (e) {
+            showToast('error', 'Gagal menyimpan diskon: ' + e.message);
+        }
+    };
     // Mengurutkan produk menggunakan logika Custom Syaren
     const sortedProducts = [...products].sort((a, b) => {
         const infoA = parseArticleForSortGlobal(a.article);
@@ -8505,7 +8523,17 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 <div className="absolute top-0 right-0 p-10 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
                 <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
                 <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
-                <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div><p className="text-3xl font-black text-rose-400">{formatRp(totalSellValue)}</p></div>
+                <div className="px-4 pt-6 md:pt-0 relative z-10">
+                    <div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div>
+                    <p className="text-3xl font-black text-rose-400">{formatRp(totalSellValue * (1 - omzetDiscount / 100))}</p>
+                    <div className="mt-3 flex items-center gap-2 bg-rose-800 p-1.5 rounded-lg border border-rose-700/50 w-max relative z-20 shadow-inner">
+                        <span className="text-xs font-bold text-rose-300 ml-1">Diskon:</span>
+                        <input type="number" min="0" max="100" placeholder="0" value={localDiscount} onChange={e => setLocalDiscount(e.target.value)} className="w-12 bg-rose-950 border border-rose-600 rounded-md text-white text-xs font-bold px-1.5 py-1 outline-none focus:border-rose-400 text-center" />
+                        <span className="text-xs font-bold text-rose-300 -ml-1">%</span>
+                        <button type="button" onClick={handleUpdateDiscount} className="bg-rose-600 hover:bg-rose-500 text-white rounded-md px-2.5 py-1 text-xs font-bold shadow-md transition-colors ml-1">Set</button>
+                    </div>
+                    {omzetDiscount > 0 && <div className="mt-1.5 text-[10px] text-rose-300 font-semibold tracking-wide">Omzet Asli: {formatRp(totalSellValue)}</div>}
+                </div>
             </div>
 
             <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-2xl overflow-hidden mt-8'}`}>
