@@ -398,9 +398,17 @@ function App() {
     const [manualOrders, setManualOrders] = useState([]); // State untuk Pesanan Manual
     const [senderTemplates, setSenderTemplates] = useState([]); // State untuk Template Pengirim
     const [dbError, setDbError] = useState(false);
-    
     const [omzetDiscount, setOmzetDiscount] = useState(0);
     const [localDiscount, setLocalDiscount] = useState('');
+
+    const handleUpdateDiscount = async () => {
+        try {
+            await window.db.collection('settings').doc('omzet').set({ discount: Number(localDiscount) || 0 }, { merge: true });
+            showToast('success', 'Diskon Omzet berhasil disimpan secara global!');
+        } catch (e) {
+            showToast('error', 'Gagal menyimpan diskon: ' + e.message);
+        }
+    };
 
     // ==========================================
     // FITUR: AUTO LOGIN & 6 JAM INACTIVITY
@@ -8380,14 +8388,6 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const totalBuyValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.buyPrice), 0);
     const totalSellValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.sellPrice), 0);
 
-    const handleUpdateDiscount = async () => {
-        try {
-            await window.db.collection('settings').doc('omzet').set({ discount: Number(localDiscount) || 0 }, { merge: true });
-            showToast('success', 'Diskon Omzet berhasil disimpan secara global!');
-        } catch (e) {
-            showToast('error', 'Gagal menyimpan diskon: ' + e.message);
-        }
-    };
     // Mengurutkan produk menggunakan logika Custom Syaren
     const sortedProducts = [...products].sort((a, b) => {
         const infoA = parseArticleForSortGlobal(a.article);
