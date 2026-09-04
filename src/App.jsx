@@ -8894,6 +8894,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         return [];
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [targetStock, setTargetStock] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
     
@@ -8904,6 +8905,24 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         setHistory(prev => [...prev, mpoDraftList]);
         setFuture([]);
         setMpoDraftList(newList);
+    };
+
+    const handleApplyTargetStock = () => {
+        const target = parseInt(targetStock);
+        if (isNaN(target) || target <= 0) return showToast('error', 'Masukkan angka target yang valid (minimal 1)');
+        
+        const newQtys = { ...qtys };
+        filteredVariants.forEach(v => {
+            const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
+                if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
+                if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
+                return sum;
+            }, 0);
+            
+            const needed = target - variantStock;
+            newQtys[v.sku] = needed > 0 ? needed : 0;
+        });
+        setQtys(newQtys);
     };
 
     const handleUndo = useCallback(() => {
@@ -8971,7 +8990,15 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     const addToDraft = (variant) => {
         if (!targetDate) return showToast('error', 'Silakan isi Target Tanggal Selesai terlebih dahulu!');
         const inputVal = qtys[variant.sku];
-        const qty = (inputVal === '' || inputVal === undefined || isNaN(inputVal) || inputVal <= 0) ? 1 : parseInt(inputVal);
+        
+        let qty = 1;
+        if (inputVal !== undefined && inputVal !== '') {
+            qty = parseInt(inputVal);
+            if (isNaN(qty) || qty <= 0) {
+                return showToast('error', 'Qty tidak valid! (Minimal 1)');
+            }
+        }
+
         const existingList = [...mpoDraftList];
         const existingIdx = existingList.findIndex(x => x.sku === variant.sku);
         if (existingIdx > -1) {
@@ -9533,6 +9560,10 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                             <div className="relative">
                                 <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
                                 <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <input type="number" placeholder="Target stok tiap SKU..." className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 font-bold bg-white" value={targetStock} onChange={e => setTargetStock(e.target.value)} />
+                                <button type="button" onClick={handleApplyTargetStock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-sm whitespace-nowrap shadow-md transition-colors"><i className="fa-solid fa-bolt mr-1 sm:mr-2"></i>Apply</button>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
