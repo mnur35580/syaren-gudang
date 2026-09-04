@@ -728,7 +728,7 @@ function App() {
             case 'qc_packing': return <QcPacking variants={allVariants} qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'handover_kurir': return <HandoverKurir qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'kas_operasional': return <KasOperasional showToast={showToast} />;
-            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} />;
+            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} omzetDiscount={omzetDiscount} localDiscount={localDiscount} setLocalDiscount={setLocalDiscount} handleUpdateDiscount={handleUpdateDiscount} />;
             case 'pantau_stok': return <PantauStok variants={allVariants} transactions={transactions} showToast={showToast} />;
             case 'stok_opname': return <StokOpname key="opname" variants={allVariants} transactions={transactions} setIsLoading={setIsLoading} showToast={showToast} currentUser={currentUser} />;
             case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
@@ -8360,7 +8360,7 @@ function CetakLabel({ products, variants, showToast }) {
 }
 
 // 5. Laporan Stok (Diperbarui untuk mengakomodasi Data Revisi)
-function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast }) {
+function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast, omzetDiscount, localDiscount, setLocalDiscount, handleUpdateDiscount }) {
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
     const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
