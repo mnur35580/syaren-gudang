@@ -9201,17 +9201,17 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
     /* ===== HEADER AREA ===== */
     .page-header { border: 2.5px solid #e65100; border-radius: 8px; padding: 14px 18px 10px; margin-bottom: 16px; position: relative; }
-    .company-name { font-size: 20px; font-weight: 900; color: #e65100; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
-    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
+    .company-name { font-size: 20px; font-weight: 900; color: #e65100; text-align: center; text-transform: uppercase; }
+    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; margin-top: 2px; }
     .bengkel-badge {
       display: inline-block; background: #e65100; color: #fff;
       font-size: 11px; font-weight: 900; padding: 2px 12px;
-      border-radius: 20px; letter-spacing: 2px; text-transform: uppercase;
+      border-radius: 20px; text-transform: uppercase;
       margin-top: 4px;
     }
-    .header-center { text-align: center; }
-    .po-info { display: flex; justify-content: center; gap: 24px; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; flex-wrap: wrap; }
-    .po-info span { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; }
+    .header-center { text-align: center; width: 100%; }
+    .po-info { text-align: center; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; }
+    .po-info span { display: inline-block; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; margin: 0 10px; }
     .po-info span b { color: #e65100; }
 
     /* ===== TABLE ===== */
@@ -9222,11 +9222,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     tr:hover td { background: #fff3e0; }
 
     /* ===== FOOTER ===== */
-    .sign-area { display: flex; justify-content: space-around; margin-top: 24px; }
-    .sign-box { text-align: center; width: 30%; }
-    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .sign-area { display: table; width: 100%; table-layout: fixed; margin-top: 24px; }
+    .sign-box { display: table-cell; text-align: center; }
+    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; margin-bottom: 4px; }
     .sign-box .role { font-size: 11px; font-weight: 900; color: #333; margin-bottom: 50px; }
-    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; }
+    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; margin: 0 auto; width: 80%; }
     .footer-note { text-align:center; font-size:9px; color:#aaa; margin-top: 12px; border-top:1px dashed #ddd; padding-top: 6px; }
 
     @media print {
