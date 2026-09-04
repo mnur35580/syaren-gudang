@@ -1,5 +1,6 @@
 const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import html2canvas from 'html2canvas';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 
 // ==========================================
@@ -9095,9 +9096,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         setIsLoading(false);
     };
     const cetakMPO = (po, mode = 'print') => {
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
-
         // ---- Build matrix data: group by article+color, columns = sizes ----
         const allSizes = [...new Set(po.items.map(i => i.sizeName))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const groups = [];
@@ -9288,29 +9286,43 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
   </div>
 
   <div class="footer-note">Dokumen ini dicetak secara otomatis oleh sistem Syaren Management &bull; ${poDateLabel}</div>
-
-  ${mode === 'download' ? `
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>
-  <script>
-      window.onload = function() {
-          setTimeout(() => {
-              html2canvas(document.body, { scale: 2 }).then(canvas => {
-                  let link = document.createElement('a');
-                  link.download = 'SPO-${po.id}.png';
-                  link.href = canvas.toDataURL('image/png');
-                  link.click();
-                  setTimeout(() => window.close(), 1500);
-              });
-          }, 800);
-      };
-  <\\/script>
-  ` : `
-  <script>setTimeout(() => window.print(), 600);<\\/script>
-  `}
 </body>
 </html>`;
+
+        if (mode === 'download') {
+            showToast('info', 'Sedang memproses gambar SPO, mohon tunggu...', 2000);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.width = '800px';
+            iframe.style.height = '1200px';
+            iframe.style.top = '-9999px';
+            document.body.appendChild(iframe);
+            
+            iframe.contentWindow.document.open();
+            iframe.contentWindow.document.write(htmlContent);
+            iframe.contentWindow.document.close();
+            
+            setTimeout(() => {
+                html2canvas(iframe.contentWindow.document.body, { scale: 2, useCORS: true }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `SPO-${po.id}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    document.body.removeChild(iframe);
+                    showToast('success', 'Gambar SPO berhasil diunduh!');
+                }).catch(err => {
+                    console.error(err);
+                    showToast('error', 'Gagal memproses gambar SPO.');
+                    document.body.removeChild(iframe);
+                });
+            }, 1000);
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
         printWindow.document.open();
-        printWindow.document.write(htmlContent);
+        printWindow.document.write(htmlContent + `<script>setTimeout(() => window.print(), 600);</script>`);
         printWindow.document.close();
     };
 
