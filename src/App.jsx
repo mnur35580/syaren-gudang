@@ -8897,7 +8897,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
     
-    const [addedFeedback, setAddedFeedback] = useState({});
     const [history, setHistory] = useState([]);
     const [future, setFuture] = useState([]);
 
@@ -8981,12 +8980,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             existingList.push({ ...variant, qty, received: 0, shipped: 0 });
         }
         updateDraftList(existingList);
-        
-        setAddedFeedback(prev => ({ ...prev, [variant.sku]: (prev[variant.sku] || 0) + 1 }));
-        setTimeout(() => {
-            setAddedFeedback(prev => ({ ...prev, [variant.sku]: Math.max(0, (prev[variant.sku] || 1) - 1) }));
-        }, 1500);
-
         showToast('success', `${qty} pcs ${variant.article} ${variant.sizeName} dimasukkan antrean MPO.`);
     };
 
@@ -9564,11 +9557,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                                         <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] !== undefined ? qtys[v.sku] : 1} onChange={e => setQtys({ ...qtys, [v.sku]: e.target.value === '' ? '' : parseInt(e.target.value) || 0 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
                                         <div className="relative">
-                                            {addedFeedback[v.sku] > 0 && (
-                                                <div className="absolute -top-5 left-1/2 -translate-x-1/2 flex gap-0.5 text-emerald-500 text-lg animate-bounce z-20 whitespace-nowrap drop-shadow-md">
-                                                    {Array.from({ length: addedFeedback[v.sku] }).map((_, i) => (
-                                                        <i key={i} className="fa-solid fa-check-circle bg-white rounded-full"></i>
-                                                    ))}
+                                            {mpoDraftList.find(x => x.sku === v.sku) && (
+                                                <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm z-20 flex items-center gap-1 animate-pulse">
+                                                    {mpoDraftList.find(x => x.sku === v.sku).qty} <i className="fa-solid fa-check"></i>
                                                 </div>
                                             )}
                                             <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
