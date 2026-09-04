@@ -8893,9 +8893,54 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         } catch (e) { console.error(e); }
         return [];
     });
+    });
     const [searchQuery, setSearchQuery] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
+    
+    const [addedFeedback, setAddedFeedback] = useState({});
+    const [history, setHistory] = useState([]);
+    const [future, setFuture] = useState([]);
+
+    const updateDraftList = (newList) => {
+        setHistory(prev => [...prev, mpoDraftList]);
+        setFuture([]);
+        setMpoDraftList(newList);
+    };
+
+    const handleUndo = useCallback(() => {
+        setHistory(prev => {
+            if (prev.length === 0) return prev;
+            const previous = prev[prev.length - 1];
+            setFuture(fPrev => [mpoDraftList, ...fPrev]);
+            setMpoDraftList(previous);
+            return prev.slice(0, -1);
+        });
+    }, [mpoDraftList]);
+
+    const handleRedo = useCallback(() => {
+        setFuture(prev => {
+            if (prev.length === 0) return prev;
+            const next = prev[0];
+            setHistory(hPrev => [...hPrev, mpoDraftList]);
+            setMpoDraftList(next);
+            return prev.slice(1);
+        });
+    }, [mpoDraftList]);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                handleUndo();
+            } else if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo]);
 
     const nextPoNumber = mpoOrders.length > 0 ? Math.max(...mpoOrders.map(o => o.poNumber)) + 1 : 1;
     const newPoId = 'PO' + nextPoNumber;
@@ -8909,7 +8954,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
     });
     
+    let isExactArticle = false;
     if (query) {
+        isExactArticle = variants.some(v => safeLower(v.article) === query);
         filteredVariants.sort((a, b) => {
             const aExact = safeLower(a.sku) === query || safeLower(a.baseCode) === query;
             const bExact = safeLower(b.sku) === query || safeLower(b.baseCode) === query;
@@ -8919,24 +8966,33 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         });
     }
     
-    filteredVariants = filteredVariants.slice(0, 30);
+    if (!isExactArticle) {
+        filteredVariants = filteredVariants.slice(0, 30);
+    }
 
     const addToDraft = (variant) => {
         if (!targetDate) return showToast('error', 'Silakan isi Target Tanggal Selesai terlebih dahulu!');
-        const qty = qtys[variant.sku] || 1;
+        const inputVal = qtys[variant.sku];
+        const qty = (inputVal === '' || inputVal === undefined || isNaN(inputVal) || inputVal <= 0) ? 1 : parseInt(inputVal);
         const existingList = [...mpoDraftList];
         const existingIdx = existingList.findIndex(x => x.sku === variant.sku);
         if (existingIdx > -1) {
-            existingList[existingIdx].qty += qty;
+            existingList[existingIdx] = { ...existingList[existingIdx], qty: existingList[existingIdx].qty + qty };
         } else {
             existingList.push({ ...variant, qty, received: 0, shipped: 0 });
         }
-        setMpoDraftList(existingList);
+        updateDraftList(existingList);
+        
+        setAddedFeedback(prev => ({ ...prev, [variant.sku]: (prev[variant.sku] || 0) + 1 }));
+        setTimeout(() => {
+            setAddedFeedback(prev => ({ ...prev, [variant.sku]: Math.max(0, (prev[variant.sku] || 1) - 1) }));
+        }, 1500);
+
         showToast('success', `${qty} pcs ${variant.article} ${variant.sizeName} dimasukkan antrean MPO.`);
     };
 
     const removeDraft = (sku) => {
-        setMpoDraftList(mpoDraftList.filter(x => x.sku !== sku));
+        updateDraftList(mpoDraftList.filter(x => x.sku !== sku));
     };
 
     const handleDuplicatePO = (po) => {
@@ -8963,7 +9019,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             }
         });
 
-        setMpoDraftList(existingList);
+        updateDraftList(existingList);
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         showToast('success', `Berhasil! Isi PO ${po.id} disalin ke keranjang. Silakan simpan untuk membuat PO baru.`);
@@ -9008,7 +9064,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             showToast('success', `PO Pabrik [${newPoId}] berhasil dibuat!`);
             setPreviewModal(false);
             setShowForm(false);
-            setMpoDraftList([]); // CHANGED
+            setHistory([]);
+            setFuture([]);
+            setMpoDraftList([]);
             setTargetDate('');
         } catch (err) {
             showToast('error', 'Gagal membuat PO: ' + err.message);
@@ -9505,8 +9563,17 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
-                                        <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
+                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] !== undefined ? qtys[v.sku] : 1} onChange={e => setQtys({ ...qtys, [v.sku]: e.target.value === '' ? '' : parseInt(e.target.value) || 0 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
+                                        <div className="relative">
+                                            {addedFeedback[v.sku] > 0 && (
+                                                <div className="absolute -top-5 left-1/2 -translate-x-1/2 flex gap-0.5 text-emerald-500 text-lg animate-bounce z-20 whitespace-nowrap drop-shadow-md">
+                                                    {Array.from({ length: addedFeedback[v.sku] }).map((_, i) => (
+                                                        <i key={i} className="fa-solid fa-check-circle bg-white rounded-full"></i>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
+                                        </div>
                                     </div>
                                 </div>
                             )})}
@@ -9523,7 +9590,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                         <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
                         <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
                             <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
-                            <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md">{mpoDraftList.length} Item</span>
+                            <div className="flex gap-1 sm:gap-2 items-center">
+                                <button type="button" onClick={handleUndo} disabled={history.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Undo (Ctrl+Z)"><i className="fa-solid fa-rotate-left"></i></button>
+                                <button type="button" onClick={handleRedo} disabled={future.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Redo (Ctrl+Y)"><i className="fa-solid fa-rotate-right"></i></button>
+                                <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md ml-1">{mpoDraftList.length} Item</span>
+                            </div>
                         </div>
                         <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-6 bg-slate-50 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                             {mpoDraftList.map((item) => (
