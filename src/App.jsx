@@ -8893,7 +8893,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         } catch (e) { console.error(e); }
         return [];
     });
-    });
     const [searchQuery, setSearchQuery] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
