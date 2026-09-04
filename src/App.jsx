@@ -9156,18 +9156,15 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             else if (c.includes('tosca') || c.includes('teal') || c.includes('cyan') || c.includes('mint')) style = 'background:#00897b;color:#fff;';
             else if (c.includes('burgundy') || c.includes('wine')) style = 'background:#6d1a36;color:#fff;';
             else style = 'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;';
-            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;letter-spacing:.5px;text-transform:uppercase;${style}">${name}</span>`;
+            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;text-transform:uppercase;${style}">${name}</span>`;
         };
 
         // ---- Build table rows ----
         let rowsHtml = '';
         groups.forEach((g) => {
-            const isFirst = !articleRendered[g.article];
-            const rowspan = articleRowCount[g.article];
-            articleRendered[g.article] = true;
             const rowTotal = allSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0);
             rowsHtml += `<tr>`;
-            if (isFirst) rowsHtml += `<td rowspan="${rowspan}" style="font-weight:900;font-size:13px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+            rowsHtml += `<td style="font-weight:900;font-size:12px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
             rowsHtml += `<td style="text-align:center;vertical-align:middle;">${colorCell(g.colorName)}</td>`;
             allSizes.forEach(sz => {
                 const qty = g.sizes[sz] || 0;
