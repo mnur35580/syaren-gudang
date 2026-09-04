@@ -8894,6 +8894,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         return [];
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [bengkelName, setBengkelName] = useState('');
     const [targetStock, setTargetStock] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
@@ -9061,6 +9062,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             const poData = {
                 id: newPoId,
                 poNumber: nextPoNumber,
+                bengkelName: bengkelName,
                 poDate: poDate,
                 targetDate: targetDate,
                 createdAt: new Date().toISOString(),
@@ -9092,7 +9094,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         }
         setIsLoading(false);
     };
-    const cetakMPO = (po) => {
+    const cetakMPO = (po, mode = 'print') => {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
 
@@ -9280,14 +9282,31 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     </div>
     <div class="sign-box">
       <div class="label">Diterima Oleh</div>
-      <div class="role">Pihak Bengkel</div>
+      <div class="role">${po.bengkelName || 'Pihak Bengkel'}</div>
       <div class="line">(................................)</div>
     </div>
   </div>
 
   <div class="footer-note">Dokumen ini dicetak secara otomatis oleh sistem Syaren Management &bull; ${poDateLabel}</div>
 
-  <script>setTimeout(() => window.print(), 600);<\/script>
+  ${mode === 'download' ? `
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\\/script>
+  <script>
+      window.onload = function() {
+          setTimeout(() => {
+              html2canvas(document.body, { scale: 2 }).then(canvas => {
+                  let link = document.createElement('a');
+                  link.download = 'SPO-${po.id}.png';
+                  link.href = canvas.toDataURL('image/png');
+                  link.click();
+                  setTimeout(() => window.close(), 1500);
+              });
+          }, 800);
+      };
+  <\\/script>
+  ` : `
+  <script>setTimeout(() => window.print(), 600);<\\/script>
+  `}
 </body>
 </html>`;
         printWindow.document.open();
@@ -9557,6 +9576,10 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
                                 </div>
                             </div>
+                            <div>
+                                <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Nama Bengkel</label>
+                                <input type="text" placeholder="Masukkan Nama Bengkel..." className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={bengkelName} onChange={e => setBengkelName(e.target.value)} />
+                            </div>
                             <div className="relative">
                                 <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
                                 <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -9670,8 +9693,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
                                         <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po)} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
+                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
                                                 <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
+                                            </button>
+                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
+                                                <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
                                             </button>
                                             <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
                                                 <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
