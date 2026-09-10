@@ -1,6 +1,5 @@
 ﻿const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import html2canvas from 'html2canvas';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 
 // ==========================================
@@ -88,18 +87,18 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
     };
 
     return (
-        <div className="w-full bg-rose-900 rounded-xl overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
+        <div className="w-full bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
             <video id={videoId} className="w-full absolute inset-0 h-full object-cover"></video>
             <div className="absolute inset-0 pointer-events-none border-2 border-green-500/50 m-6 md:m-10 rounded-lg shadow-[0_0_0_4000px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center">
                  <div className="w-full h-0.5 bg-green-500/50 animate-pulse shadow-[0_0_15px_#22c55e]"></div>
             </div>
-            <div className="absolute top-2 left-2 bg-black/70 text-rose-950 px-3 py-1.5 rounded-lg text-xs font-bold z-20 flex items-center gap-2">
+            <div className="absolute top-2 left-2 bg-black/70 text-white px-3 py-1.5 rounded-lg text-xs font-bold z-20 flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span> Kamera Aktif (Zxing)
             </div>
             <button 
                 type="button" 
                 onClick={toggleFlash}
-                className={`absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${flashOn ? 'bg-yellow-400 text-black' : 'bg-black/60 text-rose-950 hover:bg-black/80'}`}
+                className={`absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-colors ${flashOn ? 'bg-yellow-400 text-black' : 'bg-black/60 text-white hover:bg-black/80'}`}
                 title="Nyalakan/Matikan Flash"
             >
                 <i className={`fa-solid ${flashOn ? 'fa-bolt' : 'fa-bolt-lightning'} text-xl`}></i>
@@ -210,6 +209,20 @@ const parseGlobalSku = (raw, providedVariants = null) => {
     
     const sourceVariants = providedVariants || window.globalVariants || [];
     
+    // --- Strategi 0: Database-first lookup (support SKU huruf seperti Anne-Hitam-36) ---
+    // Cek semua kemungkinan panjang suffix tanggal (6 digit DDMMYY atau 8 digit YYYYMMDD)
+    // Ini mendukung SKU dengan panjang berapapun, termasuk SKU huruf
+    if (mainPart.length > 6) {
+        const suffix6 = mainPart.slice(-6);
+        if (!isNaN(suffix6) && suffix6 !== '') {
+            const candidate = mainPart.slice(0, -6);
+            if (candidate) {
+                const found = sourceVariants.find(v => v.sku === candidate || (v.legacySkus || []).includes(candidate));
+                if (found) return found.sku;
+            }
+        }
+    }
+
     // --- Strategi 1: Coba Gen3 (potong 6 digit tanggal DDMMYY) ---
     if (mainPart.length >= 7 && mainPart.length <= 13 && !isNaN(mainPart.slice(-6))) {
         const candidate = mainPart.slice(0, -6);
@@ -247,6 +260,7 @@ const detectGlobalBarcodeType = (raw) => {
     if (t.includes('*')) return 'ONLINE';
     return 'UNKNOWN';
 };
+const isSupplierSamin = (article, supplier) => supplier === 'samin' || (!supplier && (article || '').toUpperCase().startsWith('F07'));
 
 // --- AUDIO & TEXT-TO-SPEECH ---
 let lastAudioPlay = 0;
@@ -398,17 +412,6 @@ function App() {
     const [manualOrders, setManualOrders] = useState([]); // State untuk Pesanan Manual
     const [senderTemplates, setSenderTemplates] = useState([]); // State untuk Template Pengirim
     const [dbError, setDbError] = useState(false);
-    const [omzetDiscount, setOmzetDiscount] = useState(0);
-    const [localDiscount, setLocalDiscount] = useState('');
-
-    const handleUpdateDiscount = async () => {
-        try {
-            await window.db.collection('settings').doc('omzet').set({ discount: Number(localDiscount) || 0 }, { merge: true });
-            showToast('success', 'Diskon Omzet berhasil disimpan secara global!');
-        } catch (e) {
-            showToast('error', 'Gagal menyimpan diskon: ' + e.message);
-        }
-    };
 
     // ==========================================
     // FITUR: AUTO LOGIN & 6 JAM INACTIVITY
@@ -419,13 +422,13 @@ function App() {
 
         const unsubscribe = firebase.auth().onAuthStateChanged(async (user) => {
             if (user) {
-                const lastActivity = localStorage.getItem('syaren_lastActivity');
+                const lastActivity = localStorage.getItem('faradela_lastActivity');
                 const now = Date.now();
 
                 if (lastActivity && (now - parseInt(lastActivity, 10) > INACTIVITY_LIMIT)) {
                     await firebase.auth().signOut();
                     setCurrentUser(null);
-                    localStorage.removeItem('syaren_lastActivity');
+                    localStorage.removeItem('faradela_lastActivity');
                     setIsAuthChecking(false);
                     return;
                 }
@@ -435,7 +438,7 @@ function App() {
                     const snap = await db.collection('users').where('username', '==', username).get();
                     if (!snap.empty) {
                         setCurrentUser({ id: snap.docs[0].id, ...snap.docs[0].data() });
-                        localStorage.setItem('syaren_lastActivity', Date.now().toString());
+                        localStorage.setItem('faradela_lastActivity', Date.now().toString());
                     } else if (username === 'mindela') {
                         const adminSnap = await db.collection('users').doc('mindela').get();
                         if (adminSnap.exists) setCurrentUser({ id: adminSnap.id, ...adminSnap.data() });
@@ -449,7 +452,7 @@ function App() {
 
         const updateActivity = () => {
             if (firebase.auth().currentUser && !activityTimeout) {
-                localStorage.setItem('syaren_lastActivity', Date.now().toString());
+                localStorage.setItem('faradela_lastActivity', Date.now().toString());
                 activityTimeout = setTimeout(() => { activityTimeout = null; }, 60000);
             }
         };
@@ -498,14 +501,7 @@ function App() {
             setSenderTemplates(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         }, err => console.log(err));
 
-        const unsubSettings = db.collection('settings').doc('omzet').onSnapshot(snap => {
-            if (snap.exists) {
-                setOmzetDiscount(snap.data().discount || 0);
-                setLocalDiscount(snap.data().discount || '');
-            }
-        }, err => console.log(err));
-
-        return () => { unsubProducts(); unsubTx(); unsubQc(); unsubMpo(); unsubOnline(); unsubManual(); unsubSenders(); unsubSettings(); };
+        return () => { unsubProducts(); unsubTx(); unsubQc(); unsubMpo(); unsubOnline(); unsubManual(); unsubSenders(); };
     }, [currentUser]);
     // --- SKRIP MIGRASI SHORTCODE OTOMATIS ---
     useEffect(() => {
@@ -653,6 +649,7 @@ function App() {
         products.forEach(p => {
             (p.colors || []).forEach((c, cIdx) => {
                 (p.sizes || []).forEach((s, sIdx) => {
+                    const sku = `${p.baseCode}${c.code}${s.code}`;
                     const key = `${c.code}${s.code}`;
                     const sc = p.shortCodes && p.shortCodes[key] ? p.shortCodes[key] : null;
                     variants.push({
@@ -662,10 +659,11 @@ function App() {
                         sellPrice: (s.sellPrice !== undefined && s.sellPrice !== '') ? Number(s.sellPrice) : (p.sellPrice || 0),
                         isActive: p.isActive,
                         colorName: c.name, colorCode: c.code, sizeName: s.name, sizeCode: s.code,
-                        sku: `${p.baseCode}${c.code}${s.code}`,
+                        sku,
                         colorIndex: cIdx, sizeIndex: sIdx,
                         shortCode: sc,
                         // Gen3: Daftar SKU lama agar stiker jadul tetap terbaca
+                        supplier: p.supplier || "",
                         legacySkus: (() => {
                             const dbLegacy = (p.legacySkus && p.legacySkus[key]) ? [...p.legacySkus[key]] : [];
                             const shopeeSku = `${p.article}-${c.name}-${s.name}`;
@@ -690,10 +688,10 @@ function App() {
         toastTimeoutRef.current = setTimeout(() => setToast(null), 3500);
     };
 
-    if (isAuthChecking) return <div className="flex h-screen items-center justify-center bg-rose-900 text-rose-500 font-black text-2xl"><i className="fa-solid fa-circle-notch fa-spin mr-3"></i> Memeriksa Sesi...</div>;
+    if (isAuthChecking) return <div className="flex h-screen items-center justify-center bg-slate-900 text-orange-500 font-black text-2xl"><i className="fa-solid fa-circle-notch fa-spin mr-3"></i> Memeriksa Sesi...</div>;
     if (dbError) return <div className="p-8 text-center text-red-600 font-bold">Koneksi Database Gagal. Cek Aturan Firebase.</div>;
     if (!currentUser) return <LoginPage onLogin={(userObj) => {
-        localStorage.setItem('syaren_lastActivity', Date.now().toString());
+        localStorage.setItem('faradela_lastActivity', Date.now().toString());
         setCurrentUser(userObj);
     }} />;
 
@@ -705,7 +703,7 @@ function App() {
         if (m.id === 'cek_surat_jalan') {
             return (currentUser.access || []).includes('sj_lery') ||
                 (currentUser.access || []).includes('sj_samin') ||
-                (currentUser.access || []).includes('sj_syaren');
+                (currentUser.access || []).includes('sj_faradela');
         }
 
         return (currentUser.access || []).includes(m.id);
@@ -723,7 +721,7 @@ function App() {
 
     const renderContent = () => {
         switch (activeMenu) {
-            case 'dashboard': return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} setIsLoading={setIsLoading} showToast={showToast} />;
+            case 'dashboard': return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} />;
             case 'smart_analytics': return <SmartAnalyticsDashboard variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} setActiveMenu={setActiveMenu} />;
             case 'karyawan': return <ManajemenKaryawan setIsLoading={setIsLoading} showToast={showToast} />;
             case 'upload_produk': return <UploadProduk products={products} setIsLoading={setIsLoading} showToast={showToast} />;
@@ -736,43 +734,43 @@ function App() {
             case 'qc_packing': return <QcPacking variants={allVariants} qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'handover_kurir': return <HandoverKurir qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'kas_operasional': return <KasOperasional showToast={showToast} />;
-            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} omzetDiscount={omzetDiscount} localDiscount={localDiscount} setLocalDiscount={setLocalDiscount} handleUpdateDiscount={handleUpdateDiscount} />;
+            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'pantau_stok': return <PantauStok variants={allVariants} transactions={transactions} showToast={showToast} />;
             case 'stok_opname': return <StokOpname key="opname" variants={allVariants} transactions={transactions} setIsLoading={setIsLoading} showToast={showToast} currentUser={currentUser} />;
-            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
+            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} showToast={showToast} setIsLoading={setIsLoading} />;
             case 'pengaturan': return <Pengaturan currentUser={currentUser} setIsLoading={setIsLoading} setProducts={setProducts} setTransactions={setTransactions} setCurrentUser={setCurrentUser} showToast={showToast} />;
             case 'cek_surat_jalan': return <CekSuratJalan currentUser={currentUser} variants={allVariants} mpoOrders={mpoOrders} qcOrders={qcOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
-            default: return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} setIsLoading={setIsLoading} showToast={showToast} />;
+            default: return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} />;
         }
     };
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans">
             {toast && (
-                <div className={`fixed top-4 right-4 z-[99999] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-rose-950 animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
+                <div className={`fixed top-4 right-4 z-[99999] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-white animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
                     <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-3xl flex-shrink-0`}></i>
                     <div>
-                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'Peringatan!' : 'Berhasil'}</h4>
+                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'âš ï¸ Peringatan' : 'âœ… Berhasil'}</h4>
                         <p className="text-sm font-semibold mt-0.5 leading-snug">{toast.message}</p>
                     </div>
                 </div>
             )}
 
-            <aside className="hidden md:flex flex-col w-64 bg-white text-rose-900 shadow-xl z-20 flex-shrink-0">
-                <div className="flex flex-col items-center justify-center h-16 bg-[#d4c4b7] text-rose-950 font-bold text-sm py-2 border-b border-r border-[#d6909a] flex-shrink-0">
-                    <div className="flex items-center"><img src="/LogoV2.png" alt="Logo" className="w-6 h-6 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</div>
-                    <div className="text-[10px] text-rose-800 font-normal mt-0 tracking-wider">(Versi 2.0 by Ahmad)</div>
+            <aside className="hidden md:flex flex-col w-64 bg-[#2b3f31] text-slate-200 shadow-xl z-20 flex-shrink-0">
+                <div className="flex flex-col items-center justify-center h-16 bg-[#16241a] text-white font-bold text-sm py-2 border-b border-r border-[#527A5D] flex-shrink-0">
+                    <div className="flex items-center"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-6 h-6 mr-2 object-contain animate-logo-flip" /> FARADELA MANAGEMENT</div>
+                    <div className="text-[10px] text-slate-300 font-normal mt-0 tracking-wider">(Versi 2.0 by Ahmad)</div>
                 </div>
                 <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-0.5 px-4 custom-scrollbar">
                     {allowedMenus.map(m => (
-                        <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
+                        <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-orange-500 text-white shadow-md active-menu' : 'text-slate-300 hover:text-white font-bold'}`}>
                             <i className={`fa-solid ${m.icon} w-5 text-center`}></i> <span className="ml-2 truncate text-left">{m.label}</span>
                         </button>
                     ))}
                 </div>
-                <div className="p-4 bg-[#d4c4b7] border-t border-[#d6909a]">
-                    <div className="text-xs text-center text-slate-400 mb-2 font-mono">Akun login: <span className="text-rose-500">{currentUser.username}</span></div>
-                    <button onClick={() => { firebase.auth().signOut(); localStorage.removeItem('syaren_lastActivity'); setCurrentUser(null); }} className="flex items-center justify-center w-full px-3 py-3 text-sm font-bold text-rose-400 hover:bg-white hover:text-rose-300 rounded-lg transition-colors border border-[#d6909a]">
+                <div className="p-4 bg-[#16241a] border-t border-[#527A5D]">
+                    <div className="text-xs text-center text-slate-400 mb-2 font-mono">Akun login: <span className="text-orange-500">{currentUser.username}</span></div>
+                    <button onClick={() => { firebase.auth().signOut(); localStorage.removeItem('faradela_lastActivity'); setCurrentUser(null); }} className="flex items-center justify-center w-full px-3 py-3 text-sm font-bold text-orange-400 hover:bg-[#2b3f31] hover:text-orange-300 rounded-lg transition-colors border border-[#527A5D]">
                         <i className="fa-solid fa-right-from-bracket mr-2"></i> KELUAR
                     </button>
                 </div>
@@ -781,17 +779,17 @@ function App() {
             {/* SIDEBAR MOBILE */}
             {isMobileMenuOpen && (
                 <div className="fixed inset-0 z-50 bg-black/80 md:hidden" onClick={() => setIsMobileMenuOpen(false)}>
-                    <div className="w-64 h-full bg-white flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex items-center justify-between h-14 px-4 bg-[#d4c4b7] text-rose-950 border-b border-[#d6909a] flex-shrink-0">
+                    <div className="w-64 h-full bg-[#2b3f31] flex flex-col shadow-xl" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between h-14 px-4 bg-[#16241a] text-white border-b border-[#527A5D] flex-shrink-0">
                             <div className="flex flex-col justify-center">
-                                <span className="font-bold flex items-center text-sm"><img src="/LogoV2.png" alt="Logo" className="w-5 h-5 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</span>
-                                <span className="text-[9px] text-rose-800 font-normal mt-0">(Versi 2.0 by Ahmad)</span>
+                                <span className="font-bold flex items-center text-sm"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-5 h-5 mr-2 object-contain animate-logo-flip" /> FARADELA MANAGEMENT</span>
+                                <span className="text-[9px] text-slate-300 font-normal mt-0">(Versi 2.0 by Ahmad)</span>
                             </div>
-                            <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400 hover:text-rose-950"><i className="fa-solid fa-xmark text-xl"></i></button>
+                            <button onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-4 space-y-0.5">
                             {allowedMenus.map(m => (
-                                <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-3 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
+                                <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-3 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-orange-500 text-white shadow-md active-menu' : 'text-slate-300 hover:text-white font-bold'}`}>
                                     <i className={`fa-solid ${m.icon} w-5 text-center`}></i> <span className="ml-2 text-left">{m.label}</span>
                                 </button>
                             ))}
@@ -801,18 +799,18 @@ function App() {
             )}
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                {isLoading && <div className="absolute inset-0 bg-white/70 z-50 flex flex-col items-center justify-center font-black text-xl text-rose-500 backdrop-blur-sm"><i className="fa-solid fa-circle-notch fa-spin mb-3 text-3xl"></i> Loading...</div>}
+                {isLoading && <div className="absolute inset-0 bg-white/70 z-50 flex flex-col items-center justify-center font-black text-xl text-orange-500 backdrop-blur-sm"><i className="fa-solid fa-circle-notch fa-spin mb-3 text-3xl"></i> Loading...</div>}
 
-                <header className="flex items-center justify-between h-14 md:h-16 px-4 md:px-6 bg-[#d4c4b7] border-b border-[#d6909a] shadow-sm z-10 no-print">
+                <header className="flex items-center justify-between h-14 md:h-16 px-4 md:px-6 bg-[#16241a] border-b border-[#527A5D] shadow-sm z-10 no-print">
                     <div className="flex items-center min-w-0">
-                        <button className="md:hidden mr-3 text-rose-800 hover:text-rose-950 p-1.5 bg-white rounded-lg flex-shrink-0" onClick={() => setIsMobileMenuOpen(true)}><i className="fa-solid fa-bars text-lg"></i></button>
-                        <h1 className="text-base md:text-lg font-black text-rose-950 uppercase tracking-wide flex items-center gap-2 truncate">
-                            <i className={`fa-solid ${allowedMenus.find(m => m.id === activeMenu)?.icon} text-rose-500 flex-shrink-0`}></i>
+                        <button className="md:hidden mr-3 text-slate-300 hover:text-white p-1.5 bg-[#2b3f31] rounded-lg flex-shrink-0" onClick={() => setIsMobileMenuOpen(true)}><i className="fa-solid fa-bars text-lg"></i></button>
+                        <h1 className="text-base md:text-lg font-black text-white uppercase tracking-wide flex items-center gap-2 truncate">
+                            <i className={`fa-solid ${allowedMenus.find(m => m.id === activeMenu)?.icon} text-orange-500 flex-shrink-0`}></i>
                             <span className="truncate">{allowedMenus.find(m => m.id === activeMenu)?.label}</span>
                         </h1>
                     </div>
                     <div className="flex items-center flex-shrink-0 ml-2">
-                        <span className={`px-3 py-1.5 rounded-full font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm border ${currentUser.role === 'admin' ? 'bg-rose-50 text-sky-800 border-rose-200' : 'bg-teal-50 text-teal-800 border-teal-200'}`}>
+                        <span className={`px-3 py-1.5 rounded-full font-black text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm border ${currentUser.role === 'admin' ? 'bg-orange-50 text-sky-800 border-orange-200' : 'bg-teal-50 text-teal-800 border-teal-200'}`}>
                             <i className={`fa-solid ${currentUser.role === 'admin' ? 'fa-user-shield' : 'fa-user-tag'}`}></i>
                             <span className="hidden sm:inline">{currentUser.role}</span>
                         </span>
@@ -923,7 +921,7 @@ const handleCetakResiManual = (order, variants) => {
             <body>
                 <div class="thermal-label">
                     <div class="top-header">
-                        <div class="logo-brand">SYAREN OFFICIAL</div>
+                        <div class="logo-brand">FARADELA OFFICIAL</div>
                         <div class="print-date">${dateStr} | ${timeStr}</div>
                     </div>
 
@@ -957,7 +955,7 @@ const handleCetakResiManual = (order, variants) => {
                         
                         <div class="section-header">Pengirim:</div>
                         <div class="content-pengirim">
-                            <div class="sender-info">${order.nama_pengirim || 'SYAREN OFFICIAL'}</div>
+                            <div class="sender-info">${order.nama_pengirim || 'FARADELA OFFICIAL'}</div>
                             <div class="sender-info" style="font-size: 10px; font-weight: 500;">Handphone: ${order.telepon_pengirim || '-'}</div>
                             <div class="sender-info" style="font-size: 9px; font-weight: normal; margin-top: 2px;">${order.alamat_pengirim || ''}</div>
                         </div>
@@ -1207,24 +1205,24 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
         <div className="space-y-6">
             <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-xl font-black text-rose-800"><i className="fa-solid fa-envelope-open-text text-rose-500 mr-2"></i> Pesanan Manual</h2>
+                    <h2 className="text-xl font-black text-slate-800"><i className="fa-solid fa-envelope-open-text text-orange-500 mr-2"></i> Pesanan Manual</h2>
                     <p className="text-sm font-semibold text-slate-500">Kelola pesanan dari WA, Endorse, dan lainnya yang tidak memiliki resi marketplace otomatis.</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-rose-500/30 flex items-center justify-center">
+                <button onClick={() => setShowModal(true)} className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-orange-500/30 flex items-center justify-center">
                     <i className="fa-solid fa-plus mr-2"></i> Buat Pesanan
                 </button>
             </div>
 
             <div className="flex bg-slate-200/50 p-1.5 rounded-xl w-fit">
-                <button onClick={() => setActiveTab('DRAFT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'DRAFT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Draft ({draftList.length})</button>
-                <button onClick={() => setActiveTab('RIWAYAT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'RIWAYAT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Riwayat Proses ({riwayatList.length})</button>
+                <button onClick={() => setActiveTab('DRAFT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'DRAFT' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Draft ({draftList.length})</button>
+                <button onClick={() => setActiveTab('RIWAYAT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'RIWAYAT' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Riwayat Proses ({riwayatList.length})</button>
             </div>
 
             {activeTab === 'DRAFT' && (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 font-bold text-slate-700 flex items-center justify-between bg-slate-50/50">
                         <span>Menunggu Diproses di GRPA</span>
-                        <span className="text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full"><i className="fa-solid fa-info-circle mr-1"></i> Centang opsi 'Sertakan Pesanan Manual' di menu GRPA untuk memproses data ini.</span>
+                        <span className="text-xs bg-orange-100 text-orange-700 px-3 py-1 rounded-full"><i className="fa-solid fa-info-circle mr-1"></i> Centang opsi 'Sertakan Pesanan Manual' di menu GRPA untuk memproses data ini.</span>
                     </div>
                     {draftList.length === 0 ? (
                         <div className="p-10 text-center text-slate-400 font-semibold"><i className="fa-solid fa-inbox text-5xl mb-3 opacity-30 block"></i> Tidak ada draft pesanan manual.</div>
@@ -1234,16 +1232,16 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                 <div key={order.id} className="p-5 hover:bg-slate-50 transition-colors">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
                                         <div>
-                                            <div className="font-black text-lg text-rose-800 flex items-center gap-2">
+                                            <div className="font-black text-lg text-slate-800 flex items-center gap-2">
                                                 {order.id_pesanan}
-                                                <span className="text-[10px] bg-rose-50 text-slate-600 px-2 py-0.5 rounded font-bold uppercase border border-slate-200">{order.sumber}</span>
+                                                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase border border-slate-200">{order.sumber}</span>
                                             </div>
                                             <div className="text-sm font-semibold text-slate-600 mt-1">Yth. <span className="text-blue-700 font-bold">{order.nama_penerima}</span> ({order.nomor_telepon || '-'})</div>
                                             <div className="text-xs text-slate-500 mt-0.5 italic">{order.ekspedisi} - {order.layanan}</div>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <button onClick={() => handleDeleteDraft(order.id)} className="px-4 py-2 border-2 border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-500 hover:border-red-200 rounded-lg font-bold text-xs transition-colors"><i className="fa-solid fa-trash-can mr-1"></i> Hapus</button>
-                                            <button onClick={() => handleBypassInstan(order)} className="px-5 py-2 bg-rose-800 hover:bg-rose-900 text-rose-950 rounded-lg font-bold text-xs transition-colors border-b-4 border-slate-950 flex items-center gap-2"><i className="fa-solid fa-rocket text-rose-400"></i> Proses Instan (Bypass & Cetak)</button>
+                                            <button onClick={() => handleBypassInstan(order)} className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-bold text-xs transition-colors border-b-4 border-slate-950 flex items-center gap-2"><i className="fa-solid fa-rocket text-orange-400"></i> Proses Instan (Bypass & Cetak)</button>
                                         </div>
                                     </div>
                                     <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
@@ -1254,9 +1252,9 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                                 return (
                                                     <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-slate-100 shadow-sm">
                                                         <div className="font-semibold text-slate-700 overflow-hidden text-ellipsis whitespace-nowrap" title={varInfo ? varInfo.article : item.sku}>
-                                                            <span className="text-rose-600 mr-2">â– </span><b>{varInfo ? varInfo.article : item.sku}</b> <span className="text-xs text-slate-400 font-normal">({varInfo ? varInfo.colorName : ''} - {varInfo ? varInfo.sizeName : ''})</span>
+                                                            <span className="text-orange-600 mr-2">â– </span><b>{varInfo ? varInfo.article : item.sku}</b> <span className="text-xs text-slate-400 font-normal">({varInfo ? varInfo.colorName : ''} - {varInfo ? varInfo.sizeName : ''})</span>
                                                         </div>
-                                                        <div className="font-black text-rose-800 px-2 py-0.5 bg-rose-50 rounded">{item.qty}</div>
+                                                        <div className="font-black text-slate-800 px-2 py-0.5 bg-slate-100 rounded">{item.qty}</div>
                                                     </div>
                                                 );
                                             })}
@@ -1289,18 +1287,18 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                 {riwayatList.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                                         <td className="p-4">
-                                            <div className="font-black text-rose-800">{order.id_pesanan}</div>
+                                            <div className="font-black text-slate-800">{order.id_pesanan}</div>
                                             <div className="text-[10px] text-slate-400 uppercase mt-0.5">{order.sumber} &bull; {new Date(order.createdAt).toLocaleDateString('id-ID')}</div>
                                         </td>
                                         <td className="p-4">{order.nama_penerima}</td>
                                         <td className="p-4 font-mono text-xs">{order.nomor_telepon || '-'}</td>
-                                        <td className="p-4"><span className="bg-rose-50 text-slate-700 px-2 py-1 rounded font-bold text-xs border border-slate-200">{order.ekspedisi}</span></td>
+                                        <td className="p-4"><span className="bg-slate-100 text-slate-700 px-2 py-1 rounded font-bold text-xs border border-slate-200">{order.ekspedisi}</span></td>
                                         <td className="p-4">
                                             {order.status === 'direkap' && <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded"><i className="fa-solid fa-server mr-1"></i> Diproses GRPA</span>}
                                             {order.status === 'instan_diproses' && <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded"><i className="fa-solid fa-bolt mr-1"></i> Instan (Selesai)</span>}
                                         </td>
                                         <td className="p-4 text-right">
-                                            <button onClick={() => handleCetakResiManual(order, variants)} className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-bold text-xs border border-rose-200 transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak Resi</button>
+                                            <button onClick={() => handleCetakResiManual(order, variants)} className="px-3 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 rounded-lg font-bold text-xs border border-orange-200 transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak Resi</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -1312,10 +1310,10 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
             {/* Modal Buat Pesanan */}
             {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                            <h3 className="font-black text-lg text-rose-800"><i className="fa-solid fa-pen-to-square text-rose-500 mr-2"></i> Buat Pesanan Manual</h3>
+                            <h3 className="font-black text-lg text-slate-800"><i className="fa-solid fa-pen-to-square text-orange-500 mr-2"></i> Buat Pesanan Manual</h3>
                             <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark text-2xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 font-semibold custom-scrollbar">
@@ -1323,10 +1321,10 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                                     {/* Kolom Kiri: Info Konsumen */}
                                     <div className="space-y-4">
-                                        <h4 className="font-bold text-rose-800 border-b border-slate-200 pb-2 mb-3">Informasi Pelanggan</h4>
+                                        <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Informasi Pelanggan</h4>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Sumber Masuk</label>
-                                            <select value={sumber} onChange={e => setSumber(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
+                                            <select value={sumber} onChange={e => setSumber(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 font-bold text-slate-700 bg-white">
                                                 <option value="WhatsApp">WhatsApp</option>
                                                 <option value="Endorse/Affiliate">Endorse/Affiliate</option>
                                                 <option value="Resize">Tukar (Resize)</option>
@@ -1336,7 +1334,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Layanan</label>
-                                                <select value={layanan} onChange={e => setLayanan(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
+                                                <select value={layanan} onChange={e => setLayanan(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 font-bold text-slate-700 bg-white">
                                                     <option value="Reguler">Reguler</option>
                                                     <option value="DFOD">DFOD</option>
                                                     <option value="Instan">Instan</option>
@@ -1344,7 +1342,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                             </div>
                                             <div>
                                                 <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Ekspedisi</label>
-                                                <select value={ekspedisi} onChange={e => setEkspedisi(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
+                                                <select value={ekspedisi} onChange={e => setEkspedisi(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 font-bold text-slate-700 bg-white">
                                                     <option value="J&T">J&T</option>
                                                     <option value="JNE">JNE</option>
                                                     <option value="SICEPAT">SiCepat</option>
@@ -1356,29 +1354,29 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Nama Penerima</label>
-                                            <input required value={namaPenerima} onChange={e => setNamaPenerima(e.target.value)} type="text" placeholder="Contoh: Budi Santoso" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
+                                            <input required value={namaPenerima} onChange={e => setNamaPenerima(e.target.value)} type="text" placeholder="Contoh: Budi Santoso" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 bg-slate-50 focus:bg-white" />
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Nomor Telepon</label>
-                                            <input required value={nomorTelepon} onChange={e => setNomorTelepon(e.target.value)} type="tel" placeholder="0812xxxx / 628xxxx" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
+                                            <input required value={nomorTelepon} onChange={e => setNomorTelepon(e.target.value)} type="tel" placeholder="0812xxxx / 628xxxx" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 bg-slate-50 focus:bg-white" />
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Alamat Lengkap</label>
-                                            <textarea required value={alamat} onChange={e => setAlamat(e.target.value)} placeholder="Jalan, RT/RW, Kel, Kec, Kota, kodepos" rows="3" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white resize-none"></textarea>
+                                            <textarea required value={alamat} onChange={e => setAlamat(e.target.value)} placeholder="Jalan, RT/RW, Kel, Kec, Kota, kodepos" rows="3" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 bg-slate-50 focus:bg-white resize-none"></textarea>
                                         </div>
 
-                                        <h4 className="font-bold text-rose-800 border-b border-slate-200 pb-2 pt-4 mb-3">Informasi Pengirim</h4>
+                                        <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2 pt-4 mb-3">Informasi Pengirim</h4>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Template Pengirim</label>
                                             <div className="flex gap-2">
-                                                <select value={selectedTemplateId} onChange={e => handleSelectTemplate(e.target.value)} className="flex-1 border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
+                                                <select value={selectedTemplateId} onChange={e => handleSelectTemplate(e.target.value)} className="flex-1 border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-orange-500 font-bold text-slate-700 bg-white">
                                                     <option value="">-- Input Manual --</option>
                                                     {senderTemplates.map(t => (
                                                         <option key={t.id} value={t.id}>{t.name} ({t.phone})</option>
                                                     ))}
                                                 </select>
                                                 {selectedTemplateId && (
-                                                    <button type="button" onClick={(e) => handleDeleteTemplate(e, selectedTemplateId)} className="bg-red-50 text-red-500 border-2 border-red-100 p-3 rounded-xl hover:bg-red-500 hover:text-rose-950 transition-all">
+                                                    <button type="button" onClick={(e) => handleDeleteTemplate(e, selectedTemplateId)} className="bg-red-50 text-red-500 border-2 border-red-100 p-3 rounded-xl hover:bg-red-500 hover:text-white transition-all">
                                                         <i className="fa-solid fa-trash-can"></i>
                                                     </button>
                                                 )}
@@ -1397,7 +1395,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                                 <label className="block text-[10px] text-slate-500 mb-1 uppercase font-bold tracking-wider">Alamat Pengirim</label>
                                                 <textarea value={alamatPengirim} onChange={e => setAlamatPengirim(e.target.value)} placeholder="Kota / Alamat Lengkap" rows="2" className="w-full border-2 border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-500 text-sm resize-none" />
                                             </div>
-                                            <button type="button" onClick={handleSaveCurrentAsTemplate} className="w-full py-2 bg-blue-600 text-rose-950 rounded-lg font-bold text-xs hover:bg-blue-700 shadow-md shadow-blue-500/20">
+                                            <button type="button" onClick={handleSaveCurrentAsTemplate} className="w-full py-2 bg-blue-600 text-white rounded-lg font-bold text-xs hover:bg-blue-700 shadow-md shadow-blue-500/20">
                                                 <i className="fa-solid fa-cloud-arrow-up mr-1"></i> Simpan Sebagai Template Baru
                                             </button>
                                         </div>
@@ -1405,23 +1403,23 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
                                     {/* Kolom Kanan: Produk */}
                                     <div className="space-y-4">
-                                        <h4 className="font-bold text-rose-800 border-b border-slate-200 pb-2 mb-3">Daftar Produk</h4>
+                                        <h4 className="font-bold text-slate-800 border-b border-slate-200 pb-2 mb-3">Daftar Produk</h4>
 
                                         {/* Pencarian Produk */}
                                         <div className="relative">
-                                            <div className="flex items-center border-2 border-slate-200 rounded-xl bg-white focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all overflow-hidden">
+                                            <div className="flex items-center border-2 border-slate-200 rounded-xl bg-white focus-within:border-orange-500 focus-within:ring-4 focus-within:ring-orange-500/10 transition-all overflow-hidden">
                                                 <i className="fa-solid fa-search text-slate-400 pl-4"></i>
                                                 <input type="text" value={searchSku} onChange={e => setSearchSku(e.target.value)} placeholder="Ketik SKU atau Artikel untuk mencari..." className="w-full p-3 pl-3 outline-none font-semibold text-sm bg-transparent" />
                                             </div>
                                             {searchResults.length > 0 && (
                                                 <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-[60] divide-y divide-slate-100">
                                                     {searchResults.map((v, idx) => (
-                                                        <button key={idx} type="button" onClick={() => addItem(v)} className="w-full text-left p-3 hover:bg-rose-50 transition-colors flex items-center justify-between group">
+                                                        <button key={idx} type="button" onClick={() => addItem(v)} className="w-full text-left p-3 hover:bg-orange-50 transition-colors flex items-center justify-between group">
                                                             <div>
-                                                                <div className="font-bold text-rose-800 text-sm group-hover:text-rose-700">{v.article} <span className="text-xs text-slate-500 font-normal">({v.colorName} - {v.sizeName})</span></div>
+                                                                <div className="font-bold text-slate-800 text-sm group-hover:text-orange-700">{v.article} <span className="text-xs text-slate-500 font-normal">({v.colorName} - {v.sizeName})</span></div>
                                                                 <div className="text-[10px] text-slate-400 font-mono mt-0.5">{v.sku}</div>
                                                             </div>
-                                                            <div className="text-xs bg-rose-50 text-slate-600 px-2 py-1 rounded font-bold">Tambah</div>
+                                                            <div className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded font-bold">Tambah</div>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -1438,12 +1436,12 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                                     return (
                                                         <div key={item.sku} className="bg-white p-3 rounded-lg border border-slate-200 flex items-center justify-between shadow-sm">
                                                             <div className="min-w-0 flex-1 pr-3">
-                                                                <div className="font-bold text-rose-800 text-sm truncate">{varInfo ? varInfo.article : item.sku}</div>
+                                                                <div className="font-bold text-slate-800 text-sm truncate">{varInfo ? varInfo.article : item.sku}</div>
                                                                 <div className="text-[11px] text-slate-500 truncate">{varInfo ? `${varInfo.colorName} - ${varInfo.sizeName} | Stok Gudang: ${item.stockInfo}` : item.sku}</div>
                                                             </div>
-                                                            <div className="flex items-center gap-2 flex-shrink-0 bg-rose-50 p-1 rounded-lg border border-slate-200">
+                                                            <div className="flex items-center gap-2 flex-shrink-0 bg-slate-100 p-1 rounded-lg border border-slate-200">
                                                                 <button type="button" onClick={() => updateItemQty(item.sku, item.qty - 1)} className="w-7 h-7 bg-white rounded text-slate-500 hover:text-red-500 hover:bg-red-50 font-black flex items-center justify-center shadow-sm"><i className="fa-solid fa-minus text-[10px]"></i></button>
-                                                                <span className="w-6 text-center font-black text-rose-800 text-sm">{item.qty}</span>
+                                                                <span className="w-6 text-center font-black text-slate-800 text-sm">{item.qty}</span>
                                                                 <button type="button" onClick={() => updateItemQty(item.sku, item.qty + 1)} className="w-7 h-7 bg-white rounded text-slate-500 hover:text-emerald-500 hover:bg-emerald-50 font-black flex items-center justify-center shadow-sm"><i className="fa-solid fa-plus text-[10px]"></i></button>
                                                             </div>
                                                         </div>
@@ -1457,10 +1455,10 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                             </form>
                         </div>
                         <div className="p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-                            <div className="text-sm font-semibold text-slate-500">Total: <span className="font-black text-lg text-rose-800">{listProduk.reduce((a, c) => a + c.qty, 0)} Pcs</span></div>
+                            <div className="text-sm font-semibold text-slate-500">Total: <span className="font-black text-lg text-slate-800">{listProduk.reduce((a, c) => a + c.qty, 0)} Pcs</span></div>
                             <div className="flex gap-3">
                                 <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                                <button form="formPesananManual" type="submit" className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-8 py-3 rounded-xl font-bold shadow-md shadow-rose-500/30 transition-all focus:ring-4 focus:ring-rose-500/20">Simpan Draf</button>
+                                <button form="formPesananManual" type="submit" className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-orange-500/30 transition-all focus:ring-4 focus:ring-orange-500/20">Simpan Draf</button>
                             </div>
                         </div>
                     </div>
@@ -1676,7 +1674,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             doc.setFontSize(22);
             doc.setTextColor(220, 38, 38);
             doc.setFont('times', 'bold');
-            doc.text('PESANAN ONLINE SYAREN OFFICIAL', 105, 18, { align: 'center' });
+            doc.text('PESANAN ONLINE FARADELA OFFICIAL', 105, 18, { align: 'center' });
 
             // TANGGAL + SESI sebagai subtitle di bawah judul
             const dateText = `${firstDateLabel}${sesiLabel}`.trim();
@@ -1726,14 +1724,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             const mergedItems = Object.values(groupedItemsMap).sort(sortItems);
 
             // Pisahkan antara F07 dan Bukan F07
-            const mainItems = mergedItems.filter(i => !i.article.toUpperCase().startsWith('F07-'));
-            const f07Items = mergedItems.filter(i => i.article.toUpperCase().startsWith('F07-'));
+              const mainItems = mergedItems.filter(i => { const v = window.globalVariants.find(v => v.article === i.article); return !isSupplierSamin(i.article, v ? v.supplier : null); });
+              const f07Items = mergedItems.filter(i => { const v = window.globalVariants.find(v => v.article === i.article); return isSupplierSamin(i.article, v ? v.supplier : null); });
 
             const drawTablePage = (items, isF07Mode) => {
                 doc.setFontSize(22);
                 doc.setTextColor(220, 38, 38);
                 doc.setFont('times', 'bold');
-                doc.text(isF07Mode ? 'PESANAN ONLINE SYAREN OFFICIAL' : 'PESANAN ONLINE SYAREN OFFICIAL', 105, 18, { align: 'center' });
+                doc.text(isF07Mode ? 'PESANAN ONLINE FARADELA OFFICIAL' : 'PESANAN ONLINE FARADELA OFFICIAL', 105, 18, { align: 'center' });
 
                 doc.setFontSize(16);
                 doc.setTextColor(220, 38, 38);
@@ -1918,12 +1916,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             };
 
             const mergedItems = Object.values(groupedItemsMap).sort(sortItems);
-            const mainItems = mergedItems.filter(i => !i.article.toUpperCase().startsWith('F07-'));
-            const f07Items = mergedItems.filter(i => i.article.toUpperCase().startsWith('F07-'));
+              const mainItems = mergedItems.filter(i => { const v = window.globalVariants.find(v => v.article === i.article); return !isSupplierSamin(i.article, v ? v.supplier : null); });
+              const f07Items = mergedItems.filter(i => { const v = window.globalVariants.find(v => v.article === i.article); return isSupplierSamin(i.article, v ? v.supplier : null); });
 
             const drawTablePage = (items, isF07Mode) => {
                 doc.setFontSize(22); doc.setTextColor(220, 38, 38); doc.setFont('times', 'bold');
-                doc.text('PESANAN ONLINE SYAREN OFFICIAL', 105, 18, { align: 'center' });
+                doc.text('PESANAN ONLINE FARADELA OFFICIAL', 105, 18, { align: 'center' });
                 doc.setFontSize(16); doc.setTextColor(220, 38, 38); doc.setFont('times', 'italic');
                 doc.text(dateText, 105, 27, { align: 'center' });
                 const textWidth = doc.getTextWidth(dateText);
@@ -1999,14 +1997,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     const downloadedFiles = {};
                     for (const urlObj of batch.pdfUrls) {
                         const response = await fetch(urlObj.url);
-                        if (!response.ok) {
-                            throw new Error(`Gagal mengunduh file "${urlObj.name}" dari Cloud (HTTP ${response.status}). URL mungkin kedaluwarsa atau file tidak ditemukan.`);
-                        }
                         const arrayBuffer = await response.arrayBuffer();
-                        // Validasi: file PDF valid minimal berukuran beberapa ratus bytes
-                        if (arrayBuffer.byteLength < 100) {
-                            throw new Error(`File "${urlObj.name}" yang diunduh dari Cloud terlalu kecil (${arrayBuffer.byteLength} bytes) — kemungkinan file rusak atau bukan PDF. Pastikan upload_preset "gudang_pdf" di Cloudinary bertipe "Unsigned" dan resource type "Raw".`);
-                        }
                         downloadedFiles[urlObj.name] = arrayBuffer;
                     }
 
@@ -2093,11 +2084,18 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                 (o.items && o.items[0] && o.items[0].originalOrderId === track.resi)
                             );
                             if (!order) return false;
-                            // ATURAN BARU: Jika minimal ada 1 barang READY, cetak di batch READY
-                            const hasReady = (order.items || []).some(it => it.status === 'READY');
-                            if (filterType === 'ready') return hasReady;
-                            if (filterType === 'ready_latest') return hasReady;
-                            if (filterType === 'po') return !hasReady;
+                            const isReady = (order.items || []).some(it => it.status === 'READY');
+                            const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
+                            if (filterType === 'ready') {
+                                return isReady;
+                            }
+                            if (filterType === 'ready_latest') {
+                                if (isPO) return false;
+                                // Fallback jika tidak ada orderCreatedAt, gunakan excludeResiSet dari logic sebelumnya
+                                // Karena prevBatch dihapus, kita fallback ke READY biasa saja untuk data sangat lama
+                                return true;
+                            }
+                            if (filterType === 'po') return isPO;
                             return true;
                         });
                     }
@@ -2216,9 +2214,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   @page { margin: 0; }
                   body { margin: 0; padding: 0; font-family: sans-serif; background-color: white; }
                   .label-container { width: 471px; height: 215px; margin: 5px; padding: 0; border: none; box-sizing: border-box; page-break-after: always; page-break-inside: avoid; overflow: hidden; background-color: white; display: flex; justify-content: center; align-items: center; }
-                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; direction: rtl; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
-                  .cell { direction: ltr; display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
-                  .br { border-left: 1px solid black; } .bb { border-bottom: 1px solid black; }
+                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
+                  .cell { display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
+                  .br { border-right: 1px solid black; } .bb { border-bottom: 1px solid black; }
                   .photo { max-width: 100%; max-height: 100%; object-fit: contain; }
                   .barcode-svg { max-width: 100%; max-height: 100%; }
                   .size-text { font-size: 50px; font-weight: 900; line-height: 1; margin-bottom: 2px; }
@@ -2226,7 +2224,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   .prod-container { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
                   .prod-code { font-size: 34px; font-weight: 900; letter-spacing: 1px; }
                   .prod-session { font-size: 30px; font-weight: 900; letter-spacing: 1px; }
-                  .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
+                  .article-text { font-size: 20px; font-weight: 900; }
                   .price-text { font-size: 14px; font-weight: bold; margin-top: 4px; }
                   .date-marker { position: absolute; top: 2px; left: 2px; font-size: 20px; font-weight: 900; color: white; background: black; padding: 2px 8px; border-radius: 4px; z-index: 20; text-transform: uppercase; }
                 </style></head><body>
@@ -2248,7 +2246,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     <div class="cell br bb" style="flex-direction: column; padding: 10px;"><svg class="barcode-svg" jsbarcode-value="${fullBarcode}" jsbarcode-format="CODE128" jsbarcode-width="2" jsbarcode-height="55" jsbarcode-displayvalue="false" jsbarcode-margin="0"></svg></div>
                     <div class="cell bb"><div class="prod-container"><div class="prod-code">${prodCode}-</div><div class="prod-session">${item.sessionCodeInt}</div></div></div>
                     <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                    <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${item.article.length > 12 ? '18px' : (item.article.length > 7 ? '28px' : '40px')};">${item.article}</div><div class="price-text">Rp. ${Number(item.sellPrice || 0).toLocaleString('id-ID')}</div></div>
+                    <div class="cell br" style="flex-direction: column;"><div class="article-text">${item.article}</div><div class="price-text">Rp. ${Number(item.sellPrice || 0).toLocaleString('id-ID')}</div></div>
                     <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                   </div>
                 </div>
@@ -2662,7 +2660,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         const timeStr = new Date(order.createdAt || Date.now()).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
 
                         doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-                        doc.text('SYAREN OFFICIAL', 4, 8);
+                        doc.text('FARADELA OFFICIAL', 4, 8);
                         doc.setFontSize(8); doc.setFont('helvetica', 'normal');
                         doc.text(`${dateStr} | ${timeStr}`, 96, 8, { align: 'right' });
                         doc.setLineWidth(0.5); doc.line(4, 10, 96, 10);
@@ -2697,7 +2695,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             doc.text('Pengirim:', 6, pengirimYPos + 3.5);
 
                             doc.setFontSize(10); doc.setFont('helvetica', 'bold');
-                            doc.text(order.nama_pengirim || 'SYAREN OFFICIAL', 6, pengirimYPos + 9);
+                            doc.text(order.nama_pengirim || 'FARADELA OFFICIAL', 6, pengirimYPos + 9);
                             doc.setFontSize(8); doc.setFont('helvetica', 'normal');
                             doc.text(`Handphone: ${order.telepon_pengirim || '-'}`, 6, pengirimYPos + 13);
                             if (order.alamat_pengirim) doc.text(order.alamat_pengirim.substring(0, 50), 6, pengirimYPos + 16);
@@ -2919,7 +2917,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             };
 
             // Fungsi Pembanding Absolut: pabrik -> artikel -> warna -> size (100% Cocok dgn LaporanStok)
-            const strictSyarenSort = (skuAStr, skuBStr) => {
+            const strictFaradelaSort = (skuAStr, skuBStr) => {
                 const findVariant = (searchSku) => {
                     if (!searchSku) return null;
                     const normSearch = normalizeSku(searchSku);
@@ -2968,7 +2966,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             };
 
             const sortVariants = (a, b) => {
-                return strictSyarenSort(a.variant.sku, b.variant.sku);
+                return strictFaradelaSort(a.variant.sku, b.variant.sku);
             };
 
             readyList.sort(sortVariants);
@@ -2992,7 +2990,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             tempPdfTracking.forEach(track => {
                 const order = extractedOrders[track.resi];
                 if (order && order.items.length > 0) {
-                    const sortedSkus = [...order.items].sort((a, b) => strictSyarenSort(a.sku, b.sku));
+                    const sortedSkus = [...order.items].sort((a, b) => strictFaradelaSort(a.sku, b.sku));
                     track.primarySku = sortedSkus[0].sku;
                 } else {
                     track.primarySku = 'ZZZ';
@@ -3001,7 +2999,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             // Sort halaman PDF: Pabrik -> Artikel -> Warna -> Size !
             tempPdfTracking.sort((a, b) => {
-                return strictSyarenSort(a.primarySku, b.primarySku);
+                return strictFaradelaSort(a.primarySku, b.primarySku);
             });
 
             setPdfTrackingData(tempPdfTracking);
@@ -3178,7 +3176,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 return 0;
             };
 
-            const strictSyarenSort = (skuAStr, skuBStr) => {
+            const strictFaradelaSort = (skuAStr, skuBStr) => {
                 const findVariant = (searchSku) => {
                     if (!searchSku) return null;
                     const normSearch = normalizeSku(searchSku);
@@ -3221,7 +3219,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             };
 
             const sortVariants = (a, b) => {
-                return strictSyarenSort(a.variant.sku, b.variant.sku);
+                return strictFaradelaSort(a.variant.sku, b.variant.sku);
             };
 
             readyList.sort(sortVariants);
@@ -3510,11 +3508,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             if (!order) return false;
 
-            // ATURAN BARU: Jika minimal ada 1 barang READY, resi ikut cetak di batch READY
-            const hasReady = (order.items || []).some(it => it.status === 'READY');
+            const isReady = (order.items || []).some(it => it.status === 'READY');
+            const isPO = (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED');
 
-            if (filterType === 'ready') return hasReady;
-            if (filterType === 'po') return !hasReady;
+            if (filterType === 'ready') return isReady;
+            if (filterType === 'po') return isPO;
             return true;
         });
 
@@ -3915,9 +3913,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   @page { margin: 0; }
                   body { margin: 0; padding: 0; font-family: sans-serif; background-color: white; }
                   .label-container { width: 471px; height: 215px; margin: 5px; padding: 0; border: none; box-sizing: border-box; page-break-after: always; page-break-inside: avoid; overflow: hidden; background-color: white; display: flex; justify-content: center; align-items: center; }
-                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; direction: rtl; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; }
-                  .cell { direction: ltr; display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
-                  .br { border-left: 1px solid black; }
+                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; }
+                  .cell { display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
+                  .br { border-right: 1px solid black; }
                   .bb { border-bottom: 1px solid black; }
                   .photo { max-width: 100%; max-height: 100%; object-fit: contain; }
                   .barcode-svg { max-width: 100%; max-height: 100%; }
@@ -3926,7 +3924,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   .prod-container { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
                   .prod-code { font-size: 34px; font-weight: 900; letter-spacing: 1px; }
                   .prod-session { font-size: 30px; font-weight: 900; letter-spacing: 1px; }
-                  .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
+                  .article-text { font-size: 20px; font-weight: 900; }
                   .price-text { font-size: 14px; font-weight: bold; margin-top: 4px; }
                 </style>
               </head>
@@ -3966,7 +3964,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                       </div>
                     </div>
                     <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                    <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${displayArt.length > 12 ? '18px' : (displayArt.length > 7 ? '28px' : '40px')};">${displayArt}</div><div class="price-text">${priceStr}</div></div>
+                    <div class="cell br" style="flex-direction: column;"><div class="article-text">${displayArt}</div><div class="price-text">${priceStr}</div></div>
                     <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                   </div>
                 </div>
@@ -4061,11 +4059,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     const formData = new FormData();
                     formData.append('file', file);
                     formData.append('upload_preset', 'gudang_pdf');
-                    // PENTING: Gunakan /raw/upload (bukan /auto/upload) agar PDF tidak
-                    // dikonversi menjadi gambar oleh Cloudinary. /auto/upload bisa menyebabkan
-                    // PDF tersimpan sebagai gambar sehingga saat diunduh kembali, isinya kosong.
                     try {
-                        const response = await fetch('https://api.cloudinary.com/v1_1/z7fzcccu/raw/upload', {
+                        const response = await fetch('https://api.cloudinary.com/v1_1/dfcfebwrk/auto/upload', {
                             method: 'POST',
                             body: formData
                         });
@@ -4098,11 +4093,10 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     o.awb === t.resi || 
                     (o.items && o.items[0] && o.items[0].originalOrderId === t.resi)
                 );
-                // ATURAN BARU: Jika minimal ada 1 barang READY, set itemStatus menjadi READY agar bisa dicetak duluan
-                const hasReady = order ? (order.items || []).some(it => it.status === 'READY') : false;
+                const hasPO = order ? (order.items || []).some(it => it.status === 'PO' || it.status === 'UNRECOGNIZED') : false;
                 
                 // Jika order tidak ditemukan di antrean aktif, anggap sudah selesai/komplit
-                const itemStatus = order ? (hasReady ? 'READY' : 'PO') : 'COMPLETED';
+                const itemStatus = order ? (hasPO ? 'PO' : 'READY') : 'COMPLETED';
                 const orderCreatedAt = order && order.createdAt ? new Date(order.createdAt).getTime() : 0;
 
                 return {
@@ -4325,9 +4319,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   @page { margin: 0; }
                   body { margin: 0; padding: 0; font-family: sans-serif; background-color: white; }
                   .label-container { width: 471px; height: 215px; margin: 5px; padding: 0; border: none; box-sizing: border-box; page-break-after: always; page-break-inside: avoid; overflow: hidden; background-color: white; display: flex; justify-content: center; align-items: center; }
-                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; direction: rtl; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; }
-                  .cell { direction: ltr; display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
-                  .br { border-left: 1px solid black; }
+                  .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; }
+                  .cell { display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
+                  .br { border-right: 1px solid black; }
                   .bb { border-bottom: 1px solid black; }
                   .photo { max-width: 100%; max-height: 100%; object-fit: contain; }
                   .barcode-svg { max-width: 100%; max-height: 100%; }
@@ -4338,7 +4332,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                   .prod-code { font-size: 34px; font-weight: 900; letter-spacing: 1px; }
                   .prod-session { font-size: 30px; font-weight: 900; letter-spacing: 1px; }
                   
-                  .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
+                  .article-text { font-size: 20px; font-weight: 900; }
                   .price-text { font-size: 14px; font-weight: bold; margin-top: 4px; }
                 </style>
               </head>
@@ -4380,7 +4374,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                       </div>
                     </div>
                     <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                    <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${displayArt.length > 12 ? '18px' : (displayArt.length > 7 ? '28px' : '40px')};">${displayArt}</div><div class="price-text">${priceStr}</div></div>
+                    <div class="cell br" style="flex-direction: column;"><div class="article-text">${displayArt}</div><div class="price-text">${priceStr}</div></div>
                     <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                   </div>
                 </div>
@@ -4426,7 +4420,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             doc.setFontSize(22);
             doc.setTextColor(220, 38, 38); // Warna Merah
             doc.setFont('times', 'bold');
-            doc.text('PESANAN ONLINE SYAREN OFFICIAL', 105, 18, { align: 'center' });
+            doc.text('PESANAN ONLINE FARADELA OFFICIAL', 105, 18, { align: 'center' });
 
             const poDateObj = new Date(poDraftDate);
             const formattedDate = new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(poDateObj);
@@ -4525,20 +4519,20 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     return (
         <div className="max-w-6xl mx-auto space-y-6">
             <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-200 no-print">
-                <div className="mb-6 text-center"><h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-rose-500"></i> Generator Rekapan Pesanan </h2></div>
+                <div className="mb-6 text-center"><h2 className="text-3xl font-black text-slate-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-orange-500"></i> Generator Rekapan Pesanan </h2></div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
                     {/* KOTAK SHOPEE SEKARANG MENERIMA PDF (Shopee Seller Centre) */}
-                    <FileBox title="Shopee (PDF)" accept=".pdf" files={shopeeFiles} onUpload={handleUploadShopee} onRemove={(i) => setShopeeFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-bag-shopping" colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-50" stats={platformStats?.shopee} />
+                    <FileBox title="Shopee (PDF)" accept=".pdf" files={shopeeFiles} onUpload={handleUploadShopee} onRemove={(i) => setShopeeFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-bag-shopping" colorClass="text-orange-600" borderClass="border-orange-200" bgClass="bg-orange-50" stats={platformStats?.shopee} />
                     {/* KOTAK TIKTOK & LAZADA HANYA MENERIMA PDF */}
-                    <FileBox title="TikTok (PDF)" accept=".pdf" files={tiktokFiles} onUpload={handleUploadTiktok} onRemove={(i) => setTiktokFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-music" colorClass="text-rose-800" borderClass="border-slate-300" bgClass="bg-rose-50" stats={platformStats?.tiktok} />
-                    <FileBox title="Lazada (PDF)" accept=".pdf" files={lazadaFiles} onUpload={handleUploadLazada} onRemove={(i) => setLazadaFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-heart" colorClass="text-rose-500" borderClass="border-rose-200" bgClass="bg-rose-50" stats={platformStats?.lazada} />
+                    <FileBox title="TikTok (PDF)" accept=".pdf" files={tiktokFiles} onUpload={handleUploadTiktok} onRemove={(i) => setTiktokFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-music" colorClass="text-slate-800" borderClass="border-slate-300" bgClass="bg-slate-100" stats={platformStats?.tiktok} />
+                    <FileBox title="Lazada (PDF)" accept=".pdf" files={lazadaFiles} onUpload={handleUploadLazada} onRemove={(i) => setLazadaFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-heart" colorClass="text-orange-500" borderClass="border-orange-200" bgClass="bg-orange-50" stats={platformStats?.lazada} />
                     <FileBox title="Affiliate TikTok (PDF)" accept=".pdf" files={affiliateTiktokFiles} onUpload={handleUploadAffiliateTiktok} onRemove={(i) => setAffiliateTiktokFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-music" colorClass="text-purple-600" borderClass="border-purple-200" bgClass="bg-purple-50" stats={platformStats?.affiliate_tiktok} />
                 </div>
 
                 {/* CHECKBOX MANUAL ORDERS */}
-                <div className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between shadow-sm cursor-pointer hover:bg-rose-50 transition-colors" onClick={() => setIncludeManual(!includeManual)}>
+                <div className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between shadow-sm cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => setIncludeManual(!includeManual)}>
                     <div className="flex items-center gap-3">
-                        <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${includeManual ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 text-transparent'}`}>
+                        <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${includeManual ? 'bg-orange-500 border-orange-500 text-white' : 'border-slate-300 text-transparent'}`}>
                             <i className="fa-solid fa-check text-sm"></i>
                         </div>
                         <div>
@@ -4549,12 +4543,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     {platformStats?.manual && <div className="text-sm font-black text-emerald-600 hidden md:flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"><i className="fa-solid fa-check-circle"></i> {platformStats.manual.resi} Pesanan Terbaca</div>}
                 </div>
 
-                <button type="button" onClick={processAllPlatforms} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 font-black text-lg md:text-xl rounded-2xl shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1 mb-4"><i className="fa-solid fa-bolt mr-3 text-xl"></i> GABUNGKAN &amp; ANALISIS SEMUA PESANAN</button>
+                <button type="button" onClick={processAllPlatforms} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 font-black text-lg md:text-xl rounded-2xl shadow-lg shadow-orange-500/30 transition-transform transform hover:-translate-y-1 mb-4"><i className="fa-solid fa-bolt mr-3 text-xl"></i> GABUNGKAN &amp; ANALISIS SEMUA PESANAN</button>
 
                 {analysisResult && (
                     <div className="flex flex-col gap-4 no-print mt-4">
                         <div className="w-full">
-                            <button onClick={handleSiapkanQC} className="w-full bg-rose-800 hover:bg-rose-900 text-white py-3.5 font-black text-base rounded-xl shadow-lg transition-transform transform hover:-translate-y-1">
+                            <button onClick={handleSiapkanQC} className="w-full bg-slate-800 hover:bg-slate-900 text-white py-3.5 font-black text-base rounded-xl shadow-lg transition-transform transform hover:-translate-y-1">
                                 <i className="fa-solid fa-paper-plane mr-2"></i> SIAPKAN UNTUK TIM QC
                             </button>
                         </div>
@@ -4566,23 +4560,23 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                     <i className="fa-solid fa-tags"></i> {isGeneratingPdf ? 'MENYIAPKAN...' : 'CETAK RESI SHIPPING (READY SAJA)'}
                                 </button>
                                 <button onClick={() => handlePrintCurrentResi('all')} disabled={isGeneratingPdf}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white py-3 font-black text-sm rounded-xl shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                                    className="bg-orange-600 hover:bg-orange-700 text-white py-3 font-black text-sm rounded-xl shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
                                     <i className="fa-solid fa-layer-group"></i> {isGeneratingPdf ? 'MENYIAPKAN...' : 'CETAK SEMUA RESI (READY + PO)'}
                                 </button>
                             </div>
                         )}
 
                         {/* PENGATURAN TANGGAL & SESI PO DIPINDAHKAN KE SINI */}
-                        <div className="flex items-center gap-3 bg-rose-50 border-2 border-rose-200 rounded-xl p-3 flex-wrap justify-center shadow-inner">
-                            <i className="fa-solid fa-calendar-days text-rose-500 text-lg"></i>
-                            <span className="text-sm font-black text-rose-800 uppercase tracking-wider">Tgl Psn online & Sesi:</span>
+                        <div className="flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-xl p-3 flex-wrap justify-center shadow-inner">
+                            <i className="fa-solid fa-calendar-days text-orange-500 text-lg"></i>
+                            <span className="text-sm font-black text-orange-800 uppercase tracking-wider">Tgl Psn online & Sesi:</span>
                             <input type="date" value={poDraftDate} onChange={e => setPoDraftDate(e.target.value)}
-                                className="text-sm font-bold bg-white border-2 border-rose-300 rounded-lg px-3 py-1.5 outline-none text-slate-700 cursor-pointer focus:border-rose-500" />
-                            <span className="text-rose-300 mx-1 font-black">|</span>
+                                className="text-sm font-bold bg-white border-2 border-orange-300 rounded-lg px-3 py-1.5 outline-none text-slate-700 cursor-pointer focus:border-orange-500" />
+                            <span className="text-orange-300 mx-1 font-black">|</span>
                             <div className="flex gap-1.5 flex-wrap">
                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(s => (
                                     <button key={s} onClick={() => setPoSession(s)}
-                                        className={`w-9 h-9 rounded-lg text-sm font-black transition-all ${poSession === s ? 'bg-rose-500 text-white shadow-md transform scale-110' : 'bg-white border-2 border-rose-200 text-rose-600 hover:bg-rose-100'}`}>
+                                        className={`w-9 h-9 rounded-lg text-sm font-black transition-all ${poSession === s ? 'bg-orange-500 text-white shadow-md transform scale-110' : 'bg-white border-2 border-orange-200 text-orange-600 hover:bg-orange-100'}`}>
                                         {s}
                                     </button>
                                 ))}
@@ -4596,7 +4590,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             {showResiPreview && Object.keys(resiPreviews).length > 0 && (
                 <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-blue-200 no-print">
                     <div className="mb-6 text-center">
-                        <h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2">
+                        <h2 className="text-3xl font-black text-slate-800 flex items-center justify-center gap-3 mb-2">
                             <i className="fa-solid fa-magnifying-glass text-blue-500"></i> Daftar Resi Pesanan
                         </h2>
                         <p className="text-sm text-slate-600">Edit kolom Article, Warna, Size, dan Batas Kirim jika diperlukan sebelum melakukan rekap</p>
@@ -4609,17 +4603,17 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                 <i className="fa-solid fa-list mr-2"></i> Semua ({Object.keys(resiPreviews).length})
                             </button>
                             {platformStats?.shopee && platformStats.shopee.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-orange-600 text-white shadow-md' : 'bg-orange-50 text-orange-600 border-2 border-orange-200 hover:bg-orange-100'}`}>
                                     <i className="fa-solid fa-bag-shopping mr-2"></i> Shopee ({platformStats.shopee.resi})
                                 </button>
                             )}
                             {platformStats?.tiktok && platformStats.tiktok.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-rose-800 text-white shadow-md' : 'bg-rose-50 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-slate-800 text-white shadow-md' : 'bg-slate-100 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
                                     <i className="fa-solid fa-music mr-2"></i> TikTok ({platformStats.tiktok.resi})
                                 </button>
                             )}
                             {platformStats?.lazada && platformStats.lazada.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-orange-600 text-white shadow-md' : 'bg-orange-50 text-orange-600 border-2 border-orange-200 hover:bg-orange-100'}`}>
                                     <i className="fa-solid fa-heart mr-2"></i> Lazada ({platformStats.lazada.resi})
                                 </button>
                             )}
@@ -4636,9 +4630,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         <table className="w-full border-collapse bg-white">
                             <thead>
                                 <tr className="bg-blue-50 border-b-2 border-blue-300">
-                                    <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 w-40">Nomer Resi</th>
-                                    <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 flex-1">SKU</th>
-                                    <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300">
+                                    <th className="px-4 py-3 text-left font-black text-slate-800 border-r border-slate-300 w-40">Nomer Resi</th>
+                                    <th className="px-4 py-3 text-left font-black text-slate-800 border-r border-slate-300 flex-1">SKU</th>
+                                    <th className="px-4 py-3 text-left font-black text-slate-800 border-r border-slate-300">
                                         <div className="flex flex-col gap-2">
                                             <div className="flex items-center justify-between">
                                                 <span>Batas Kirim</span>
@@ -4656,8 +4650,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                             </div>
                                         </div>
                                     </th>
-                                    <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 flex-1">Catatan</th>
-                                    <th className="px-4 py-3 text-center font-black text-rose-800 w-20">Qty</th>
+                                    <th className="px-4 py-3 text-left font-black text-slate-800 border-r border-slate-300 flex-1">Catatan</th>
+                                    <th className="px-4 py-3 text-center font-black text-slate-800 w-20">Qty</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -4685,7 +4679,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
                                             return (
                                                 <tr key={`${orderIdx}-${itemIdx}`} className={`border-b border-slate-200 text-sm ${isAnyEdited ? 'bg-yellow-50' : ''}`}>
-                                                    <td className="px-4 py-3 font-mono font-bold text-rose-800 border-r border-slate-300 align-top">
+                                                    <td className="px-4 py-3 font-mono font-bold text-slate-800 border-r border-slate-300 align-top">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span>{order.id}</span>
                                                             {isAnyEdited && <span className="inline-block bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded">ed</span>}
@@ -4699,7 +4693,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                                 onChange={(e) => handleEditResiItem(order.id, itemIdx, 'sku', e.target.value)}
                                                                 className={`flex-1 px-2 py-1 border rounded text-sm font-mono ${isEdited ? 'border-yellow-500 bg-yellow-100' : 'border-slate-300'}`}
                                                             />
-                                                            {isEdited && <span className="inline-block bg-rose-400 text-white text-[8px] font-black px-1 py-0.5 rounded flex-shrink-0">ed</span>}
+                                                            {isEdited && <span className="inline-block bg-orange-400 text-white text-[8px] font-black px-1 py-0.5 rounded flex-shrink-0">ed</span>}
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-2 border-r border-slate-300">
@@ -4725,7 +4719,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                             {isCatatanEdited && <span className="inline-block bg-blue-500 text-white text-[8px] font-black px-1 py-0.5 rounded flex-shrink-0">ed</span>}
                                                         </div>
                                                     </td>
-                                                    <td className="px-4 py-2 text-center font-bold text-rose-800">{item.qty} pcs</td>
+                                                    <td className="px-4 py-2 text-center font-bold text-slate-800">{item.qty} pcs</td>
                                                 </tr>
                                             );
                                         })
@@ -4750,14 +4744,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
                         {/* KEMBALI KE DESAIN TAB YANG LAMA (Besar, Icon di Atas) */}
-                        <div className="flex overflow-x-auto bg-rose-50 p-2 gap-2 border-b-4 border-slate-200 no-print custom-scrollbar">
+                        <div className="flex overflow-x-auto bg-slate-100 p-2 gap-2 border-b-4 border-slate-200 no-print custom-scrollbar">
                             <button onClick={() => setActiveTab('PO')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'PO' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-triangle-exclamation text-2xl mb-1"></i> Pesan Bengkel (Online) <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.poList.reduce((a, c) => a + c.missingQty, 0)} Pcs</span>
                             </button>
                             <button onClick={() => setActiveTab('READY')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'READY' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-check-double text-2xl mb-1"></i> Barang Ready <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.readyList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
-                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-rose-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-slate-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-circle-question text-2xl mb-1"></i> Tidak Dikenali <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.unrecognizedList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
                         </div>
@@ -4774,8 +4768,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                     <div key={idx} className={`bg-white p-4 rounded-xl flex items-center gap-4 ${item.isEdited ? 'border-2 border-yellow-400 bg-yellow-50 shadow-md shadow-yellow-300' : 'border border-emerald-200'}`}>
                                         <div className={`${item.isEdited ? 'bg-yellow-200 text-yellow-800' : 'bg-emerald-100 text-emerald-700'} w-12 h-12 rounded-lg flex items-center justify-center font-black text-xl`}>{item.qty}</div>
                                         <div className="flex-1">
-                                            <div className="font-black text-rose-800 flex items-center gap-2 flex-wrap">{item.variant.article} {item.isEdited && <span className="inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-0.5 rounded">ed</span>}</div>
-                                            <div className="text-xs font-bold text-slate-500">{item.variant.colorName} - Sz: <span className="text-rose-500">{item.variant.sizeName}</span></div>
+                                            <div className="font-black text-slate-800 flex items-center gap-2 flex-wrap">{item.variant.article} {item.isEdited && <span className="inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-0.5 rounded">ed</span>}</div>
+                                            <div className="text-xs font-bold text-slate-500">{item.variant.colorName} - Sz: <span className="text-orange-500">{item.variant.sizeName}</span></div>
                                         </div>
                                     </div>
                                 ))}
@@ -4825,20 +4819,20 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             <div className="flex flex-col md:flex-row justify-between items-center mb-6 no-print border-b pb-4 border-slate-300 gap-4">
                                 <h3 className="text-xl font-black text-rose-700 flex items-center"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Daftar Kekurangan (Harus Produksi)</h3>
                                 <div className="flex flex-wrap gap-3 w-full md:w-auto items-center justify-end">
-                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-rose-900 hover:bg-rose-800 text-white px-8 py-3.5 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
+                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-slate-900 hover:bg-slate-800 text-white px-8 py-3.5 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
                                         <i className="fa-solid fa-print mr-2 text-lg"></i> CETAK PESANAN KERTAS
                                     </button>
                                 </div>
                             </div>
 
                             {/* BANNER ANTRIAN READY */}
-                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${readyDrafts.length > 0 ? 'bg-teal-50 border-teal-300' : 'bg-rose-50 border-slate-200'}`}>
+                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${readyDrafts.length > 0 ? 'bg-teal-50 border-teal-300' : 'bg-slate-100 border-slate-200'}`}>
                                 <div className="flex items-center gap-3">
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${readyDrafts.length > 0 ? 'bg-teal-500 text-white' : 'bg-slate-300 text-slate-500'}`}>
                                         {readyDrafts.length > 0 ? <i className="fa-solid fa-tags"></i> : <i className="fa-solid fa-inbox"></i>}
                                     </div>
                                     <div>
-                                        <div className="font-black text-rose-800">
+                                        <div className="font-black text-slate-800">
                                             {readyDrafts.length > 0
                                                 ? <><i className="fa-solid fa-tags mr-1"></i>  <span className="text-teal-700">{readyDrafts.length} batch resi READY</span> tersimpan
                                                     (<span className="text-teal-600 font-black">{readyDrafts.reduce((a, d) => a + (d.totalPcs || 0), 0)} pcs total</span>)</>
@@ -4854,7 +4848,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                 <div className="flex gap-2 flex-wrap justify-end">
                                     {(currentUser?.role === 'admin' || (currentUser?.access || []).includes('delete_antrean')) && (
                                         <button onClick={handleHapusAntrianReady} disabled={readyDrafts.length === 0 || poDraftLoading}
-                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-4 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
+                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-4 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
                                             <i className="fa-solid fa-trash-can"></i> Hapus Antrean
                                         </button>
                                     )}
@@ -4867,15 +4861,15 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             </div>
 
                             {/* BANNER ANTRIAN PO - ditampilkan selalu di tab PO */}
-                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${poDrafts.length > 0 ? 'bg-rose-50 border-rose-300' : 'bg-rose-50 border-slate-200'}`}>
+                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${poDrafts.length > 0 ? 'bg-amber-50 border-amber-300' : 'bg-slate-100 border-slate-200'}`}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${poDrafts.length > 0 ? 'bg-rose-400 text-white' : 'bg-slate-300 text-slate-500'}`}>
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${poDrafts.length > 0 ? 'bg-amber-400 text-white' : 'bg-slate-300 text-slate-500'}`}>
                                         {poDrafts.length > 0 ? <i className="fa-solid fa-box-open"></i> : <i className="fa-solid fa-inbox"></i>}
                                     </div>
                                     <div>
-                                        <div className="font-black text-rose-800">
+                                        <div className="font-black text-slate-800">
                                             {poDrafts.length > 0
-                                                ? <><i className="fa-solid fa-box-open mr-1"></i>  <span className="text-rose-700">{poDrafts.length} batch</span> tersimpan di antrian
+                                                ? <><i className="fa-solid fa-box-open mr-1"></i>  <span className="text-amber-700">{poDrafts.length} batch</span> tersimpan di antrian
                                                     (<span className="text-rose-600 font-black">{poDrafts.reduce((a, d) => a + d.items.reduce((b, i) => b + i.missingQty, 0), 0)} pcs total</span>)</>
                                                 : 'Antrian PO kosong'}
                                         </div>
@@ -4890,13 +4884,13 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                     {/* TOMBOL HAPUS BARU (Hanya Muncul untuk Admin / Akses Hapus) */}
                                     {(currentUser?.role === 'admin' || (currentUser?.access || []).includes('delete_antrean')) && (
                                         <button onClick={handleHapusAntrianPO} disabled={poDrafts.length === 0 || poDraftLoading}
-                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-5 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
+                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-5 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
                                             <i className="fa-solid fa-trash-can"></i> Hapus Antrean
                                         </button>
                                     )}
 
                                     <button onClick={handleCetakLabelAntrian} disabled={poDrafts.length === 0 || poDraftLoading}
-                                        className="bg-rose-500 hover:bg-rose-600 disabled:bg-slate-400 text-white px-5 py-3 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
+                                        className="bg-orange-500 hover:bg-orange-600 disabled:bg-slate-400 text-white px-5 py-3 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
                                         <i className="fa-solid fa-tags"></i> Cetak Label
                                     </button>
                                     <button onClick={handleKirimProduksi} disabled={poDrafts.length === 0 || poDraftLoading}
@@ -4911,7 +4905,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             ) : (
                                 <div className="overflow-x-auto flex justify-center bg-white p-6 rounded-2xl border border-slate-200 shadow-inner">
                                     <div id="print-po-area" className="bg-white w-full max-w-[800px]">
-                                        <h2 style={{ fontFamily: "'Times New Roman', serif", textAlign: 'center', color: '#dc2626', textTransform: 'uppercase', fontWeight: '900', fontSize: '22pt', margin: '0 0 10px 0' }}>PESANAN ONLINE SYAREN OFFICIAL</h2>
+                                        <h2 style={{ fontFamily: "'Times New Roman', serif", textAlign: 'center', color: '#dc2626', textTransform: 'uppercase', fontWeight: '900', fontSize: '22pt', margin: '0 0 10px 0' }}>PESANAN ONLINE FARADELA OFFICIAL</h2>
                                         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
                                             <span style={{
                                                 fontFamily: "'Times New Roman', serif", fontStyle: 'italic', fontWeight: 'bold', fontSize: '15pt',
@@ -4930,7 +4924,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {analysisResult.poList.filter(i => !i.variant.article.toUpperCase().startsWith('F07-')).map((item, idx) => (
+                                                {analysisResult.poList.filter(i => !isSupplierSamin(i.variant.article, i.variant.supplier)).map((item, idx) => (
                                                     <tr key={`main-${idx}`} style={{ color: item.isUrgent ? '#dc2626' : 'black', fontWeight: 'bold', backgroundColor: item.isEdited ? '#fef3c7' : 'transparent' }}>
                                                         <td style={{ border: '1px solid black', padding: '8px' }}>{item.variant.article}{item.isEdited && <span style={{ fontWeight: '900', color: '#ea580c', marginLeft: '4px', fontSize: '10px', backgroundColor: '#fed7aa', padding: '1px 4px', borderRadius: '3px' }}>ed</span>}</td>
                                                         <td style={{ border: '1px solid black', padding: '8px' }}>{item.variant.colorName}</td>
@@ -4938,10 +4932,10 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                         <td style={{ border: '1px solid black', padding: '8px' }}>{item.missingQty}</td>
                                                     </tr>
                                                 ))}
-                                                {analysisResult.poList.filter(i => !i.variant.article.toUpperCase().startsWith('F07-')).length > 0 && (
+                                                {analysisResult.poList.filter(i => !isSupplierSamin(i.variant.article, i.variant.supplier)).length > 0 && (
                                                     <tr style={{ fontWeight: 'bold', backgroundColor: '#f8fafc' }}>
                                                         <td colSpan="3" style={{ border: '2px solid black', padding: '12px', textAlign: 'center', textTransform: 'uppercase', color: 'black' }}>JUMLAH</td>
-                                                        <td style={{ border: '2px solid black', padding: '12px', color: '#dc2626' }}>{analysisResult.poList.filter(i => !i.variant.article.toUpperCase().startsWith('F07-')).reduce((a, c) => a + c.missingQty, 0)}</td>
+                                                        <td style={{ border: '2px solid black', padding: '12px', color: '#dc2626' }}>{analysisResult.poList.filter(i => !isSupplierSamin(i.variant.article, i.variant.supplier)).reduce((a, c) => a + c.missingQty, 0)}</td>
                                                     </tr>
                                                 )}
 
@@ -4954,7 +4948,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                         <tr>
                                                             <td colSpan="4" style={{ backgroundColor: '#fee2e2', border: '2px solid black', padding: '10px', fontWeight: '900', color: '#b91c1c' }}>BENGKEL KHUSUS (F07)</td>
                                                         </tr>
-                                                        {analysisResult.poList.filter(i => i.variant.article.toUpperCase().startsWith('F07-')).map((item, idx) => {
+                                                        {analysisResult.poList.filter(i => isSupplierSamin(i.variant.article, i.variant.supplier)).map((item, idx) => {
                                                             const shortArt = item.variant.article.substring(4).replace(/^0+/, '').replace(/\.\d+$/, '');
                                                             return (
                                                                 <tr key={`f07-${idx}`} style={{ color: item.isUrgent ? '#dc2626' : 'black', fontWeight: 'bold', backgroundColor: item.isEdited ? '#fef3c7' : 'transparent' }}>
@@ -4967,7 +4961,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                         })}
                                                         <tr style={{ fontWeight: 'bold', backgroundColor: '#fef2f2' }}>
                                                             <td colSpan="3" style={{ border: '2px solid black', padding: '12px', textAlign: 'center', textTransform: 'uppercase', color: 'black' }}>TOTAL F07</td>
-                                                            <td style={{ border: '2px solid black', padding: '12px', color: '#dc2626' }}>{analysisResult.poList.filter(i => i.variant.article.toUpperCase().startsWith('F07-')).reduce((a, c) => a + c.missingQty, 0)}</td>
+                                                            <td style={{ border: '2px solid black', padding: '12px', color: '#dc2626' }}>{analysisResult.poList.filter(i => isSupplierSamin(i.variant.article, i.variant.supplier)).reduce((a, c) => a + c.missingQty, 0)}</td>
                                                         </tr>
                                                     </>
                                                 )}
@@ -4981,7 +4975,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         {/* TAB TIDAK DIKENALI */}
                         <div className={`p-8 bg-slate-50 ${activeTab !== 'UNREC' && 'hidden'}`}>
                             <div className="mb-6 border-b pb-4 border-slate-300 no-print">
-                                <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-circle-question mr-2"></i> SKU Tidak Dikenali</h3>
+                                <h3 className="text-xl font-black text-slate-800 flex items-center"><i className="fa-solid fa-circle-question mr-2"></i> SKU Tidak Dikenali</h3>
                                 <p className="text-sm text-slate-500 font-semibold mt-1">Teks SKU di bawah ini <b className="text-rose-500">TIDAK ADA</b> di Master Produk Anda (Mungkin salah ketik di marketplace).</p>
                             </div>
                             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
@@ -4990,9 +4984,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                         <div className="font-mono text-sm font-bold text-slate-700">{item.sku}</div>
                                         <div className="flex items-center gap-2">
                                             {item.sku.split('-').length < 3 && (
-                                                <span className="text-xs text-rose-600 font-bold">(âš ï¸ SKU tidak lengkap)</span>
+                                                <span className="text-xs text-amber-600 font-bold">(âš ï¸ SKU tidak lengkap)</span>
                                             )}
-                                            <div className="bg-rose-50 px-3 py-1 rounded-lg font-bold text-slate-600 text-sm whitespace-nowrap">Butuh: {item.qty}</div>
+                                            <div className="bg-slate-100 px-3 py-1 rounded-lg font-bold text-slate-600 text-sm whitespace-nowrap">Butuh: {item.qty}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -5006,12 +5000,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             {/* RIWAYAT PESANAN ONLINE (SPO) - MIRIP MPO */}
             <div className="mt-8 bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden no-print animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-xl text-rose-800 uppercase tracking-widest"><i className="fa-solid fa-clock-rotate-left text-emerald-600 mr-3"></i> Daftar Riwayat Pesanan</h3>
+                    <h3 className="font-black text-xl text-slate-800 uppercase tracking-widest"><i className="fa-solid fa-clock-rotate-left text-emerald-600 mr-3"></i> Daftar Riwayat Pesanan</h3>
                     <span className={`font-bold px-4 py-1.5 rounded-full text-xs shadow-inner uppercase tracking-wider ${onlineHistory.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}`}>{onlineHistory.length} Batch Tersimpan</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 text-[10px] border-b-4 border-slate-200">
+                        <thead className="bg-slate-100 text-slate-700 text-[10px] border-b-4 border-slate-200">
                             <tr>
                                 <th className="p-6 font-black uppercase tracking-tighter w-48">SESI & TANGGAL</th>
                                 <th className="p-6 font-black uppercase tracking-tighter w-48">INFO BATCH</th>
@@ -5038,7 +5032,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                     return (
                                         <tr key={batch.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="p-6">
-                                                <div className="font-black text-xl text-rose-900 leading-none">SESI {batch.session}</div>
+                                                <div className="font-black text-xl text-slate-900 leading-none">SESI {batch.session}</div>
                                                 <div className="text-xs font-bold text-slate-400 mt-2 flex items-center gap-1.5"><i className="fa-regular fa-calendar-check text-emerald-500"></i> {dateDisplay}</div>
                                             </td>
                                             <td className="p-6">
@@ -5054,15 +5048,13 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                             </td>
                                             <td className="p-6 text-center border-l border-slate-100">
                                                 <div className="flex items-center justify-center gap-2 flex-col sm:flex-row">
-                                                    <button type="button" title="Cetak Semua Resi (Ready + PO)" onClick={() => handleRePrintResi(batch, 'all')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
+                                                    <button type="button" title="Cetak Semua Resi (Ready + PO)" onClick={() => handleRePrintResi(batch, 'all')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-print mr-1"></i> SEMUA
                                                     </button>
                                                     <button type="button" title="Cetak Resi Barang Ready Saja" onClick={() => handleRePrintResi(batch, 'ready')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-box-open mr-1"></i> READY
                                                     </button>
-                                                    <button type="button" title="Cetak Resi Ready Terakhir (Sesi Ini)" onClick={() => handleRePrintResi(batch, 'ready_latest')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter">
-                                                        <i className="fa-solid fa-bolt mr-1"></i> LATEST
-                                                    </button>
+
                                                     <button type="button" title="Cetak Resi Pesanan Online Saja" onClick={() => handleRePrintResi(batch, 'po')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-clock mr-1"></i> PO
                                                     </button>
@@ -5073,7 +5065,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                     <button type="button" onClick={() => handleRePrintSPO(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-xl border-2 border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
                                                         <i className="fa-solid fa-file-invoice mr-1.5 group-hover:scale-125 transition-transform"></i> SPO
                                                     </button>
-                                                    <button type="button" title="Cetak Label Produk (Berurutan)" onClick={() => handleRePrintLabels(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-xl border-2 border-rose-100 bg-white text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
+                                                    <button type="button" title="Cetak Label Produk (Berurutan)" onClick={() => handleRePrintLabels(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-xl border-2 border-orange-100 bg-white text-orange-700 hover:bg-orange-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
                                                         <i className="fa-solid fa-tags mr-1.5 group-hover:rotate-12 transition-transform"></i> LBL
                                                     </button>
                                                 </div>
@@ -5344,11 +5336,11 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
         <div className="max-w-4xl mx-auto space-y-6">
             {!activeCart ? (
                 <div className="bg-white p-16 rounded-3xl border border-slate-200 shadow-2xl text-center">
-                    <i className="fa-solid fa-id-card text-8xl text-rose-500 mb-8 mt-4 animate-bounce"></i>
-                    <h2 className="text-4xl font-black text-rose-800 mb-4">SCAN ID CHART KAMU</h2>
+                    <i className="fa-solid fa-id-card text-8xl text-orange-500 mb-8 mt-4 animate-bounce"></i>
+                    <h2 className="text-4xl font-black text-slate-800 mb-4">SCAN ID CHART KAMU</h2>
                     <p className="text-slate-500 font-bold mb-8 text-lg">Silakan scan Barcode ID Chart/Keranjang Anda sebelum memulai QC.</p>
                     <form onSubmit={handleCartSubmit}>
-                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-6 text-3xl font-mono text-center border-4 border-rose-200 focus:border-rose-600 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
+                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-6 text-3xl font-mono text-center border-4 border-orange-200 focus:border-orange-600 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
                     </form>
                 </div>
             ) : !activeOrder ? (
@@ -5360,7 +5352,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                         </button>
                     </div>
 
-                    <div className="absolute top-6 left-6 flex items-center gap-2 bg-rose-100 text-blue-800 px-4 py-2 rounded-xl font-bold border border-rose-200 shadow-sm transition-colors">
+                    <div className="absolute top-6 left-6 flex items-center gap-2 bg-orange-100 text-blue-800 px-4 py-2 rounded-xl font-bold border border-orange-200 shadow-sm transition-colors">
                         <i className="fa-solid fa-cart-shopping"></i> Chart: {activeCart}
                     </div>
 
@@ -5368,28 +5360,28 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                         {/* FOTO KARYAWAN + UCAPAN SEMANGAT */}
                         {activeEmployee ? (
                             <div className="flex flex-col items-center mb-6">
-                                <div className="w-24 h-28 rounded-2xl border-4 border-rose-200 overflow-hidden bg-rose-50 shadow-lg mb-3">
+                                <div className="w-24 h-28 rounded-2xl border-4 border-orange-200 overflow-hidden bg-slate-100 shadow-lg mb-3">
                                     {activeEmployee.foto
                                         ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
                                         : <div className="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i className="fa-solid fa-user"></i></div>
                                     }
                                 </div>
-                                <h2 className="text-3xl font-black text-rose-800 mb-1">{activeEmployee.nama}</h2>
-                                <span className="bg-rose-100 text-rose-600 text-xs font-black uppercase px-3 py-1 rounded-full mb-3">{activeEmployee.posisi}</span>
+                                <h2 className="text-3xl font-black text-slate-800 mb-1">{activeEmployee.nama}</h2>
+                                <span className="bg-orange-100 text-orange-600 text-xs font-black uppercase px-3 py-1 rounded-full mb-3">{activeEmployee.posisi}</span>
                             </div>
                         ) : (
                             <div className="mb-6">
-                                <i className="fa-solid fa-barcode text-6xl text-rose-500 mb-4 animate-pulse block"></i>
-                                <h2 className="text-4xl font-black text-rose-800 mb-2">TIM QC</h2>
+                                <i className="fa-solid fa-barcode text-6xl text-orange-500 mb-4 animate-pulse block"></i>
+                                <h2 className="text-4xl font-black text-slate-800 mb-2">TIM QC</h2>
                             </div>
                         )}
                         <p className="text-slate-400 font-bold mb-4 uppercase tracking-widest text-xs">Siap Menerima Scan Resi</p>
 
                         {/* STATS ANTREAN */}
                         <div className="flex justify-center gap-4 mb-6">
-                            <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl px-6 py-4 text-center shadow-sm min-w-[140px]">
-                                <div className="text-3xl font-black text-rose-600">{pendingOrders.length}</div>
-                                <div className="text-xs font-black text-rose-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-clock-rotate-left mr-1"></i>Antrean QC</div>
+                            <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl px-6 py-4 text-center shadow-sm min-w-[140px]">
+                                <div className="text-3xl font-black text-amber-600">{pendingOrders.length}</div>
+                                <div className="text-xs font-black text-amber-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-clock-rotate-left mr-1"></i>Antrean QC</div>
                             </div>
                             <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl px-6 py-4 text-center shadow-sm min-w-[140px]">
                                 <div className="text-3xl font-black text-emerald-600">{qcOrders.filter(o => o.status === 'PACKED' && o.cartId === activeCart).length}</div>
@@ -5398,7 +5390,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                         </div>
 
                         <form onSubmit={handleScan}>
-                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className="scan-input-big w-full max-w-xl p-5 text-2xl md:text-3xl font-mono text-center border-4 border-rose-200 focus:border-rose-200 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SIAP SCAN..." />
+                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className="scan-input-big w-full max-w-xl p-5 text-2xl md:text-3xl font-mono text-center border-4 border-orange-200 focus:border-orange-200 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SIAP SCAN..." />
                         </form>
                     </div>
                 </div>
@@ -5407,11 +5399,11 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                     <div className="flex justify-between items-start mb-6 border-b pb-6 border-slate-100">
                         <div>
                             <h3 className="text-3xl font-black flex items-center gap-3">
-                                {isDefectMode ? <i className="fa-solid fa-triangle-exclamation text-rose-600 animate-bounce"></i> : <i className="fa-solid fa-box-open text-rose-500"></i>}
+                                {isDefectMode ? <i className="fa-solid fa-triangle-exclamation text-rose-600 animate-bounce"></i> : <i className="fa-solid fa-box-open text-orange-500"></i>}
                                 {activeOrder.id}
                             </h3>
                             <div className="flex gap-3 mt-2">
-                                <span className={`px-4 py-1.5 rounded-xl font-black text-xs uppercase shadow-sm border ${activeOrder.platform === 'SHOPEE' ? 'bg-rose-100 text-rose-700 border-rose-200' : activeOrder.platform === 'TIKTOK' ? 'bg-rose-800 text-white border-slate-900' : 'bg-rose-100 text-rose-600 border-rose-200'}`}>{activeOrder.platform}</span>
+                                <span className={`px-4 py-1.5 rounded-xl font-black text-xs uppercase shadow-sm border ${activeOrder.platform === 'SHOPEE' ? 'bg-orange-100 text-orange-700 border-orange-200' : activeOrder.platform === 'TIKTOK' ? 'bg-slate-800 text-white border-slate-900' : 'bg-orange-100 text-orange-600 border-orange-200'}`}>{activeOrder.platform}</span>
                                 {isDefectMode && <span className="bg-rose-600 text-white px-4 py-1.5 rounded-xl font-black text-xs uppercase animate-pulse shadow-md">Mode Koreksi Rusak Aktif</span>}
                             </div>
                         </div>
@@ -5420,7 +5412,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
                     <div className="mb-8">
                         <form onSubmit={handleScan}>
-                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className={`scan-input-big w-full p-4 md:p-6 text-xl md:text-3xl font-mono text-center border-4 rounded-2xl outline-none shadow-inner transition-all ${isDefectMode ? 'border-red-500 bg-red-50 text-red-900 placeholder-red-400' : 'border-slate-300 focus:border-rose-200 bg-slate-50 text-rose-800'}`} placeholder={isDone ? 'PESANAN SELESAI' : isDefectMode ? 'SCAN BARANG RUSAK!' : 'SCAN BARANG...'} />
+                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className={`scan-input-big w-full p-4 md:p-6 text-xl md:text-3xl font-mono text-center border-4 rounded-2xl outline-none shadow-inner transition-all ${isDefectMode ? 'border-red-500 bg-red-50 text-red-900 placeholder-red-400' : 'border-slate-300 focus:border-orange-200 bg-slate-50 text-slate-800'}`} placeholder={isDone ? 'PESANAN SELESAI' : isDefectMode ? 'SCAN BARANG RUSAK!' : 'SCAN BARANG...'} />
                         </form>
                     </div>
 
@@ -5436,12 +5428,12 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                                         </div>
                                         {variant && <img src={variant.photo} className="w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover shadow-md border-2 border-white flex-shrink-0" />}
                                         <div className="min-w-0">
-                                            <div className={`font-black text-base md:text-xl truncate ${itemDone ? 'text-teal-900' : 'text-rose-800'}`}>{variant ? variant.article : item.sku}</div>
+                                            <div className={`font-black text-base md:text-xl truncate ${itemDone ? 'text-teal-900' : 'text-slate-800'}`}>{variant ? variant.article : item.sku}</div>
                                             <div className="text-xs font-bold text-slate-500 uppercase">{variant ? `${variant.colorName} â€¢ Sz ${variant.sizeName}` : ''}</div>
                                             <div className="flex gap-1.5 mt-1 flex-wrap">
                                                 {item.defect > 0 && <span className="bg-red-700 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase"><i className="fa-solid fa-circle-xmark mr-1"></i>Rusak: {item.defect}</span>}
-                                                {item.status === 'PO' && !itemDone && <span className="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase">Tunggu PO</span>}
-                                                {item.status === 'PO' && itemDone && <span className="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase">PO Selesai</span>}
+                                                {item.status === 'PO' && !itemDone && <span className="bg-amber-600 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase">Tunggu PO</span>}
+                                                {item.status === 'PO' && itemDone && <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-black uppercase">PO Selesai</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -5456,7 +5448,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                             <div className="inline-block bg-teal-100 text-teal-700 px-5 py-2 rounded-full font-black text-sm uppercase tracking-widest border border-teal-200 shadow-sm animate-pulse mb-5">
                                 <i className="fa-solid fa-wand-magic-sparkles mr-2"></i> Pesanan Siap Dibungkus!
                             </div>
-                            <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="w-full bg-rose-800 hover:bg-rose-900 text-white font-black py-5 md:py-6 rounded-2xl shadow-xl shadow-slate-800/30 transition-all transform hover:-translate-y-1 text-xl md:text-2xl flex items-center justify-center gap-3 border-b-4 border-slate-950">
+                            <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-5 md:py-6 rounded-2xl shadow-xl shadow-slate-800/30 transition-all transform hover:-translate-y-1 text-xl md:text-2xl flex items-center justify-center gap-3 border-b-4 border-slate-950">
                                 <i className="fa-solid fa-box"></i> LANJUT PESANAN BARU
                             </button>
                             <p className="text-center text-slate-400 font-bold mt-4 text-sm italic">Tips: Langsung scan Resi baru untuk lanjut otomatis tanpa klik.</p>
@@ -5532,7 +5524,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
                     <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera ({cameraTarget === 'wrong' ? 'Barang Salah' : 'Barang Benar'})</h3>
+                            <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-orange-500"></i> Scan Kamera ({cameraTarget === 'wrong' ? 'Barang Salah' : 'Barang Benar'})</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
                         <ZxingScanner videoId="video-revisi" onScan={(text) => {
@@ -5550,9 +5542,9 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                 </div>
             )}
 
-            <div className="bg-rose-900 p-8 rounded-3xl shadow-xl flex items-center justify-between text-white">
+            <div className="bg-slate-900 p-8 rounded-3xl shadow-xl flex items-center justify-between text-white">
                 <div>
-                    <h2 className="text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-right-left text-rose-500"></i> Menu Koreksi & Tukar Barang</h2>
+                    <h2 className="text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-right-left text-orange-500"></i> Menu Koreksi & Tukar Barang</h2>
                     <p className="text-slate-400 font-bold mt-2">Untuk Tim Picker: Kembalikan barang yang salah, ambil barang yang benar.</p>
                 </div>
             </div>
@@ -5575,7 +5567,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                     </div>
                     {rightBarcode && getVariantByFullBarcode(rightBarcode) && <div className="mt-4 font-bold text-emerald-700 bg-emerald-200 p-2 rounded-lg">{getVariantByFullBarcode(rightBarcode).article} - {getVariantByFullBarcode(rightBarcode).sizeName}</div>}
                 </div>
-                <button type="submit" disabled={!wrongBarcode || !rightBarcode} className="md:col-span-2 bg-rose-900 hover:bg-black text-white font-black text-xl py-5 rounded-2xl shadow-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-bolt mr-2"></i> KONFIRMASI TUKAR BARANG</button>
+                <button type="submit" disabled={!wrongBarcode || !rightBarcode} className="md:col-span-2 bg-slate-900 hover:bg-black text-white font-black text-xl py-5 rounded-2xl shadow-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-bolt mr-2"></i> KONFIRMASI TUKAR BARANG</button>
             </form>
         </div>
     );
@@ -5686,78 +5678,6 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                 }
             });
             await batch.commit();
-            
-            // --- AUTO REPORT TO GOOGLE SHEETS ---
-            try {
-                const sheetPayload = [];
-                const d = new Date();
-                const months = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-                const todayStr = d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
-                
-                const ordersToProcess = [];
-                stagedList.forEach(s => {
-                    if (s.type === 'CART') {
-                        ordersToProcess.push(...s.orders);
-                    } else {
-                        if(s.order) ordersToProcess.push(s.order);
-                    }
-                });
-
-                ordersToProcess.forEach(o => {
-                    let platform = o.platform || 'Unknown';
-                    if (platform === 'MANUAL') {
-                        platform = o.sumber || 'Reguler';
-                    }
-                    if (platform.toLowerCase().includes('shopee')) platform = 'Shopee';
-                    else if (platform.toLowerCase().includes('tiktok')) platform = 'Tiktok';
-                    else if (platform.toLowerCase().includes('lazada')) platform = 'Lazada';
-                    else if (platform.toLowerCase().includes('resize')) platform = 'Resize';
-                    else platform = 'Reguler'; // Fallback manual ke reguler
-
-                    (o.items || []).forEach(item => {
-                        let articleName = item.article || '';
-                        if (!articleName && item.sku) {
-                            // Coba cari di globalVariants
-                            const variant = window.globalVariants?.find(v => v.sku === item.sku || v.shortCode === item.sku);
-                            if (variant && variant.article) {
-                                articleName = variant.article;
-                            } else {
-                                // Ekstrak manual dari teks SKU
-                                const parts = item.sku.split(/[\s\-]+/);
-                                if (item.sku.includes('BF-') && parts.length >= 3) {
-                                    articleName = parts[2]; // misal BF-H-CALLA-36
-                                } else {
-                                    articleName = parts[0]; // misal CALLA HITAM 36
-                                }
-                            }
-                        }
-                        if (!articleName) articleName = 'Unknown';
-
-                        // Capitalize nicely
-                        articleName = articleName.charAt(0).toUpperCase() + articleName.slice(1).toLowerCase();
-
-                        sheetPayload.push({
-                            tanggal: todayStr,
-                            platform: platform,
-                            article: articleName,
-                            qty: item.qty || 1
-                        });
-                    });
-                });
-
-                // Cek URL di .env
-                const WEBHOOK_URL = import.meta.env.VITE_GAS_WEBHOOK_URL;
-                if (WEBHOOK_URL && sheetPayload.length > 0) {
-                    fetch(WEBHOOK_URL, {
-                        method: 'POST',
-                        body: JSON.stringify(sheetPayload),
-                        headers: { 'Content-Type': 'text/plain;charset=utf-8' }
-                    }).catch(e => console.log('Sheet Error:', e));
-                }
-            } catch(ex) {
-                console.log('Error reporting to sheet', ex);
-            }
-            // ------------------------------------
             playCekling();
             showToast('success', `${totalPaket} paket resmi diserahkan ke kurir! âœ…`);
             playTTS(`${totalPaket} paket selesai`);
@@ -5792,7 +5712,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                 // LAYAR SCAN ID KARYAWAN
                 <div className="bg-white p-16 rounded-3xl border border-slate-200 shadow-2xl text-center">
                     <i className="fa-solid fa-id-card text-8xl text-emerald-500 mb-8 mt-4 animate-bounce"></i>
-                    <h2 className="text-4xl font-black text-rose-800 mb-4">HANDOVER KURIR</h2>
+                    <h2 className="text-4xl font-black text-slate-800 mb-4">HANDOVER KURIR</h2>
                     <p className="text-slate-500 font-bold mb-8 text-lg">Scan ID Card karyawan untuk mulai menyerahkan paket ke kurir.</p>
                     <form onSubmit={handleIdSubmit}>
                         <input ref={idInputRef} autoFocus value={idInput} onChange={e => setIdInput(e.target.value)} className="scan-input-big w-full max-w-xl p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-4 border-teal-200 focus:border-teal-600 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN ID KARYAWAN..." />
@@ -5801,18 +5721,18 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             ) : (
                 <div className="space-y-4">
                     {/* HEADER: foto karyawan + tombol aksi */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex items-center justify-between gap-4">
+                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex items-center justify-between gap-4 relative">
                         <div className="flex items-center gap-5">
                             {activeEmployee && (
                                 <>
-                                    <div className="w-16 h-20 rounded-xl border-2 border-emerald-200 overflow-hidden bg-rose-50 shadow-md flex-shrink-0">
+                                    <div className="w-16 h-20 rounded-xl border-2 border-emerald-200 overflow-hidden bg-slate-100 shadow-md flex-shrink-0">
                                         {activeEmployee.foto
                                             ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
                                             : <div className="w-full h-full flex items-center justify-center text-slate-300 text-2xl"><i className="fa-solid fa-user"></i></div>
                                         }
                                     </div>
                                     <div>
-                                        <div className="font-black text-rose-800 text-xl">{activeEmployee.nama}</div>
+                                        <div className="font-black text-slate-800 text-xl">{activeEmployee.nama}</div>
                                         <span className="bg-emerald-100 text-emerald-700 text-xs font-black uppercase px-2 py-1 rounded-md">{activeEmployee.posisi}</span>
                                         {motivasiMsg && <div className="text-yellow-700 font-bold text-sm mt-1">ðŸ’ª {motivasiMsg}</div>}
                                     </div>
@@ -5843,7 +5763,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                             <form onSubmit={handleScan} className="flex-1">
                                 <input ref={inputRef} autoFocus value={resi} onChange={e => setResi(e.target.value)} className="scan-input-big w-full p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-4 border-slate-300 focus:border-teal-500 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN RESI / ID CHART..." />
                             </form>
-                            <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                            <button type="button" onClick={() => setShowCamera(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
                                 <i className="fa-solid fa-camera text-3xl mb-1 text-emerald-400"></i> Kamera
                             </button>
                         </div>
@@ -5864,7 +5784,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                                                 <i className={`fa-solid ${s.type === 'CART' ? 'fa-boxes-stacked' : 'fa-box'} text-emerald-600`}></i>
                                             </div>
                                             <div>
-                                                <div className="font-black text-rose-800 font-mono">{s.id}</div>
+                                                <div className="font-black text-slate-800 font-mono">{s.id}</div>
                                                 <div className="text-xs text-slate-500 font-bold">{s.type === 'CART' ? `Karung â€¢ ${s.count} paket` : 'Resi individual'}</div>
                                             </div>
                                         </div>
@@ -6112,10 +6032,10 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
             <body>
               <div class="id-card">
                 <div class="glare"></div>
-                <div class="huge-bottom">SYAREN</div>
+                <div class="huge-bottom">FARADELA</div>
                 <div class="frame-box"></div>
                 
-                <div class="banner-bg">SYAREN TEAM</div>
+                <div class="banner-bg">FARADELA TEAM</div>
                 <div class="badge-top">NO: ${emp.idKaryawan || emp.id}</div>
                 
                 <div class="photo-area">${fotoHtml}</div>
@@ -6158,29 +6078,29 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
         <div className="space-y-6">
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h2 className="text-xl md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-id-card text-rose-500"></i> Manajemen Karyawan</h2>
+                    <h2 className="text-xl md:text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-id-card text-orange-500"></i> Manajemen Karyawan</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Data staf dan pembuatan ID Card Barcode.</p>
                 </div>
-                <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(initialForm); }} className={`px-5 py-2.5 rounded-xl font-black transition-colors ${showForm ? 'bg-slate-200 text-slate-700' : 'bg-rose-500 text-white hover:bg-rose-600 shadow-md'}`}>
+                <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(initialForm); }} className={`px-5 py-2.5 rounded-xl font-black transition-colors ${showForm ? 'bg-slate-200 text-slate-700' : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md'}`}>
                     <i className={`fa-solid ${showForm ? 'fa-xmark' : 'fa-plus'} mr-2`}></i> {showForm ? 'Batal' : 'Tambah Karyawan'}
                 </button>
             </div>
 
             {showForm && (
                 <div className="bg-slate-50 p-6 md:p-8 rounded-3xl border-2 border-slate-200 shadow-inner animate-in fade-in zoom-in duration-300">
-                    <h3 className="text-xl font-black text-rose-800 mb-6 border-b pb-4"><i className="fa-solid fa-user-pen mr-2 text-rose-500"></i> {editId ? 'Edit Data Karyawan' : 'Input Karyawan Baru'}</h3>
+                    <h3 className="text-xl font-black text-slate-800 mb-6 border-b pb-4"><i className="fa-solid fa-user-pen mr-2 text-orange-500"></i> {editId ? 'Edit Data Karyawan' : 'Input Karyawan Baru'}</h3>
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
                         <div className="space-y-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Lengkap</label><input required value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-bold bg-white" placeholder="NAMA LENGKAP" /></div>
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">ID Karyawan (Boleh Kosong)</label><input value={form.idKaryawan} onChange={e => setForm({ ...form, idKaryawan: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-mono bg-white" placeholder="ID KARYAWAN (OTOMATIS JIKA KOSONG)" /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Lengkap</label><input required value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 font-bold bg-white" placeholder="NAMA LENGKAP" /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">ID Karyawan (Boleh Kosong)</label><input value={form.idKaryawan} onChange={e => setForm({ ...form, idKaryawan: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 font-mono bg-white" placeholder="ID KARYAWAN (OTOMATIS JIKA KOSONG)" /></div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Posisi / Jabatan</label>
-                                <input required value={form.posisi || ''} onChange={e => setForm({ ...form, posisi: e.target.value })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-bold bg-white" placeholder="POSISI / JABATAN" />
+                                <input required value={form.posisi || ''} onChange={e => setForm({ ...form, posisi: e.target.value })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 font-bold bg-white" placeholder="POSISI / JABATAN" />
                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Foto Pas Karyawan (Max 800Kb)</label>
-                            <label className="flex flex-col items-center justify-center w-full h-64 border-4 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-white hover:bg-rose-50 transition-colors shadow-sm overflow-hidden relative">
+                            <label className="flex flex-col items-center justify-center w-full h-64 border-4 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-white hover:bg-slate-100 transition-colors shadow-sm overflow-hidden relative">
                                 {form.foto ? (
                                     <img src={form.foto} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
@@ -6190,7 +6110,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
                             </label>
                         </div>
                         <div className="md:col-span-2 pt-6 border-t border-slate-200">
-                            <button type="submit" className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
+                            <button type="submit" className="w-full md:w-auto bg-orange-500 hover:bg-orange-600 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-orange-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
                         </div>
                     </form>
                 </div>
@@ -6198,21 +6118,21 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {employees.map(emp => (
-                    <div key={emp.id} className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-rose-300 transition-colors relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+                    <div key={emp.id} className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-colors relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-orange-50 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
                         <div className="flex items-start gap-4 mb-6">
-                            <div className="w-20 h-24 rounded-xl border-2 border-slate-200 overflow-hidden bg-rose-50 flex-shrink-0 shadow-sm">
+                            <div className="w-20 h-24 rounded-xl border-2 border-slate-200 overflow-hidden bg-slate-100 flex-shrink-0 shadow-sm">
                                 {emp.foto ? <img src={emp.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 text-3xl"><i className="fa-solid fa-user"></i></div>}
                             </div>
                             <div>
-                                <h3 className="font-black text-rose-800 text-lg leading-tight mb-1">{emp.nama}</h3>
-                                <span className="bg-rose-100 text-rose-600 text-[10px] font-black uppercase px-2 py-1 rounded-md">{emp.posisi}</span>
+                                <h3 className="font-black text-slate-800 text-lg leading-tight mb-1">{emp.nama}</h3>
+                                <span className="bg-orange-100 text-orange-600 text-[10px] font-black uppercase px-2 py-1 rounded-md">{emp.posisi}</span>
                                 <div className="mt-3 text-xs font-mono text-slate-500 font-bold"><i className="fa-solid fa-barcode mr-1"></i> {emp.idKaryawan}</div>
                             </div>
                         </div>
                         <div className="flex gap-2 border-t border-slate-100 pt-4">
-                            <button onClick={() => cetakIDCard(emp)} className="flex-1 bg-rose-900 hover:bg-black text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak ID</button>
-                            <button onClick={() => handleEdit(emp)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-xl font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-pen"></i></button>
+                            <button onClick={() => cetakIDCard(emp)} className="flex-1 bg-slate-900 hover:bg-black text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak ID</button>
+                            <button onClick={() => handleEdit(emp)} className="w-10 h-10 bg-amber-50 hover:bg-amber-500 hover:text-white text-amber-500 rounded-xl font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-pen"></i></button>
                             <button onClick={() => handleDelete(emp.id)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-xl font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
@@ -6230,33 +6150,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
     );
 }
 // 1. Dashboard
-function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setIsLoading, showToast }) {
-    
-    
-    const [showSettings, setShowSettings] = useState(false);
-    const [waTarget, setWaTarget] = useState(() => localStorage.getItem('syaren_waTarget') || '');
-    const [waTime, setWaTime] = useState(() => localStorage.getItem('syaren_waTime') || '23:00');
-
-    const saveWaSettings = async (e) => {
-        e.preventDefault();
-        // Since Dashboard doesn't receive setIsLoading and showToast natively, we use alert for now
-        // wait, I can just use alert or pass them in App.jsx. Let's just use alert to be completely safe and avoid prop drilling issues that might cause another crash!
-        try {
-            const url = import.meta.env.VITE_GAS_WEBHOOK_URL;
-            await fetch(url, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'settings', wa_target: waTarget, wa_time: waTime })
-            });
-            localStorage.setItem('syaren_waTarget', waTarget);
-            localStorage.setItem('syaren_waTime', waTime);
-            alert('Pengaturan Laporan WA berhasil disimpan!');
-            setShowSettings(false);
-        } catch (error) {
-            console.error(error);
-            alert('Gagal menyimpan pengaturan.');
-        }
-    };
-
+function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
     const [range, setRange] = useState('hari');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const [isResetting, setIsResetting] = useState(false);
@@ -6598,40 +6492,11 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     };
 
     return (
-        <div className="space-y-6 relative">
-            <div className="flex justify-end -mb-4 relative z-10">
-                <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-white text-rose-500 border-2 border-rose-100 px-4 py-2 rounded-xl hover:bg-rose-50 transition-colors shadow-sm font-bold text-sm" title="Pengaturan Laporan WA">
-                    <i className="fa-solid fa-gear"></i> Pengaturan WA
-                </button>
-            </div>
-            {showSettings && (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative border-4 border-rose-100">
-                        <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4"><i className="fa-brands fa-whatsapp text-3xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800 text-center mb-6">Pengaturan Laporan WA</h3>
-                        <form onSubmit={saveWaSettings} className="space-y-5">
-                            <div>
-                                <label className="block text-sm font-bold text-rose-700 mb-2">Nomor WhatsApp Tujuan</label>
-                                <input required type="text" value={waTarget} onChange={e => setWaTarget(e.target.value)} className="w-full p-4 rounded-xl border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" placeholder="081234567890" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-rose-700 mb-2">Jam Pengiriman Otomatis</label>
-                                <input required type="time" value={waTime} onChange={e => setWaTime(e.target.value)} className="w-full p-4 rounded-xl border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" />
-                                
-                            </div>
-                            <div className="flex gap-4 pt-4">
-                                <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-4 font-bold text-rose-500 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">BATAL</button>
-                                <button type="submit" className="flex-1 py-4 font-black text-white bg-rose-500 rounded-xl hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">SIMPAN</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
+        <div className="space-y-6">
             <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
                 <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                     {['hari', 'kemarin', 'minggu', 'bulan', 'tahun', 'custom'].map(r => (
-                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-5 py-2.5 rounded-xl text-sm md:text-base font-bold capitalize transition-colors ${range === r ? 'bg-rose-900 text-white shadow-md' : 'bg-rose-50 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
+                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-5 py-2.5 rounded-xl text-sm md:text-base font-bold capitalize transition-colors ${range === r ? 'bg-slate-900 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
                     ))}
                 </div>
                 {range === 'custom' && (
@@ -6663,7 +6528,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 {/* KARTU SALDO KAS */}
                 <div
                     onClick={() => setKasModal(true)}
-                    className="cursor-pointer bg-gradient-to-br from-rose-500 to-rose-600 p-5 md:p-6 rounded-3xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-4 group"
+                    className="cursor-pointer bg-gradient-to-br from-amber-500 to-orange-600 p-5 md:p-6 rounded-3xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-4 group"
                 >
                     <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
                         <i className="fa-solid fa-wallet text-white text-2xl"></i>
@@ -6683,7 +6548,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
             <div className="mt-8 pt-6 border-t border-slate-200">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                    <h3 className="text-xl font-black text-rose-800 flex items-center gap-2"><i className="fa-solid fa-radar text-rose-500"></i> Pantauan Live QC & Packing</h3>
+                    <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><i className="fa-solid fa-radar text-orange-500"></i> Pantauan Live QC & Packing</h3>
                     <div className="flex items-center gap-3 w-full md:w-auto">
                         <button onClick={() => { generateLaporan(); setLaporanModal(true); }} className="bg-emerald-100 hover:bg-emerald-600 text-emerald-700 hover:text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors flex items-center gap-2 border border-emerald-200 shadow-sm flex-1 md:flex-none justify-center">
                             <i className="fa-solid fa-clipboard-list"></i> BUAT LAPORAN
@@ -6700,13 +6565,13 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                         <div className="text-3xl font-black text-slate-400">{qcStats.pending}</div>
                         <div className="text-xs font-bold text-slate-500 uppercase mt-1">Antrean Masuk</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm text-center">
-                        <div className="text-3xl font-black text-rose-600">{tungguOnline}</div>
-                        <div className="text-xs font-bold text-rose-700 uppercase mt-1">Tunggu Pesanan Online</div>
+                    <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl shadow-sm text-center">
+                        <div className="text-3xl font-black text-amber-600">{tungguOnline}</div>
+                        <div className="text-xs font-bold text-amber-700 uppercase mt-1">Tunggu Pesanan Online</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm text-center">
-                        <div className="text-3xl font-black text-rose-500">{qcStats.packed}</div>
-                        <div className="text-xs font-bold text-rose-600 uppercase mt-1">Selesai QC (Siap Kirim)</div>
+                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-2xl shadow-sm text-center">
+                        <div className="text-3xl font-black text-orange-500">{qcStats.packed}</div>
+                        <div className="text-xs font-bold text-orange-600 uppercase mt-1">Selesai QC (Siap Kirim)</div>
                     </div>
                     <div className="bg-teal-50 border border-teal-200 p-4 rounded-2xl shadow-sm text-center">
                         <div className="text-3xl font-black text-teal-700">{qcStats.shipped}</div>
@@ -6717,15 +6582,15 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 {mpoOrders.filter(o => o.status === 'OPEN' || o.status === 'ARRIVED').length > 0 && (
                     <div className="mt-8 pt-6 border-t border-slate-200">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-black text-rose-800 flex items-center gap-2"><i className="fa-solid fa-list-check text-rose-500"></i> Status PO Pabrik Terbaru</h3>
+                            <h3 className="text-xl font-black text-slate-800 flex items-center gap-2"><i className="fa-solid fa-list-check text-orange-500"></i> Status PO Pabrik Terbaru</h3>
                             {/* KOTAK SISA PO BENGKEL GABUNGAN */}
-                            <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl font-black text-sm border border-rose-200 shadow-sm">
+                            <div className="bg-orange-50 text-orange-600 px-4 py-2 rounded-xl font-black text-sm border border-orange-200 shadow-sm">
                                 <i className="fa-solid fa-box mr-2"></i>SISA PO SEMUA BENGKEL: {pendingPO} Pcs
                             </div>
                         </div>
                         <div className="bg-slate-50 border rounded-2xl overflow-hidden shadow-inner">
                             <table className="w-full text-left bg-white">
-                                <thead className="bg-rose-50 text-slate-700 border-b-2">
+                                <thead className="bg-slate-100 text-slate-700 border-b-2">
                                     <tr>
                                         <th className="p-4 font-black">No. PO</th>
                                         <th className="p-4 font-black">Target Selesai</th>
@@ -6742,7 +6607,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                         const isArrived = po.status === 'ARRIVED';
                                         return (
                                             <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-4 font-black text-rose-800">{po.id}</td>
+                                                <td className="p-4 font-black text-slate-800">{po.id}</td>
                                                 <td className="p-4 font-bold text-slate-600">
                                                     {(() => {
                                                         const curDate = toLocalDateStr();
@@ -6753,13 +6618,13 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                     })()}
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <div className="font-bold text-sm mb-1 text-rose-600">{totalRcvQty} / {totalOrderQty} Pcs</div>
+                                                    <div className="font-bold text-sm mb-1 text-orange-600">{totalRcvQty} / {totalOrderQty} Pcs</div>
                                                     <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                                        <div className={`bg-${isArrived ? 'teal-500' : 'rose-500'} h-1.5 rounded-full`} style={{ width: `${Math.round((totalRcvQty / totalOrderQty) * 100) || 0}%` }}></div>
+                                                        <div className={`bg-${isArrived ? 'teal-500' : 'orange-500'} h-1.5 rounded-full`} style={{ width: `${Math.round((totalRcvQty / totalOrderQty) * 100) || 0}%` }}></div>
                                                     </div>
                                                 </td>
                                                 <td className="p-4 text-center">
-                                                    <span className={`bg-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-700 text-xs font-black uppercase px-2 py-1 rounded-md`}>{po.status}</span>
+                                                    <span className={`bg-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'amber')}-100 text-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'amber')}-700 text-xs font-black uppercase px-2 py-1 rounded-md`}>{po.status}</span>
                                                 </td>
                                             </tr>
                                         );
@@ -6800,7 +6665,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 const sessions = getGroupedSessions(allFilteredTx);
 
                 return (
-                    <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
+                    <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
                         <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                             {/* HEADER */}
                             <div className={`p-4 md:p-6 border-b flex justify-between items-center ${historyModal.type === 'IN' ? 'bg-teal-50 border-teal-100' : 'bg-rose-50 border-rose-100'}`}>
@@ -6837,7 +6702,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                         ) : (
                                             <div className="bg-white border rounded-2xl overflow-x-auto custom-scrollbar shadow-sm">
                                                 <table className="w-full text-left border-collapse min-w-[380px] md:min-w-0">
-                                                    <thead className="bg-rose-50/50 border-b">
+                                                    <thead className="bg-slate-100/50 border-b">
                                                         <tr className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
                                                             <th className="px-2 py-3 md:p-4 font-black">Tanggal</th>
                                                             <th className="px-2 py-3 md:p-4 font-black hidden md:table-cell">Operator</th>
@@ -6851,7 +6716,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                         {sessions.map((session, idx) => (
                                                             <tr key={idx} className="hover:bg-blue-50/30 transition-colors text-xs md:text-sm font-bold text-slate-700">
                                                                 <td className="px-2 py-3 md:p-4">
-                                                                    <div className="text-rose-900 leading-tight">{new Date(session.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
+                                                                    <div className="text-slate-900 leading-tight">{new Date(session.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: '2-digit' })}</div>
                                                                     <div className="text-[9px] text-slate-400 font-mono mt-0.5">{new Date(session.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                                                                 </td>
                                                                 <td className="px-2 py-3 md:p-4 font-black text-slate-500 hidden md:table-cell">{session.user}</td>
@@ -6879,7 +6744,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                             <div className="flex gap-4">
                                                 <div className="text-center bg-white px-4 py-2 rounded-xl shadow-sm border">
                                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Variasi Produk</div>
-                                                    <div className="text-xl font-black text-rose-800 leading-none">{selectedSession.skus.size}</div>
+                                                    <div className="text-xl font-black text-slate-800 leading-none">{selectedSession.skus.size}</div>
                                                 </div>
                                                 <div className="text-center bg-white px-4 py-2 rounded-xl shadow-sm border">
                                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Total Pieces</div>
@@ -6903,10 +6768,10 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
                                                                 <td className="py-3 md:py-4 px-2">
-                                                                    <div className="font-black text-rose-800 text-xs md:text-sm">{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
+                                                                    <div className="font-black text-slate-800 text-xs md:text-sm">{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                                                                 </td>
                                                                 <td className="py-3 md:py-4 px-2">
-                                                                    <div className="font-black text-rose-800 text-xs md:text-sm">{variant ? variant.article : t.sku}</div>
+                                                                    <div className="font-black text-slate-800 text-xs md:text-sm">{variant ? variant.article : t.sku}</div>
                                                                     <div className="text-[10px] text-slate-400 font-mono translate-y-[-2px]">{t.sku}</div>
                                                                 </td>
                                                                 <td className="py-3 md:py-4 px-2">
@@ -6930,7 +6795,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             {/* FOOTER */}
                             <div className="p-4 bg-slate-50 border-t flex justify-between items-center no-print">
                                 <p className="text-[10px] font-bold text-slate-400 italic">Klik baris atau tombol detail untuk melihat pemecahan per item.</p>
-                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-6 py-2.5 bg-slate-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                             </div>
                         </div>
                     </div>
@@ -6939,10 +6804,10 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
             {/* MODAL LAPORAN */}
             {laporanModal && (
-                <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
+                <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
                     <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                         <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
-                            <h3 className="font-black text-xl text-rose-800 flex items-center gap-3"><i className="fa-solid fa-clipboard-list text-emerald-500"></i> Buat Laporan Harian</h3>
+                            <h3 className="font-black text-xl text-slate-800 flex items-center gap-3"><i className="fa-solid fa-clipboard-list text-emerald-500"></i> Buat Laporan Harian</h3>
                             <button onClick={() => setLaporanModal(false)} className="text-slate-400 hover:text-rose-500 bg-white hover:bg-rose-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm border"><i className="fa-solid fa-xmark"></i></button>
                         </div>
                         <div className="p-6">
@@ -6979,7 +6844,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     </div>
                                 </div>
                             </div>
-                            <button onClick={generateLaporan} className="w-full bg-rose-800 hover:bg-rose-900 text-white font-black text-xs py-2 rounded-lg mb-4 shadow-sm transition-colors">GENERATE ULANG</button>
+                            <button onClick={generateLaporan} className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black text-xs py-2 rounded-lg mb-4 shadow-sm transition-colors">GENERATE ULANG</button>
 
                             <textarea value={laporanTeks} readOnly className="w-full h-64 p-4 rounded-xl border border-slate-200 bg-slate-50 font-mono text-sm resize-none focus:outline-none whitespace-pre-wrap" />
                             
@@ -6991,10 +6856,10 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
             {/* MODAL RIWAYAT KAS OPERASIONAL */}
             {kasModal && (
-                <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
+                <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
                     <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                         {/* HEADER */}
-                        <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gradient-to-r from-rose-50 to-rose-50 border-rose-100">
+                        <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gradient-to-r from-amber-50 to-orange-50 border-amber-100">
                             <div className="flex items-center gap-3">
                                 {kasDetailItem && (
                                     <button onClick={() => setKasDetailItem(null)} className="w-10 h-10 rounded-xl bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm transition-transform active:scale-95">
@@ -7002,7 +6867,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     </button>
                                 )}
                                 <div>
-                                    <h3 className="text-lg md:text-xl font-black text-rose-800">
+                                    <h3 className="text-lg md:text-xl font-black text-amber-800">
                                         {kasDetailItem ? 'Detail Transaksi Kas' : 'Riwayat Kas Operasional'}
                                     </h3>
                                     <p className="text-slate-500 font-bold text-[10px] md:text-xs uppercase tracking-widest leading-none mt-1">
@@ -7033,9 +6898,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                 Rp {kasFiltered.filter(d => d.jenis === 'keluar').reduce((s, d) => s + d.nominal, 0).toLocaleString('id-ID')}
                                             </div>
                                         </div>
-                                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center shadow-sm">
-                                            <div className="text-[10px] font-black text-rose-700 uppercase">Saldo Total</div>
-                                            <div className={`text-sm font-black mt-0.5 ${totalSaldoKas >= 0 ? 'text-rose-700' : 'text-red-700'}`}>
+                                        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center shadow-sm">
+                                            <div className="text-[10px] font-black text-amber-700 uppercase">Saldo Total</div>
+                                            <div className={`text-sm font-black mt-0.5 ${totalSaldoKas >= 0 ? 'text-amber-700' : 'text-red-700'}`}>
                                                 Rp {totalSaldoKas.toLocaleString('id-ID')}
                                             </div>
                                         </div>
@@ -7060,7 +6925,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
                                                     {kasFiltered.map((item, idx) => (
-                                                        <tr key={idx} className="hover:bg-rose-50/40 transition-colors text-sm font-bold">
+                                                        <tr key={idx} className="hover:bg-amber-50/40 transition-colors text-sm font-bold">
                                                             <td className="px-3 py-3 text-slate-600 whitespace-nowrap">
                                                                 <div>{item.tanggal}</div>
                                                                 {item.timestamp?.toDate && (
@@ -7079,7 +6944,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                                 {item.jenis === 'masuk' ? '+' : '-'}Rp {item.nominal.toLocaleString('id-ID')}
                                                             </td>
                                                             <td className="px-3 py-3 text-center">
-                                                                <button onClick={() => setKasDetailItem(item)} className="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] shadow-sm flex items-center gap-1 mx-auto">
+                                                                <button onClick={() => setKasDetailItem(item)} className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] shadow-sm flex items-center gap-1 mx-auto">
                                                                     DETAIL <i className="fa-solid fa-chevron-right text-[7px]"></i>
                                                                 </button>
                                                             </td>
@@ -7096,7 +6961,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     <div className="bg-slate-50 border rounded-2xl p-4 space-y-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500 font-bold text-sm">Tanggal</span>
-                                            <span className="font-black text-rose-800">{kasDetailItem.tanggal}</span>
+                                            <span className="font-black text-slate-800">{kasDetailItem.tanggal}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500 font-bold text-sm">Jenis</span>
@@ -7112,7 +6977,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                         </div>
                                         <div className="pt-2 border-t">
                                             <div className="text-slate-500 font-bold text-sm mb-1">Keterangan</div>
-                                            <div className="font-bold text-rose-800">{kasDetailItem.keterangan}</div>
+                                            <div className="font-bold text-slate-800">{kasDetailItem.keterangan}</div>
                                         </div>
                                     </div>
                                     {kasDetailItem.buktiUrl && (
@@ -7127,7 +6992,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
                         {/* FOOTER */}
                         <div className="p-4 bg-slate-50 border-t flex justify-end">
-                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-6 py-2.5 bg-slate-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                         </div>
                     </div>
                 </div>
@@ -7140,14 +7005,14 @@ function StatCard({ title, value, icon, color, bg, onClick }) {
     return (
         <div
             onClick={onClick}
-            className={`bg-white p-5 md:p-7 rounded-2xl border-2 border-slate-100 shadow-sm flex items-center gap-4 md:gap-6 transition-all active:scale-95 group ${onClick ? 'cursor-pointer hover:border-rose-300 hover:shadow-md' : ''}`}
+            className={`bg-white p-5 md:p-7 rounded-2xl border-2 border-slate-100 shadow-sm flex items-center gap-4 md:gap-6 transition-all active:scale-95 group ${onClick ? 'cursor-pointer hover:border-orange-300 hover:shadow-md' : ''}`}
         >
             <div className={`w-14 h-14 md:w-16 md:h-16 rounded-xl ${bg} ${color} flex items-center justify-center shadow-inner flex-shrink-0 transition-transform group-hover:scale-110`}><i className={`fa-solid ${icon} text-2xl md:text-3xl`}></i></div>
             <div className="flex-1">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
                 <div className="flex items-end justify-between">
-                    <p className="text-3xl md:text-4xl font-black text-rose-800">{value}</p>
-                    {onClick && <i className="fa-solid fa-chevron-right text-slate-300 text-sm md:text-base group-hover:text-rose-500 transition-colors"></i>}
+                    <p className="text-3xl md:text-4xl font-black text-slate-800">{value}</p>
+                    {onClick && <i className="fa-solid fa-chevron-right text-slate-300 text-sm md:text-base group-hover:text-orange-500 transition-colors"></i>}
                 </div>
             </div>
         </div>
@@ -7160,30 +7025,13 @@ function UploadProduk({ products, setIsLoading, showToast }) {
     const nextBaseCode = useMemo(() => {
         let maxCode = 0;
         products.forEach(p => {
-            const code = p.baseCode;
-            if (/^[A-Z]+$/.test(code)) {
-                let num = 0;
-                for (let i = 0; i < code.length; i++) {
-                    num = num * 26 + (code.charCodeAt(i) - 64);
-                }
-                if (num > maxCode) maxCode = num;
-            } else {
-                // If there are numeric ones, just ignore or parse
-                const num = parseInt(code, 10);
-                if (!isNaN(num) && num > maxCode) maxCode = num;
-            }
+            const num = parseInt(p.baseCode, 10);
+            if (!isNaN(num) && num > maxCode) maxCode = num;
         });
-        let n = maxCode + 1;
-        let result = '';
-        while (n > 0) {
-            let rem = (n - 1) % 26;
-            result = String.fromCharCode(65 + rem) + result;
-            n = Math.floor((n - 1) / 26);
-        }
-        return result;
+        return String(maxCode + 1);
     }, [products]);
     
-    const initialForm = { article: '', baseCode: '', photo: '', buyPrice: 0, sellPrice: 0 };
+    const initialForm = { article: '', baseCode: '', supplier: '', photo: '', buyPrice: 0, sellPrice: 0 };
     const [form, setForm] = useState(initialForm);
     const [colors, setColors] = useState([{ name: '', code: '' }]);
     const [sizes, setSizes] = useState([{ name: '', code: '', buyPrice: '', sellPrice: '' }]);
@@ -7246,7 +7094,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
     };
 
     const handleEdit = (product) => {
-        setForm({ article: product.article, baseCode: product.baseCode, photo: product.photo, buyPrice: product.buyPrice, sellPrice: product.sellPrice });
+        setForm({ article: product.article, baseCode: product.baseCode, supplier: product.supplier || '', photo: product.photo, buyPrice: product.buyPrice, sellPrice: product.sellPrice });
         setColors(product.colors || [{ name: '', code: '' }]); setSizes(product.sizes || [{ name: '', code: '' }]); setEditId(product.id);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -7277,10 +7125,10 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
     return (
         <div className="space-y-8">
-            <div className={`p-8 rounded-3xl border-4 shadow-xl transition-colors ${editId ? 'bg-rose-50 border-rose-300' : 'bg-white border-white'}`}>
+            <div className={`p-8 rounded-3xl border-4 shadow-xl transition-colors ${editId ? 'bg-amber-50 border-amber-300' : 'bg-white border-white'}`}>
                 <div className="flex justify-between items-center border-b border-slate-200 pb-5 mb-8">
-                    <h3 className="text-2xl font-black text-rose-800 flex items-center">
-                        <div className={`w-14 h-14 flex items-center justify-center rounded-2xl mr-4 text-white shadow-md ${editId ? 'bg-rose-500' : 'bg-rose-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-2xl`}></i></div>
+                    <h3 className="text-2xl font-black text-slate-800 flex items-center">
+                        <div className={`w-14 h-14 flex items-center justify-center rounded-2xl mr-4 text-white shadow-md ${editId ? 'bg-amber-500' : 'bg-orange-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-2xl`}></i></div>
                         {editId ? 'Edit Master Produk' : 'Input Master Produk Baru'}
                     </h3>
                     {editId && <button type="button" onClick={cancelEdit} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3 rounded-xl font-bold shadow-sm transition-colors"><i className="fa-solid fa-xmark mr-2"></i> Batal Edit</button>}
@@ -7289,19 +7137,20 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                 <form onSubmit={handleSubmit} action="javascript:void(0);">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                         <div className="space-y-6">
-                            <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> Informasi Utama</h4>
+                            <h4 className="font-bold text-lg text-slate-800 flex items-center"><span className="bg-slate-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> Informasi Utama</h4>
                             <div className="space-y-4">
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Article</label><input required type="text" value={form.article} onChange={e => setForm({ ...form, article: e.target.value.toUpperCase() })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 uppercase bg-white shadow-inner font-bold text-rose-800" placeholder="CONTOH: F01-04.1" /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article) {!editId && <span className="text-emerald-600 text-xs font-bold ml-1">âœ… Otomatis #{nextBaseCode}</span>}</label><input required type="text" value={editId ? form.baseCode : (form.baseCode || nextBaseCode)} onChange={e => editId ? setForm({ ...form, baseCode: e.target.value }) : null} readOnly={!editId} className={`w-full px-5 py-3.5 border-2 rounded-xl outline-none font-mono shadow-inner text-rose-800 ${editId ? 'border-slate-300 focus:border-rose-500 bg-white' : 'border-emerald-300 bg-emerald-50 cursor-not-allowed font-black text-emerald-700'}`} placeholder="Otomatis" /></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Article</label><input required type="text" value={form.article} onChange={e => setForm({ ...form, article: e.target.value.toUpperCase() })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 uppercase bg-white shadow-inner font-bold text-slate-800" placeholder="CONTOH: F01-04.1" /></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article) {!editId && <span className="text-emerald-600 text-xs font-bold ml-1">Oto. #{nextBaseCode}</span>}</label><input required type="text" value={editId ? form.baseCode : (form.baseCode || nextBaseCode)} onChange={e => editId ? setForm({ ...form, baseCode: e.target.value }) : null} readOnly={!editId} className={`w-full px-5 py-3.5 border-2 rounded-xl outline-none font-mono shadow-inner text-slate-800 ${editId ? "border-slate-300 focus:border-orange-500 bg-white" : "border-emerald-300 bg-emerald-50 cursor-not-allowed font-black text-emerald-700"}`} placeholder="Otomatis" /></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Diproduksi Oleh (Supplier/Pabrik)</label><select value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 bg-white shadow-inner font-bold text-slate-800"><option value="">-- Tidak Spesifik --</option><option value="samin">🏭 Pak Samin</option><option value="lery">🏭 Lerys</option></select></div>
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Beli</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
-                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Jual</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.sellPrice} onChange={e => setForm({ ...form, sellPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
+                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Beli</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 bg-white shadow-inner font-bold text-slate-800" placeholder="0" /></div></div>
+                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Jual</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.sellPrice} onChange={e => setForm({ ...form, sellPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 bg-white shadow-inner font-bold text-slate-800" placeholder="0" /></div></div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Foto SKU (Max 800Kb)</label>
                                     <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-xl" /> : <><i className="fa-solid fa-cloud-arrow-up text-5xl mb-4 text-rose-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
+                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-xl" /> : <><i className="fa-solid fa-cloud-arrow-up text-5xl mb-4 text-orange-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
                                         </div>
                                         <input type="file" className="hidden" accept="image/*" onChange={e => {
                                             const file = e.target.files[0];
@@ -7314,21 +7163,21 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                         <div className="space-y-8">
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                                    <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">2</span> Variasi Warna & Kode</h4>
-                                    <button type="button" onClick={() => setColors([...colors, { name: '', code: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
+                                    <h4 className="font-bold text-lg text-slate-800 flex items-center"><span className="bg-slate-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">2</span> Variasi Warna & Kode</h4>
+                                    <button type="button" onClick={() => setColors([...colors, { name: '', code: '' }])} className="bg-orange-100 hover:bg-orange-500 hover:text-white transition-colors text-orange-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
                                 </div>
                                 {colors.map((c, i) => (
                                     <div key={i} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                                        <input required type="text" value={c.name} onChange={e => { const n = [...colors]; n[i].name = e.target.value; setColors(n); }} className="flex-1 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Nama (ex: Hitam)" />
-                                        <input required type="text" value={c.code} onChange={e => { const n = [...colors]; n[i].code = e.target.value; setColors(n); }} className="w-1/3 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm font-mono bg-white shadow-inner font-bold" placeholder="Kode (ex: 1)" />
+                                        <input required type="text" value={c.name} onChange={e => { const n = [...colors]; n[i].name = e.target.value; setColors(n); }} className="flex-1 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm bg-white shadow-inner font-bold" placeholder="Nama (ex: Hitam)" />
+                                        <input required type="text" value={c.code} onChange={e => { const n = [...colors]; n[i].code = e.target.value; setColors(n); }} className="w-1/3 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm font-mono bg-white shadow-inner font-bold" placeholder="Kode (ex: 1)" />
                                         {colors.length > 1 && <button type="button" onClick={() => { const n = [...colors]; n.splice(i, 1); setColors(n); }} className="w-12 h-[52px] flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
                                     </div>
                                 ))}
                             </div>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-                                    <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">3</span> Variasi Size & Kode</h4>
-                                    <button type="button" onClick={() => setSizes([...sizes, { name: '', code: '', buyPrice: '', sellPrice: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
+                                    <h4 className="font-bold text-lg text-slate-800 flex items-center"><span className="bg-slate-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">3</span> Variasi Size & Kode</h4>
+                                    <button type="button" onClick={() => setSizes([...sizes, { name: '', code: '', buyPrice: '', sellPrice: '' }])} className="bg-orange-100 hover:bg-orange-500 hover:text-white transition-colors text-orange-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
                                 </div>
                                 {sizes.map((s, i) => (
                                     <div key={i} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl animate-in slide-in-from-top-2">
@@ -7339,7 +7188,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                                 n[i].name = e.target.value;
                                                 n[i].code = e.target.value; // Otomatis menduplikasi input nama size menjadi kode barcode
                                                 setSizes(n);
-                                            }} className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Size (ex: 37)" />
+                                            }} className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm bg-white shadow-inner font-bold" placeholder="Size (ex: 37)" />
 
                                             {/* Input Kode dihapus dari sini */}
 
@@ -7348,11 +7197,11 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                         <div className="flex flex-col sm:flex-row gap-3 mt-2">
                                             <div className="relative w-full">
                                                 <span className="absolute left-3 top-3 text-slate-400 font-bold text-[10px] uppercase tracking-wider">Beli Rp</span>
-                                                <input type="number" value={s.buyPrice || ''} onChange={e => { const n = [...sizes]; n[i].buyPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.buyPrice || "Sesuai Pusat"} />
+                                                <input type="number" value={s.buyPrice || ''} onChange={e => { const n = [...sizes]; n[i].buyPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm md:text-base bg-white shadow-inner font-bold text-slate-800" placeholder={form.buyPrice || "Sesuai Pusat"} />
                                             </div>
                                             <div className="relative w-full">
                                                 <span className="absolute left-3 top-3 text-slate-400 font-bold text-[10px] uppercase tracking-wider">Jual Rp</span>
-                                                <input type="number" value={s.sellPrice || ''} onChange={e => { const n = [...sizes]; n[i].sellPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.sellPrice || "Sesuai Pusat"} />
+                                                <input type="number" value={s.sellPrice || ''} onChange={e => { const n = [...sizes]; n[i].sellPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm md:text-base bg-white shadow-inner font-bold text-slate-800" placeholder={form.sellPrice || "Sesuai Pusat"} />
                                             </div>
                                         </div>
                                     </div>
@@ -7361,7 +7210,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                         </div>
                     </div>
                     <div className="mt-10 pt-8 border-t border-slate-200 flex justify-end">
-                        <button type="submit" className={`w-full md:w-auto px-12 py-5 rounded-2xl font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30'}`}>
+                        <button type="submit" className={`w-full md:w-auto px-12 py-5 rounded-2xl font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/30' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30'}`}>
                             <i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-save'} mr-3`}></i> {editId ? 'UPDATE MASTER PRODUK' : 'SIMPAN MASTER PRODUK'}
                         </button>
                     </div>
@@ -7370,14 +7219,14 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-xl text-rose-800 flex items-center">
-                        <i className="fa-solid fa-list-ul text-rose-500 mr-3"></i> Daftar Produk 
+                    <h3 className="font-black text-xl text-slate-800 flex items-center">
+                        <i className="fa-solid fa-list-ul text-orange-500 mr-3"></i> Daftar Produk 
                     </h3>
                     <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{products.length} Produk</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 text-sm border-b-4 border-slate-200">
+                        <thead className="bg-slate-100 text-slate-700 text-sm border-b-4 border-slate-200">
                             <tr><th className="p-5 font-black uppercase">Detail Produk</th><th className="p-5 font-black uppercase">Harga Beli / Jual</th><th className="p-5 font-black uppercase">Status</th><th className="p-5 font-black text-right uppercase">Aksi</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -7385,7 +7234,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                 <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${!p.isActive ? 'bg-slate-50 opacity-60' : ''}`}>
                                     <td className="p-5 flex items-center gap-5">
                                         <img src={p.photo} className="w-16 h-16 rounded-xl object-cover shadow-md border-2 border-white" />
-                                        <div><div className="font-black text-rose-900 text-lg">{p.article}</div><div className="text-xs font-mono text-rose-600 font-bold bg-rose-100 px-2 py-1 rounded-md inline-block mt-1">Kode: {p.baseCode}</div></div>
+                                        <div><div className="font-black text-slate-900 text-lg">{p.article}</div><div className="flex items-center gap-2 mt-1"><div className="text-xs font-mono text-orange-600 font-bold bg-orange-100 px-2 py-1 rounded-md inline-block">Kode: {p.baseCode}</div>{p.supplier && <div className="text-xs font-bold px-2 py-1 rounded-md inline-block bg-blue-100 text-blue-700">🏭 {p.supplier === "samin" ? "Pak Samin" : p.supplier === "lery" ? "Lerys" : p.supplier}</div>}</div></div>
                                     </td>
                                     <td className="p-5">
                                         <div className="font-bold text-slate-700 text-base">{formatRp(p.buyPrice)}</div>
@@ -7395,10 +7244,10 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                         <span className={`px-4 py-2 rounded-xl text-xs font-black shadow-sm ${p.isActive ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-slate-200 text-slate-600 border border-slate-300'}`}>{p.isActive ? 'AKTIF' : 'NONAKTIF'}</span>
                                     </td>
                                     <td className="p-5 text-right space-x-3 whitespace-nowrap">
-                                        <button type="button" onClick={() => toggleStatus(p.id, p.isActive)} className={`w-12 h-12 rounded-xl border shadow-sm transition-colors ${p.isActive ? 'bg-white text-slate-600 hover:bg-slate-200' : 'bg-rose-800 text-white'}`} title="Ubah Status">
+                                        <button type="button" onClick={() => toggleStatus(p.id, p.isActive)} className={`w-12 h-12 rounded-xl border shadow-sm transition-colors ${p.isActive ? 'bg-white text-slate-600 hover:bg-slate-200' : 'bg-slate-800 text-white'}`} title="Ubah Status">
                                             {p.isActive ? <i className="fa-solid fa-eye-slash"></i> : <i className="fa-solid fa-eye"></i>}
                                         </button>
-                                        <button type="button" onClick={() => handleEdit(p)} className="w-12 h-12 rounded-xl border shadow-sm transition-colors bg-white text-rose-500 hover:bg-rose-500 hover:text-white border-rose-200" title="Edit Produk">
+                                        <button type="button" onClick={() => handleEdit(p)} className="w-12 h-12 rounded-xl border shadow-sm transition-colors bg-white text-amber-500 hover:bg-amber-500 hover:text-white border-amber-200" title="Edit Produk">
                                             <i className="fa-solid fa-pen"></i>
                                         </button>
                                         <button type="button" onClick={() => deleteProduct(p.id)} className="w-12 h-12 bg-white border shadow-sm rounded-xl hover:bg-red-500 hover:text-white border-red-200 text-red-500 transition-colors" title="Hapus Permanen">
@@ -7690,13 +7539,13 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
             {unmappedBarcode && (
                 <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
                     <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
-                        <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-5xl text-rose-500"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800 text-center mb-2">Barcode Terputus!</h3>
+                        <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-5xl text-orange-500"></i></div>
+                        <h3 className="text-2xl font-black text-slate-800 text-center mb-2">Barcode Terputus!</h3>
                         <p className="text-slate-600 text-center text-sm mb-6">Sistem mendeteksi label <b>{unmappedBarcode.fullBarcode}</b> menggunakan kode usang (<b>{unmappedBarcode.shortCode}</b>). Pilih barang yang sesuai agar kode ini dapat tersambung kembali selamanya.</p>
                         
                         <div className="mb-6">
                             <label className="block text-sm font-black text-slate-700 mb-2">Pilih Barang yang Sesuai:</label>
-                            <select value={unmappedSku} onChange={e => setUnmappedSku(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold bg-slate-50 focus:border-rose-500 outline-none text-sm">
+                            <select value={unmappedSku} onChange={e => setUnmappedSku(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold bg-slate-50 focus:border-orange-500 outline-none text-sm">
                                 <option value="">-- Ketuk untuk memilih --</option>
                                 {unmappedBarcode.poSkus && unmappedBarcode.poSkus.length > 0 ? (
                                     variants.filter(v => unmappedBarcode.poSkus.includes(v.sku)).map(v => (
@@ -7710,7 +7559,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                             </select>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-4 bg-rose-50 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
+                            <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-4 bg-slate-100 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
                             <button onClick={async () => {
                                 if (!unmappedSku) return showToast('error', 'Pilih barang terlebih dahulu!');
                                 
@@ -7739,7 +7588,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     showToast('error', 'Gagal menyambungkan: ' + e.message);
                                 }
                                 setIsLoading(false);
-                            }} className="flex-1 py-4 bg-rose-500 text-white rounded-xl font-black hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">Sambungkan & Scan</button>
+                            }} className="flex-1 py-4 bg-orange-500 text-white rounded-xl font-black hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/30">Sambungkan & Scan</button>
                         </div>
                     </div>
                 </div>
@@ -7749,7 +7598,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
                     <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera</h3>
+                            <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-orange-500"></i> Scan Kamera</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
                         <ZxingScanner videoId="video-main" onScan={(text) => processBarcode(text)} />
@@ -7757,7 +7606,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 </div>
             )}
 
-            <div className={`flex justify-between items-center text-white p-4 md:p-6 rounded-2xl shadow-inner mb-6 ${isMasuk ? 'bg-rose-800' : 'bg-rose-800'}`}>
+            <div className={`flex justify-between items-center text-white p-4 md:p-6 rounded-2xl shadow-inner mb-6 ${isMasuk ? 'bg-slate-800' : 'bg-slate-800'}`}>
                 <div>
                     <h2 className="text-2xl md:text-3xl font-black flex items-center gap-3">
                         <i className={`fa-solid ${isMasuk ? 'fa-right-to-bracket text-teal-400' : 'fa-right-from-bracket text-red-400'}`}></i>
@@ -7769,11 +7618,11 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
             </div>
 
             <div className="flex flex-col gap-3 mb-5 border-b-4 border-slate-100 pb-5">
-                <button type="button" onClick={handleConfirm} disabled={scannedItems.length === 0} className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-base md:text-lg flex justify-center items-center gap-3 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-md transition-transform transform hover:-translate-y-0.5">
+                <button type="button" onClick={handleConfirm} disabled={scannedItems.length === 0} className="w-full py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-black text-base md:text-lg flex justify-center items-center gap-3 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-md transition-transform transform hover:-translate-y-0.5">
                     <i className="fa-solid fa-cloud-arrow-up text-xl"></i> KONFIRMASI &amp; SIMPAN
                 </button>
                 <div className="flex gap-3">
-                    <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl font-bold flex justify-center items-center gap-2 disabled:bg-slate-300 disabled:text-slate-500 transition-colors shadow-sm">
+                    <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-2.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold flex justify-center items-center gap-2 disabled:bg-slate-300 disabled:text-slate-500 transition-colors shadow-sm">
                         <i className="fa-solid fa-mug-hot"></i> Jeda &amp; Draft
                     </button>
                     <button type="button" onClick={() => { if (confirm('Hapus semua antrean scan yang belum tersimpan?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem(draftKey); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border-2 border-rose-200 rounded-xl font-bold flex justify-center items-center gap-2 disabled:border-slate-200 disabled:text-slate-400 transition-colors">
@@ -7820,28 +7669,28 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     }
                                 }
                             }}
-                            className="w-full pl-16 pr-6 py-5 text-2xl md:text-3xl border-4 border-slate-300 focus:border-rose-500 rounded-2xl font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner"
+                            className="w-full pl-16 pr-6 py-5 text-2xl md:text-3xl border-4 border-slate-300 focus:border-orange-500 rounded-2xl font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner"
                             placeholder="KODE..."
                         />
                     </div>
-                    <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
-                        <i className="fa-solid fa-camera text-3xl mb-1 text-rose-400"></i> Kamera
+                    <button type="button" onClick={() => setShowCamera(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                        <i className="fa-solid fa-camera text-3xl mb-1 text-orange-400"></i> Kamera
                     </button>
                 </div>
 
             </div>
 
             <div>
-                <h3 className="font-black text-lg text-rose-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-rose-500"></i> 10 Barang Terakhir di-Scan</h3>
-                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
+                <h3 className="font-black text-lg text-slate-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-orange-500"></i> 10 Barang Terakhir di-Scan</h3>
+                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-slate-100 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
                     {scannedItems.slice(0, 10).map((item, idx) => (
                         <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-2xl bg-white shadow-sm animate-in slide-in-from-left-4">
                             <div className="flex items-center gap-4 md:gap-5">
                                 <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                 <div>
-                                    <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
-                                    <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 text-base">{item.variantInfo.sizeName}</span></div>
-                                    <div className="text-[10px] md:text-[11px] text-slate-500 font-mono mt-2 bg-rose-50 px-2 py-1 rounded-md inline-block border border-slate-200">ID: {item.fullBarcode}</div>
+                                    <div className="font-black text-slate-900 text-base md:text-lg">{item.variantInfo.article}</div>
+                                    <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-orange-500 text-base">{item.variantInfo.sizeName}</span></div>
+                                    <div className="text-[10px] md:text-[11px] text-slate-500 font-mono mt-2 bg-slate-100 px-2 py-1 rounded-md inline-block border border-slate-200">ID: {item.fullBarcode}</div>
                                 </div>
                             </div>
                             <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-xl transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
@@ -8045,7 +7894,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                 <div className="flex flex-col gap-3 mb-6 border-b-4 border-slate-100 pb-6">
                     <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-2xl font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-2xl"></i> SELESAI SCAN & EVALUASI</button>
                     <div className="flex gap-3">
-                        <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-xl font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
+                        <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-300 text-white rounded-xl font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
                         <button type="button" onClick={() => { if (confirm('Hapus semua draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border-2 border-rose-200 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
                     </div>
                 </div>
@@ -8056,20 +7905,20 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                             <i className="fa-solid fa-barcode absolute left-6 top-5 text-purple-400 text-2xl"></i>
                             <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-16 pr-6 py-5 text-2xl md:text-3xl border-4 border-purple-200 focus:border-purple-500 rounded-2xl font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner" placeholder="KODE..." />
                         </div>
-                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-3xl mb-1 text-purple-400"></i> Kamera</button>
+                        <button type="button" onClick={() => setShowCamera(true)} className="bg-slate-800 hover:bg-slate-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-3xl mb-1 text-purple-400"></i> Kamera</button>
                     </div>
                 </div>
 
                 <div>
-                    <h3 className="font-black text-lg text-rose-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-purple-500"></i> 10 Barang Terakhir di-Scan</h3>
-                    <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
+                    <h3 className="font-black text-lg text-slate-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-purple-500"></i> 10 Barang Terakhir di-Scan</h3>
+                    <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-slate-100 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
                         {scannedItems.slice(0, 10).map((item, idx) => (
                             <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-2xl bg-white shadow-sm animate-in slide-in-from-left-4">
                                 <div className="flex items-center gap-4 md:gap-5">
                                     <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                     <div>
-                                        <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
-                                        <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 font-black">{item.variantInfo.sizeName}</span></div>
+                                        <div className="font-black text-slate-900 text-base md:text-lg">{item.variantInfo.article}</div>
+                                        <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-orange-500 font-black">{item.variantInfo.sizeName}</span></div>
                                     </div>
                                 </div>
                                 <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-xl transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
@@ -8085,7 +7934,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
     return (
         <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border shadow-sm">
-                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
+                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
                 <div className="flex gap-3 w-full md:w-auto">
                     <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-6 py-3 rounded-xl font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
                     <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
@@ -8093,27 +7942,27 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-rose-900 text-white p-6 rounded-3xl border-4 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-5xl font-black">{totalSystem}</div></div>
-                <div className="bg-rose-500 text-white p-6 rounded-3xl border-4 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-5xl font-black">{totalScanned}</div></div>
+                <div className="bg-slate-900 text-white p-6 rounded-3xl border-4 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-5xl font-black">{totalSystem}</div></div>
+                <div className="bg-orange-500 text-white p-6 rounded-3xl border-4 border-orange-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-5xl font-black">{totalScanned}</div></div>
                 <div className={`p-6 rounded-3xl border-4 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-5xl font-black">{totalDiffAbsolute}</div></div>
             </div>
 
             <div className="bg-white rounded-3xl border shadow-lg overflow-hidden">
-                <div className="p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
+                <div className="p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-slate-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
                 <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
                     <table className="w-full text-left text-sm border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
-                            <tr><th className="p-5 font-black uppercase">Detail Produk</th><th className="p-5 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-5 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-5 font-black uppercase text-center bg-rose-50">Stok Scan Fisik</th><th className="p-5 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
+                        <thead className="bg-slate-100 text-slate-700 border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
+                            <tr><th className="p-5 font-black uppercase">Detail Produk</th><th className="p-5 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-5 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-5 font-black uppercase text-center bg-orange-50">Stok Scan Fisik</th><th className="p-5 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
                         </thead>
                         <tbody>
                             {comparisonResult && comparisonResult.map((c, i) => {
                                 const isDiff = c.diff !== 0;
                                 return (
                                     <tr key={i} className={`border-b border-slate-100 transition-colors whitespace-nowrap ${isDiff ? (c.diff > 0 ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'bg-rose-50/40 hover:bg-rose-50') : 'hover:bg-slate-50'}`}>
-                                        <td className="p-5"><div className="font-black text-rose-800 text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-xs font-bold text-slate-500 mt-1">{c.variant?.colorName || '-'} - Sz: <span className="text-rose-500 font-black">{c.variant?.sizeName || '-'}</span></div></td>
+                                        <td className="p-5"><div className="font-black text-slate-800 text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-xs font-bold text-slate-500 mt-1">{c.variant?.colorName || '-'} - Sz: <span className="text-orange-500 font-black">{c.variant?.sizeName || '-'}</span></div></td>
                                         <td className="p-5 text-center font-mono text-xs text-slate-500 border-x border-slate-100">{c.fullBarcode}</td>
                                         <td className="p-5 text-center font-bold text-slate-600 bg-slate-50/50 text-lg">{c.sysQty}</td>
-                                        <td className="p-5 text-center font-black text-rose-600 bg-rose-50/30 text-lg">{c.scanQty}</td>
+                                        <td className="p-5 text-center font-black text-orange-600 bg-orange-50/30 text-lg">{c.scanQty}</td>
                                         <td className="p-5 text-center border-l border-slate-100">{c.diff === 0 ? <span className="text-slate-300 font-black"><i className="fa-solid fa-check"></i> Pas</span> : c.diff > 0 ? <span className="text-emerald-600 font-black bg-emerald-100 px-3 py-1.5 rounded-lg">+ {c.diff} (Lebih)</span> : <span className="text-rose-600 font-black bg-rose-100 px-3 py-1.5 rounded-lg">{c.diff} (Hilang)</span>}</td>
                                     </tr>
                                 );
@@ -8179,7 +8028,7 @@ function CetakLabel({ products, variants, showToast }) {
                   <div class="cell br bb" style="flex-direction: column;"><svg class="barcode-svg" jsbarcode-value="${fullBarcode}" jsbarcode-format="CODE128" jsbarcode-width="2" jsbarcode-height="55" jsbarcode-displayvalue="false" jsbarcode-margin="0" jsbarcode-fontsize="14"></svg></div>
                   <div class="cell bb"><div class="prod-code">${prodCode}</div></div>
                   <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                  <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${item.article.length > 12 ? '18px' : (item.article.length > 7 ? '28px' : '40px')};">${item.article}</div><div class="price-text">${priceStr}</div></div>
+                  <div class="cell br" style="flex-direction: column;"><div class="article-text">${item.article}</div><div class="price-text">${priceStr}</div></div>
                   <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                 </div>
               </div>
@@ -8196,16 +8045,16 @@ function CetakLabel({ products, variants, showToast }) {
                 @page { margin: 0; }
                 body { margin: 0; padding: 0; font-family: sans-serif; background-color: white; }
                 .label-container { width: 471px; height: 215px; margin: 5px; padding: 0; border: none; box-sizing: border-box; page-break-after: always; page-break-inside: avoid; overflow: hidden; background-color: white; display: flex; justify-content: center; align-items: center; }
-                .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; direction: rtl; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
-                .cell { direction: ltr; display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
-                .br { border-left: 1px solid black; }
+                .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
+                .cell { display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
+                .br { border-right: 1px solid black; }
                 .bb { border-bottom: 1px solid black; }
                 .photo { max-width: 100%; max-height: 100%; object-fit: contain; }
                 .barcode-svg { max-width: 100%; max-height: 100%; }
                 .size-text { font-size: 48px; font-weight: 900; line-height: 1; }
                 .color-text { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
                 .prod-code { font-size: 36px; font-weight: 900; letter-spacing: 2px; }
-                .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
+                .article-text { font-size: 20px; font-weight: 900; }
                 .price-text { font-size: 14px; font-weight: 900; color: #222; margin-top: 4px; border: 1.5px solid #666; padding: 2px 8px; border-radius: 4px; }
               </style>
             </head><body>`;
@@ -8259,27 +8108,27 @@ function CetakLabel({ products, variants, showToast }) {
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
                 <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col h-[650px]">
-                    <h3 className="text-2xl font-black mb-6 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-xl"></i> Cari Produk</h3>
+                    <h3 className="text-2xl font-black mb-6 flex items-center gap-3 text-slate-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-orange-500 bg-orange-50 p-3 rounded-xl"></i> Cari Produk</h3>
                     <div className="space-y-4 mb-4">
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal Cetak Barcode</label>
-                            <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={printDate} onChange={e => setPrintDate(e.target.value)} />
+                            <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-slate-800 outline-none focus:border-orange-500 bg-slate-50" value={printDate} onChange={e => setPrintDate(e.target.value)} />
                         </div>
                         <div className="relative">
                             <i className="fa-solid fa-search absolute left-5 top-4 text-slate-400 text-lg"></i>
-                            <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-orange-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
                         {filteredVariants.map(v => (
-                            <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-4">
+                            <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-orange-400 transition-colors gap-4">
                                 <div className="flex items-center gap-4">
                                     <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
-                                    <div><div className="text-base font-black text-rose-800">{v.article} <span className="text-xs text-rose-500 bg-rose-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-rose-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
+                                    <div><div className="text-base font-black text-slate-800">{v.article} <span className="text-xs text-orange-500 bg-orange-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                 </div>
                                 <div className="flex items-center gap-2 w-full md:w-auto">
-                                    <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-rose-500 bg-slate-50" />
-                                    <button type="button" onClick={() => addToPrint(v)} className="flex-1 md:flex-none bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> CETAK</button>
+                                    <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-orange-500 bg-slate-50" />
+                                    <button type="button" onClick={() => addToPrint(v)} className="flex-1 md:flex-none bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> CETAK</button>
                                 </div>
                             </div>
                         ))}
@@ -8295,32 +8144,32 @@ function CetakLabel({ products, variants, showToast }) {
                 <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-400"><i className="fa-solid fa-print text-8xl"></i></div>
                     <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 relative z-10">
-                        <h3 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean Label</h3>
+                        <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-orange-500"></i> Antrean Label</h3>
                         <div className="flex items-center gap-3">
                             <button type="button" onClick={() => setPrintList([])} disabled={printList.length === 0} className="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 border border-red-200"><i className="fa-solid fa-trash-can mr-1"></i> Hapus Semua</button>
-                            <span className="text-white font-black bg-rose-500 px-4 py-2 rounded-xl text-sm shadow-md">{printList.length} Item</span>
+                            <span className="text-white font-black bg-orange-500 px-4 py-2 rounded-xl text-sm shadow-md">{printList.length} Item</span>
                         </div>
                     </div>
                     <div className="flex-1 overflow-y-auto space-y-2 mb-6 bg-slate-50 rounded-2xl p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                         {printList.map((item, idx) => (
-                            <div key={item._id} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 hover:border-rose-300 transition-colors shadow-sm">
+                            <div key={item._id} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 hover:border-orange-300 transition-colors shadow-sm">
                                 <div className="text-sm text-slate-600 flex items-center gap-3">
                                     <span className="text-slate-400 font-bold w-4">{idx + 1}.</span>
-                                    <span><span className="font-black text-rose-800 text-base">{item.article}</span> <span className="opacity-80 font-bold ml-1 text-slate-500">({item.colorName} - <b className="text-rose-500 text-base">{item.sizeName}</b>)</span></span>
+                                    <span><span className="font-black text-slate-800 text-base">{item.article}</span> <span className="opacity-80 font-bold ml-1 text-slate-500">({item.colorName} - <b className="text-orange-500 text-base">{item.sizeName}</b>)</span></span>
                                 </div>
-                                <button type="button" onClick={() => removePrint(idx)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-xmark text-lg font-black"></i></button>
+                                <button type="button" onClick={() => removePrint(idx)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-xmark text-lg font-black"></i></button>
                             </div>
                         ))}
                         {printList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                     </div>
-                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-rose-500/30 relative z-10"><i className="fa-solid fa-print text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
+                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-orange-500/30 relative z-10"><i className="fa-solid fa-print text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
                 </div>
             </div>
 
             {/* Pratinjau Visual */}
             <div className="bg-white p-8 rounded-2xl border shadow-sm no-print">
-                <h3 className="text-lg font-bold text-rose-800 mb-6 border-b pb-4 flex items-center gap-2">
-                    <i className="fa-solid fa-magnifying-glass text-rose-500 bg-rose-50 p-2 rounded-lg"></i> Pratinjau Desain Stiker (471x215 px)
+                <h3 className="text-lg font-bold text-slate-800 mb-6 border-b pb-4 flex items-center gap-2">
+                    <i className="fa-solid fa-magnifying-glass text-orange-500 bg-orange-50 p-2 rounded-lg"></i> Pratinjau Desain Stiker (471x215 px)
                 </h3>
                 {printList.length > 0 ? (
                     <div className="flex gap-6 overflow-x-auto pb-4 custom-scrollbar">
@@ -8329,26 +8178,26 @@ function CetakLabel({ products, variants, showToast }) {
                             const prodCode = getProductionCode(item.printDate);
                             return (
                                 <div key={idx} className="flex-shrink-0 shadow-xl" style={{ width: '471px', height: '215px', margin: '5px', padding: '0', backgroundColor: 'white', boxSizing: 'border-box', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                                    <div style={{ position: 'relative', width: '100%', height: '100%', border: '2px solid black', display: 'grid', gridTemplateColumns: '1.4fr 2.4fr 0.9fr', gridTemplateRows: '1fr 1fr', boxSizing: 'border-box', direction: 'rtl' }}>
+                                    <div style={{ position: 'relative', width: '100%', height: '100%', border: '2px solid black', display: 'grid', gridTemplateColumns: '1.4fr 2.4fr 0.9fr', gridTemplateRows: '1fr 1fr', boxSizing: 'border-box' }}>
 
-                                        <div style={{ borderLeft: '1px solid black', borderBottom: '1px solid black', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr' }}>
+                                        <div style={{ borderRight: '1px solid black', borderBottom: '1px solid black', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px' }}>
                                             {item.photo ? <img src={item.photo} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /> : <span style={{ fontSize: '10px' }}>No Img</span>}
                                         </div>
-                                        <div style={{ borderLeft: '1px solid black', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr', overflow: 'hidden' }}>
+                                        <div style={{ borderRight: '1px solid black', borderBottom: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', overflow: 'hidden' }}>
                                             <Barcode value={fullBarcode} />
                                         </div>
-                                        <div style={{ borderBottom: '1px solid black', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr' }}>
+                                        <div style={{ borderBottom: '1px solid black', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px' }}>
                                             <div style={{ fontSize: '36px', fontWeight: '900', letterSpacing: '2px' }}>{prodCode}</div>
                                         </div>
-                                        <div style={{ borderLeft: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr', textAlign: 'center' }}>
+                                        <div style={{ borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', textAlign: 'center' }}>
                                             <div style={{ fontSize: '48px', fontWeight: '900', lineHeight: '1' }}>{item.sizeName}</div>
                                             <div style={{ fontSize: '18px', fontWeight: 'bold', textTransform: 'uppercase', marginTop: '4px' }}>{item.colorName}</div>
                                         </div>
-                                        <div style={{ borderLeft: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr', textAlign: 'center' }}>
-                                            <div style={{ fontSize: item.article.length > 12 ? '18px' : (item.article.length > 7 ? '28px' : '40px'), fontWeight: '900', lineHeight: '1.1' }}>{item.article}</div>
+                                        <div style={{ borderRight: '1px solid black', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', padding: '5px', textAlign: 'center' }}>
+                                            <div style={{ fontSize: '20px', fontWeight: '900' }}>{item.article}</div>
                                             <div style={{ fontSize: '14px', fontWeight: '900', color: '#222', marginTop: '4px', border: '1.5px solid #666', padding: '2px 8px', borderRadius: '4px' }}>Rp. {formatRp(item.sellPrice || 0).replace('Rp\xa0', '')}</div>
                                         </div>
-                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px', direction: 'ltr' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '5px' }}>
                                             <QRCodeLocal value={fullBarcode} />
                                         </div>
                                     </div>
@@ -8368,11 +8217,9 @@ function CetakLabel({ products, variants, showToast }) {
 }
 
 // 5. Laporan Stok (Diperbarui untuk mengakomodasi Data Revisi)
-function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast, omzetDiscount, localDiscount, setLocalDiscount, handleUpdateDiscount }) {
+function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast }) {
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
-    const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
-    const [selectedImage, setSelectedImage] = useState(null);
 
     const calculatedStock = variants.map(v => {
         const legacy = v.legacySkus || [];
@@ -8388,7 +8235,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const totalBuyValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.buyPrice), 0);
     const totalSellValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.sellPrice), 0);
 
-    // Mengurutkan produk menggunakan logika Custom Syaren
+    // Mengurutkan produk menggunakan logika Custom Faradela
     const sortedProducts = [...products].sort((a, b) => {
         const infoA = parseArticleForSortGlobal(a.article);
         const infoB = parseArticleForSortGlobal(b.article);
@@ -8408,13 +8255,6 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const tableRows = [];
     sortedProducts.forEach(prod => {
         const colors = prod.colors || [];
-        
-        let articleTotalQty = 0;
-        colors.forEach(color => {
-            const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
-            articleTotalQty += sizesArray.reduce((acc, curr) => acc + curr.stock, 0);
-        });
-
         colors.forEach((color, idx) => {
             const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
             if (sizesArray.length > 0) {
@@ -8429,8 +8269,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 tableRows.push({
                     article: prod.article, colorName: color.name, isFirstRow: idx === 0, rowSpan: colors.length,
                     buyPrice: prod.buyPrice || 0, sellPrice: prod.sellPrice || 0, sizes: sizesArray,
-                    rowTotalBeli, rowTotalJual, photo: sizesArray.length > 0 ? sizesArray[0].photo : null,
-                    articleTotalQty
+                    rowTotalBeli, rowTotalJual
                 });
             }
         });
@@ -8519,42 +8358,28 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 </div>
             )}
 
-            <div className="bg-rose-900 rounded-3xl p-8 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
+            <div className="bg-slate-900 rounded-3xl p-8 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-10 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
-                <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
+                <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-orange-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
                 <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
-                <div className="px-4 pt-6 md:pt-0 relative z-10">
-                    <div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div>
-                    <p className="text-3xl font-black text-rose-400">{formatRp(totalSellValue * (1 - omzetDiscount / 100))}</p>
-                    <div className="mt-3 flex items-center gap-2 bg-rose-800 p-1.5 rounded-lg border border-rose-700/50 w-max relative z-20 shadow-inner">
-                        <span className="text-xs font-bold text-rose-300 ml-1">Diskon:</span>
-                        <input type="number" min="0" max="100" placeholder="0" value={localDiscount} onChange={e => setLocalDiscount(e.target.value)} className="w-12 bg-rose-950 border border-rose-600 rounded-md text-white text-xs font-bold px-1.5 py-1 outline-none focus:border-rose-400 text-center" />
-                        <span className="text-xs font-bold text-rose-300 -ml-1">%</span>
-                        <button type="button" onClick={handleUpdateDiscount} className="bg-rose-600 hover:bg-rose-500 text-white rounded-md px-2.5 py-1 text-xs font-bold shadow-md transition-colors ml-1">Set</button>
-                    </div>
-                    {omzetDiscount > 0 && <div className="mt-1.5 text-[10px] text-rose-300 font-semibold tracking-wide">Omzet Asli: {formatRp(totalSellValue)}</div>}
-                </div>
+                <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-orange-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div><p className="text-3xl font-black text-orange-400">{formatRp(totalSellValue)}</p></div>
             </div>
 
-            <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-2xl overflow-hidden mt-8'}`}>
-                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center shrink-0">
-                    <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-table-list text-rose-500 mr-3"></i> Detail Stok Per Article</h3>
-                    <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-                        <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
-                        <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
-                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
+            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center">
+                    <h3 className="text-xl font-black text-slate-800 flex items-center"><i className="fa-solid fa-table-list text-orange-500 mr-3"></i> Detail Stok Per Article</h3>
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                        <button type="button" onClick={() => setShowResetModal(true)} className="flex-1 md:flex-none bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
+                        <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
                     </div>
                 </div>
-                <div className={`overflow-auto custom-scrollbar ${isFullScreenLaporan ? 'flex-1 h-full' : 'pb-4'}`}>
-                    <table className="w-full text-left text-sm border-collapse min-w-max">
-                        <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
+                <div className="overflow-x-auto custom-scrollbar pb-4">
+                    <table className="w-full text-left text-sm border-collapse">
+                        <thead className="bg-slate-100 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th>
-                                <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r bg-rose-50">Warna</th>
-                                {allSizeNames.map(s => <th key={s} className="p-1 sm:p-5 text-[10px] sm:text-sm text-center border-r font-black uppercase text-rose-600 tracking-wider min-w-[24px] sm:w-16">{s}</th>)}
-                                <th className="hidden sm:table-cell p-5 text-sm text-center font-black uppercase tracking-wider bg-rose-100 text-blue-900 border-l-2 border-white">Qty</th>
-                                <th className="hidden sm:table-cell p-5 text-sm text-right font-black uppercase tracking-wider border-r">Beli</th>
-                                <th className="hidden sm:table-cell p-5 text-sm text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Jual</th>
+                                <th className="p-5 font-black uppercase tracking-wider border-r">Article</th><th className="p-5 font-black uppercase tracking-wider border-r">Warna</th>
+                                {allSizeNames.map(s => <th key={s} className="p-5 text-center border-r font-black uppercase text-orange-600 tracking-wider w-16">{s}</th>)}
+                                <th className="p-5 text-center font-black uppercase tracking-wider bg-orange-100 text-blue-900 border-l-4 border-white">Total Qty</th><th className="p-5 text-right font-black uppercase tracking-wider border-r">Total Harga Beli</th><th className="p-5 text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Total Harga Jual</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -8565,36 +8390,23 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                 return (
                                     <tr key={`${row.article}-${row.colorName}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors whitespace-nowrap">
                                         {row.isFirstRow && (
-                                            <td className="p-1.5 sm:p-4 border-r border-slate-200 align-top bg-white min-w-[70px] max-w-[85px] sm:min-w-[140px] sm:max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
-                                                <div className="flex flex-col items-center text-center gap-1 sm:gap-3">
-                                                    {row.photo && (
-                                                        <div className="w-10 h-10 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSelectedImage(row.photo)}>
-                                                            <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
-                                                        </div>
-                                                    )}
-                                                    <div className="w-full flex flex-col justify-between h-full">
-                                                        <div className="font-extrabold text-rose-800 text-[10px] sm:text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
-                                                        <div className="mt-1 sm:hidden text-center bg-rose-100/70 text-rose-800 font-black rounded-md text-[9px] py-0.5 w-full border border-rose-200/50">{row.articleTotalQty} Pcs</div>
-                                                        <div className="hidden sm:block mt-3 text-[10px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full text-left">
-                                                            <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono tracking-tighter">{formatRp(row.buyPrice)}</span></div>
-                                                            <div className="flex justify-between items-center gap-1 mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono tracking-tighter">{formatRp(row.sellPrice)}</span></div>
-                                                        </div>
-                                                    </div>
+                                            <td className="p-5 border-r border-slate-200 align-top bg-white" rowSpan={row.rowSpan}>
+                                                <div className="font-extrabold text-slate-800 text-base">{row.article}</div>
+                                                <div className="mt-2 text-xs font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
+                                                    <div className="flex items-center gap-2"><span className="w-8 font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
+                                                    <div className="flex items-center gap-2 mt-1 text-emerald-600"><span className="w-8 font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
                                                 </div>
                                             </td>
                                         )}
-                                        <td className="p-1.5 sm:p-5 border-r border-slate-100">
-                                            <div className="font-bold text-slate-700 text-[9px] sm:text-sm whitespace-nowrap">{row.colorName}</div>
-                                            <div className="sm:hidden font-extrabold text-rose-600 text-[8px] mt-0.5">{totalPerColor} Pcs</div>
-                                        </td>
+                                        <td className="p-5 font-bold text-slate-600 border-r border-slate-100">{row.colorName}</td>
                                         {allSizeNames.map(sz => {
                                             const matchedSize = row.sizes.find(s => s.sizeName === sz);
                                             const qty = matchedSize ? matchedSize.stock : 0;
-                                            return <td key={sz} className={`p-1 sm:p-5 text-center text-[10px] sm:text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
+                                            return <td key={sz} className={`p-5 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-slate-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
                                         })}
-                                        <td className="hidden sm:table-cell p-5 text-center font-black text-lg text-rose-600 bg-rose-50/50 border-l-2 border-white">{totalPerColor}</td>
-                                        <td className="hidden sm:table-cell p-5 text-right font-bold text-slate-600 border-r border-slate-100 text-sm">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
-                                        <td className="hidden sm:table-cell p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50 text-sm">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
+                                        <td className="p-5 text-center font-black text-lg text-orange-600 bg-orange-50/50 border-l-4 border-white">{totalPerColor}</td>
+                                        <td className="p-5 text-right font-bold text-slate-600 border-r border-slate-100">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
+                                        <td className="p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
                                     </tr>
                                 );
                             })}
@@ -8603,13 +8415,6 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                     </table>
                 </div>
             </div>
-            {/* Image Modal */}
-            {selectedImage && (
-                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
-                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
-                </div>
-            )}
         </div>
     );
 }
@@ -8724,11 +8529,11 @@ function PantauStok({ variants, transactions, showToast }) {
                         {data.map((item, i) => (
                             <div key={i} className="flex justify-between items-center p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 hover:border-slate-300 transition-colors">
                                 <div>
-                                    <div className="font-black text-rose-800 text-lg">{item.article}</div>
-                                    <div className="font-bold text-slate-500 text-sm mt-0.5">{item.colorName} - Sz: <span className="text-rose-500 font-black">{item.sizeName}</span></div>
-                                    <div className="text-xs font-bold text-slate-400 mt-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"><i className="fa-regular fa-calendar-check mr-1 text-rose-500"></i> Cetak: {new Date(item.originalDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                                    <div className="font-black text-slate-800 text-lg">{item.article}</div>
+                                    <div className="font-bold text-slate-500 text-sm mt-0.5">{item.colorName} - Sz: <span className="text-orange-500 font-black">{item.sizeName}</span></div>
+                                    <div className="text-xs font-bold text-slate-400 mt-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"><i className="fa-regular fa-calendar-check mr-1 text-orange-500"></i> Cetak: {new Date(item.originalDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                                 </div>
-                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-2xl border-2 shadow-sm text-rose-600">{item.qty} Pcs</span></div>
+                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-2xl border-2 shadow-sm text-orange-600">{item.qty} Pcs</span></div>
                             </div>
                         ))}
                         {data.length === 0 && <div className="text-center py-10 text-slate-400"><i className="fa-solid fa-box-open text-5xl mb-4 opacity-30"></i><p className="font-bold">Stok kategori ini kosong / habis terjual.</p></div>}
@@ -8740,15 +8545,15 @@ function PantauStok({ variants, transactions, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-rose-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="bg-slate-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
-                <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-rose-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
+                <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-orange-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
                 <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <CategorySection title="Stok Baru" subtitle="0 s/d 3 Bulan" dataKey="baru" data={inventoryData.baru} colorClass="text-emerald-600" borderClass="border-emerald-200" bgClass="bg-emerald-100" icon="fa-leaf" />
-                <CategorySection title="Stok Lama" subtitle="3 s/d 6 Bulan" dataKey="lama" data={inventoryData.lama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-hourglass-half" />
-                <CategorySection title="Stok Sudah Lama" subtitle="6 s/d 12 Bulan" dataKey="sudahLama" data={inventoryData.sudahLama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-calendar-minus" />
+                <CategorySection title="Stok Lama" subtitle="3 s/d 6 Bulan" dataKey="lama" data={inventoryData.lama} colorClass="text-amber-600" borderClass="border-amber-200" bgClass="bg-amber-100" icon="fa-hourglass-half" />
+                <CategorySection title="Stok Sudah Lama" subtitle="6 s/d 12 Bulan" dataKey="sudahLama" data={inventoryData.sudahLama} colorClass="text-orange-600" borderClass="border-orange-200" bgClass="bg-orange-100" icon="fa-calendar-minus" />
                 <CategorySection title="Stok Lama Banget" subtitle="Lebih dari 1 Tahun" dataKey="lamaBanget" data={inventoryData.lamaBanget} colorClass="text-red-600" borderClass="border-red-200" bgClass="bg-red-100" icon="fa-triangle-exclamation" />
             </div>
         </div>
@@ -8768,7 +8573,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 
     const handleSaveUser = async (e) => {
         e.preventDefault(); setIsLoading(true);
-        const emailFormat = formUser.username.toLowerCase() + '@syaren.com';
+        const emailFormat = formUser.username.toLowerCase() + '@faradela.com';
         try {
             let secondaryApp;
             const apps = firebase.apps.filter(app => app.name === "Secondary");
@@ -8837,15 +8642,15 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-3xl border shadow-sm">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
-                    <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-users-gear text-rose-500 mr-2"></i> Manajemen Sub-Akun</h3>
-                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
+                    <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-users-gear text-orange-500 mr-2"></i> Manajemen Sub-Akun</h3>
+                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
                 </div>
 
                 {showAdd && (
                     <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-8 p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-5 shadow-inner">
                         <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-orange-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-orange-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Beri Akses Menu:</label>
@@ -8854,14 +8659,14 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                     ...ALL_MENUS.filter(m => !m.adminOnly && m.id !== 'dashboard' && m.id !== 'cek_surat_jalan').map(m => ({ id: m.id, label: m.label })),
                                     { id: 'sj_lery', label: 'Bengkel - Lery Workshop (F01)' },
                                     { id: 'sj_samin', label: 'Bengkel - Pak Samin (F07)' },
-                                    { id: 'sj_syaren', label: 'Penerima - Syaren Official' },
+                                    { id: 'sj_faradela', label: 'Penerima - Faradela Official' },
                                     { id: 'delete_antrean', label: 'Akses Hapus Pesanan Online' }
                                 ].map(m => (
-                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-xl cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-rose-50 border-rose-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-rose-50'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-rose-500 focus:ring-blue-500" />{m.label}</label>
+                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-xl cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-orange-50 border-orange-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-orange-500 focus:ring-blue-500" />{m.label}</label>
                                 ))}
                             </div>
                         </div>
-                        <button className="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-4 rounded-xl mt-4 shadow-lg shadow-rose-500/30">SIMPAN SUB-AKUN</button>
+                        <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-4 rounded-xl mt-4 shadow-lg shadow-orange-500/30">SIMPAN SUB-AKUN</button>
                     </form>
                 )}
 
@@ -8869,7 +8674,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                     {users.map(u => (
                         <div key={u.id} className="flex justify-between items-center p-5 border-2 border-slate-100 rounded-2xl bg-white shadow-sm hover:border-slate-300 transition-colors">
                             <div>
-                                <div className="font-black text-rose-800 text-lg">{u.username} <span className={`text-[10px] px-2 py-0.5 rounded-md ml-2 uppercase align-middle ${u.role === 'admin' ? 'bg-rose-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{u.role}</span></div>
+                                <div className="font-black text-slate-800 text-lg">{u.username} <span className={`text-[10px] px-2 py-0.5 rounded-md ml-2 uppercase align-middle ${u.role === 'admin' ? 'bg-orange-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{u.role}</span></div>
                                 <div className="text-xs text-slate-500 font-semibold mt-1.5 leading-relaxed">
                                     Akses: {u.role === 'admin' ? 'Semua Menu (Full Access)' : (
                                         (u.access || []).length > 0 ? (u.access || []).map(accId => {
@@ -8877,7 +8682,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                             if (found) return found.label;
                                             if (accId === 'sj_lery') return 'Workshop (F01)';
                                             if (accId === 'sj_samin') return 'Workshop (F07)';
-                                            if (accId === 'sj_syaren') return 'Penerima';
+                                            if (accId === 'sj_faradela') return 'Penerima';
                                             if (accId === 'delete_antrean') return 'Hapus Pesanan Online';
                                             return accId;
                                         }).join(', ') : 'Tidak Ada Akses'
@@ -8906,11 +8711,10 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 // ==========================================
 // MPO PABRIK V2 (INPUT MATRIKS, PREVIEW, SCAN KIRIM)
 // ==========================================
-function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, setIsLoading }) {
+function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     const [showForm, setShowForm] = useState(false);
     const [targetDate, setTargetDate] = useState('');
     const [poDate, setPoDate] = useState(toLocalDateStr());
-    const [selectedImage, setSelectedImage] = useState(null);
     const [mpoDraftList, setMpoDraftList] = useState(() => {
         try {
             const saved = localStorage.getItem('smart_mpo_draft');
@@ -8923,125 +8727,37 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         return [];
     });
     const [searchQuery, setSearchQuery] = useState('');
-    const [bengkelName, setBengkelName] = useState('');
-    const [targetStock, setTargetStock] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
-    
-    const [history, setHistory] = useState([]);
-    const [future, setFuture] = useState([]);
-
-    const updateDraftList = (newList) => {
-        setHistory(prev => [...prev, mpoDraftList]);
-        setFuture([]);
-        setMpoDraftList(newList);
-    };
-
-    const handleApplyTargetStock = () => {
-        const target = parseInt(targetStock);
-        if (isNaN(target) || target <= 0) return showToast('error', 'Masukkan angka target yang valid (minimal 1)');
-        
-        const newQtys = { ...qtys };
-        filteredVariants.forEach(v => {
-            const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
-                if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
-                if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
-                return sum;
-            }, 0);
-            
-            const needed = target - variantStock;
-            newQtys[v.sku] = needed > 0 ? needed : 0;
-        });
-        setQtys(newQtys);
-    };
-
-    const handleUndo = useCallback(() => {
-        setHistory(prev => {
-            if (prev.length === 0) return prev;
-            const previous = prev[prev.length - 1];
-            setFuture(fPrev => [mpoDraftList, ...fPrev]);
-            setMpoDraftList(previous);
-            return prev.slice(0, -1);
-        });
-    }, [mpoDraftList]);
-
-    const handleRedo = useCallback(() => {
-        setFuture(prev => {
-            if (prev.length === 0) return prev;
-            const next = prev[0];
-            setHistory(hPrev => [...hPrev, mpoDraftList]);
-            setMpoDraftList(next);
-            return prev.slice(1);
-        });
-    }, [mpoDraftList]);
-
-    useEffect(() => {
-        const handleKeyDown = (e) => {
-            if (e.ctrlKey && e.key === 'z') {
-                e.preventDefault();
-                handleUndo();
-            } else if (e.ctrlKey && e.key === 'y') {
-                e.preventDefault();
-                handleRedo();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleUndo, handleRedo]);
 
     const nextPoNumber = mpoOrders.length > 0 ? Math.max(...mpoOrders.map(o => o.poNumber)) + 1 : 1;
     const newPoId = 'PO' + nextPoNumber;
 
     const safeLower = (str) => (str || '').toString().toLowerCase();
     const query = (searchQuery || '').toLowerCase().trim();
-    let filteredVariants = variants.filter(v => {
+    const filteredVariants = variants.filter(v => {
         if (!v.isActive || !query) return false;
         if (/^\d{8,}$/.test(query)) return safeLower(v.sku) === query || safeLower(v.baseCode) === query;
         const words = query.split(/\s+/);
         return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
-    });
-    
-    let isExactArticle = false;
-    if (query) {
-        isExactArticle = variants.some(v => safeLower(v.article) === query);
-        filteredVariants.sort((a, b) => {
-            const aExact = safeLower(a.sku) === query || safeLower(a.baseCode) === query;
-            const bExact = safeLower(b.sku) === query || safeLower(b.baseCode) === query;
-            if (aExact && !bExact) return -1;
-            if (!aExact && bExact) return 1;
-            return 0;
-        });
-    }
-    
-    if (!isExactArticle) {
-        filteredVariants = filteredVariants.slice(0, 30);
-    }
+    }).slice(0, 30);
 
     const addToDraft = (variant) => {
         if (!targetDate) return showToast('error', 'Silakan isi Target Tanggal Selesai terlebih dahulu!');
-        const inputVal = qtys[variant.sku];
-        
-        let qty = 1;
-        if (inputVal !== undefined && inputVal !== '') {
-            qty = parseInt(inputVal);
-            if (isNaN(qty) || qty <= 0) {
-                return showToast('error', 'Qty tidak valid! (Minimal 1)');
-            }
-        }
-
+        const qty = qtys[variant.sku] || 1;
         const existingList = [...mpoDraftList];
         const existingIdx = existingList.findIndex(x => x.sku === variant.sku);
         if (existingIdx > -1) {
-            existingList[existingIdx] = { ...existingList[existingIdx], qty: existingList[existingIdx].qty + qty };
+            existingList[existingIdx].qty += qty;
         } else {
             existingList.push({ ...variant, qty, received: 0, shipped: 0 });
         }
-        updateDraftList(existingList);
+        setMpoDraftList(existingList);
         showToast('success', `${qty} pcs ${variant.article} ${variant.sizeName} dimasukkan antrean MPO.`);
     };
 
     const removeDraft = (sku) => {
-        updateDraftList(mpoDraftList.filter(x => x.sku !== sku));
+        setMpoDraftList(mpoDraftList.filter(x => x.sku !== sku));
     };
 
     const handleDuplicatePO = (po) => {
@@ -9068,7 +8784,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             }
         });
 
-        updateDraftList(existingList);
+        setMpoDraftList(existingList);
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         showToast('success', `Berhasil! Isi PO ${po.id} disalin ke keranjang. Silakan simpan untuk membuat PO baru.`);
@@ -9091,7 +8807,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             const poData = {
                 id: newPoId,
                 poNumber: nextPoNumber,
-                bengkelName: bengkelName,
                 poDate: poDate,
                 targetDate: targetDate,
                 createdAt: new Date().toISOString(),
@@ -9114,16 +8829,17 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             showToast('success', `PO Pabrik [${newPoId}] berhasil dibuat!`);
             setPreviewModal(false);
             setShowForm(false);
-            setHistory([]);
-            setFuture([]);
-            setMpoDraftList([]);
+            setMpoDraftList([]); // CHANGED
             setTargetDate('');
         } catch (err) {
             showToast('error', 'Gagal membuat PO: ' + err.message);
         }
         setIsLoading(false);
     };
-    const cetakMPO = (po, mode = 'print') => {
+    const cetakMPO = (po) => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
+
         // ---- Build matrix data: group by article+color, columns = sizes ----
         const allSizes = [...new Set(po.items.map(i => i.sizeName))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const groups = [];
@@ -9178,21 +8894,24 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             else if (c.includes('pink') || c.includes('salem') || c.includes('rose')) style = 'background:#e91e63;color:#fff;';
             else if (c.includes('kuning') || c.includes('yellow') || c.includes('gold')) style = 'background:#f9a825;color:#333;';
             else if (c.includes('ungu') || c.includes('purple') || c.includes('lilac') || c.includes('lavender')) style = 'background:#7b1fa2;color:#fff;';
-            else if (c.includes('rose') || c.includes('oren')) style = 'background:#ef6c00;color:#fff;';
+            else if (c.includes('orange') || c.includes('oren')) style = 'background:#ef6c00;color:#fff;';
             else if (c.includes('apricot') || c.includes('peach')) style = 'background:#ffab91;color:#4e342e;';
             else if (c.includes('tan') || c.includes('khaki') || c.includes('beige')) style = 'background:#d2b48c;color:#4e342e;';
             else if (c.includes('tosca') || c.includes('teal') || c.includes('cyan') || c.includes('mint')) style = 'background:#00897b;color:#fff;';
             else if (c.includes('burgundy') || c.includes('wine')) style = 'background:#6d1a36;color:#fff;';
             else style = 'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;';
-            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;text-transform:uppercase;${style}">${name}</span>`;
+            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;letter-spacing:.5px;text-transform:uppercase;${style}">${name}</span>`;
         };
 
         // ---- Build table rows ----
         let rowsHtml = '';
         groups.forEach((g) => {
+            const isFirst = !articleRendered[g.article];
+            const rowspan = articleRowCount[g.article];
+            articleRendered[g.article] = true;
             const rowTotal = allSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0);
             rowsHtml += `<tr>`;
-            rowsHtml += `<td style="font-weight:900;font-size:12px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+            if (isFirst) rowsHtml += `<td rowspan="${rowspan}" style="font-weight:900;font-size:13px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
             rowsHtml += `<td style="text-align:center;vertical-align:middle;">${colorCell(g.colorName)}</td>`;
             allSizes.forEach(sz => {
                 const qty = g.sizes[sz] || 0;
@@ -9226,17 +8945,17 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
     /* ===== HEADER AREA ===== */
     .page-header { border: 2.5px solid #e65100; border-radius: 8px; padding: 14px 18px 10px; margin-bottom: 16px; position: relative; }
-    .company-name { font-size: 20px; font-weight: 900; color: #e65100; text-align: center; text-transform: uppercase; }
-    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; margin-top: 2px; }
+    .company-name { font-size: 20px; font-weight: 900; color: #e65100; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
+    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
     .bengkel-badge {
       display: inline-block; background: #e65100; color: #fff;
       font-size: 11px; font-weight: 900; padding: 2px 12px;
-      border-radius: 20px; text-transform: uppercase;
+      border-radius: 20px; letter-spacing: 2px; text-transform: uppercase;
       margin-top: 4px;
     }
-    .header-center { text-align: center; width: 100%; }
-    .po-info { text-align: center; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; }
-    .po-info span { display: inline-block; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; margin: 0 10px; }
+    .header-center { text-align: center; }
+    .po-info { display: flex; justify-content: center; gap: 24px; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; flex-wrap: wrap; }
+    .po-info span { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; }
     .po-info span b { color: #e65100; }
 
     /* ===== TABLE ===== */
@@ -9247,11 +8966,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     tr:hover td { background: #fff3e0; }
 
     /* ===== FOOTER ===== */
-    .sign-area { display: table; width: 100%; table-layout: fixed; margin-top: 24px; }
-    .sign-box { display: table-cell; text-align: center; }
-    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; margin-bottom: 4px; }
+    .sign-area { display: flex; justify-content: space-around; margin-top: 24px; }
+    .sign-box { text-align: center; width: 30%; }
+    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
     .sign-box .role { font-size: 11px; font-weight: 900; color: #333; margin-bottom: 50px; }
-    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; margin: 0 auto; width: 80%; }
+    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; }
     .footer-note { text-align:center; font-size:9px; color:#aaa; margin-top: 12px; border-top:1px dashed #ddd; padding-top: 6px; }
 
     @media print {
@@ -9263,7 +8982,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
   <div class="page-header">
     <div class="header-center">
-      <div class="company-name">&#x1F3ED; SYAREN OFFICIAL</div>
+      <div class="company-name">&#x1F3ED; FARADELA OFFICIAL</div>
       <div class="doc-title">Surat Pesanan (Purchase Order)</div>
       <div><span class="bengkel-badge">&#x22C6; Bengkel &#x22C6;</span></div>
     </div>
@@ -9305,49 +9024,18 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     </div>
     <div class="sign-box">
       <div class="label">Diterima Oleh</div>
-      <div class="role">${po.bengkelName || 'Pihak Bengkel'}</div>
+      <div class="role">Pihak Bengkel</div>
       <div class="line">(................................)</div>
     </div>
   </div>
 
-  <div class="footer-note">Dokumen ini dicetak secara otomatis oleh sistem Syaren Management &bull; ${poDateLabel}</div>
+  <div class="footer-note">Dokumen ini dicetak secara otomatis oleh sistem Faradela Management &bull; ${poDateLabel}</div>
+
+  <script>setTimeout(() => window.print(), 600);<\/script>
 </body>
 </html>`;
-
-        if (mode === 'download') {
-            showToast('info', 'Sedang memproses gambar SPO, mohon tunggu...', 2000);
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'absolute';
-            iframe.style.width = '800px';
-            iframe.style.height = '1200px';
-            iframe.style.top = '-9999px';
-            document.body.appendChild(iframe);
-            
-            iframe.contentWindow.document.open();
-            iframe.contentWindow.document.write(htmlContent);
-            iframe.contentWindow.document.close();
-            
-            setTimeout(() => {
-                html2canvas(iframe.contentWindow.document.body, { scale: 2, useCORS: true }).then(canvas => {
-                    const link = document.createElement('a');
-                    link.download = `SPO-${po.id}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    document.body.removeChild(iframe);
-                    showToast('success', 'Gambar SPO berhasil diunduh!');
-                }).catch(err => {
-                    console.error(err);
-                    showToast('error', 'Gagal memproses gambar SPO.');
-                    document.body.removeChild(iframe);
-                });
-            }, 1000);
-            return;
-        }
-
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
         printWindow.document.open();
-        printWindow.document.write(htmlContent + `<script>setTimeout(() => window.print(), 600);</script>`);
+        printWindow.document.write(htmlContent);
         printWindow.document.close();
     };
 
@@ -9392,7 +9080,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     <div class="cell br bb" style="flex-direction: column;"><svg class="barcode-svg" jsbarcode-value="${fullBarcode}" jsbarcode-format="CODE128" jsbarcode-width="2" jsbarcode-height="55" jsbarcode-displayvalue="false" jsbarcode-margin="0" jsbarcode-fontsize="14"></svg></div>
                                     <div class="cell bb"><div class="prod-code">${prodCode}</div></div>
                                     <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                                    <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${item.article.length > 12 ? '18px' : (item.article.length > 7 ? '28px' : '40px')};">${item.article}</div><div class="price-text">Rp. ${(variantRef.sellPrice || 0).toLocaleString('id-ID')}</div></div>
+                                    <div class="cell br" style="flex-direction: column;"><div class="article-text">${item.article}</div><div class="price-text">Rp. ${(variantRef.sellPrice || 0).toLocaleString('id-ID')}</div></div>
                                     <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                                 </div>
                             </div>
@@ -9415,16 +9103,16 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                         @page { margin: 0; }
                         body { margin: 0; padding: 0; font-family: sans-serif; background-color: white; }
                         .label-container { width: 471px; height: 215px; margin: 5px; padding: 0; border: none; box-sizing: border-box; page-break-after: always; page-break-inside: avoid; overflow: hidden; background-color: white; display: flex; justify-content: center; align-items: center; }
-                        .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; direction: rtl; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
-                        .cell { direction: ltr; display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
-                        .br { border-left: 1px solid black; }
+                        .label-grid { width: 100%; height: 100%; border: 2px solid black; display: grid; grid-template-columns: 1.4fr 2.4fr 0.9fr; grid-template-rows: 1fr 1fr; box-sizing: border-box; position: relative; }
+                        .cell { display: flex; justify-content: center; align-items: center; padding: 5px; box-sizing: border-box; text-align: center; overflow: hidden; }
+                        .br { border-right: 1px solid black; }
                         .bb { border-bottom: 1px solid black; }
                         .photo { max-width: 100%; max-height: 100%; object-fit: contain; }
                         .barcode-svg { max-width: 100%; max-height: 100%; margin-top: 8px; }
                         .size-text { font-size: 48px; font-weight: 900; line-height: 1; }
                         .color-text { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
                         .prod-code { font-size: 36px; font-weight: 900; letter-spacing: 2px; }
-                        .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
+                        .article-text { font-size: 20px; font-weight: 900; }
                         .mpo-badge { font-size: 14px; background: black; color: white; padding: 2px 5px; margin-top: 5px; font-weight: bold; }
                         .sell-price { font-size: 32px; font-weight: 900; margin-top: 2px; margin-bottom: 5px; }
                         .po-corner { position: absolute; top: 1px; right: 2px; font-size: 12px; font-weight: 900; color: black; z-index: 10; padding: 2px; }
@@ -9484,13 +9172,13 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         <div className="space-y-6">
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Manajemen PO Bengkel</h2>
+                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-industry text-orange-500"></i> Manajemen PO Bengkel</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Buat Matrix Order, cetak SP dan label barcode</p>
                 </div>
                 {showForm ? (
                     <button onClick={() => setShowForm(false)} className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-black transition-colors">Batal</button>
                 ) : (
-                    <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white shadow-md rounded-xl font-black transition-colors">+ BIKIN PO MPO</button>
+                    <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white shadow-md rounded-xl font-black transition-colors">+ BIKIN PO MPO</button>
                 )}
             </div>
 
@@ -9513,31 +9201,31 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                     if (c.includes('pink') || c.includes('salem') || c.includes('rose')) return { background: '#e91e63', color: '#fff' };
                     if (c.includes('kuning') || c.includes('yellow') || c.includes('gold')) return { background: '#f9a825', color: '#333' };
                     if (c.includes('ungu') || c.includes('purple') || c.includes('lilac') || c.includes('lavender')) return { background: '#7b1fa2', color: '#fff' };
-                    if (c.includes('rose') || c.includes('oren')) return { background: '#ef6c00', color: '#fff' };
+                    if (c.includes('orange') || c.includes('oren')) return { background: '#ef6c00', color: '#fff' };
                     if (c.includes('silver') || c.includes('grey') || c.includes('gray')) return { background: '#bdbdbd', color: '#333' };
                     if (c.includes('apricot') || c.includes('peach')) return { background: '#ffab91', color: '#4e342e' };
                     if (c.includes('tan') || c.includes('khaki') || c.includes('beige')) return { background: '#d2b48c', color: '#4e342e' };
                     if (c.includes('tosca') || c.includes('teal') || c.includes('cyan') || c.includes('mint')) return { background: '#00897b', color: '#fff' };
                     if (c.includes('burgundy') || c.includes('wine')) return { background: '#6d1a36', color: '#fff' };
-                    // Default: rose accent
+                    // Default: orange accent
                     return { background: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80' };
                 };
 
                 return (
-                    <div className="fixed inset-0 bg-rose-900/80 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-                            <h3 className="text-2xl font-black text-rose-800 mb-2">Preview PO <span className="text-rose-500">{newPoId}</span></h3>
+                            <h3 className="text-2xl font-black text-slate-800 mb-2">Preview PO <span className="text-orange-500">{newPoId}</span></h3>
                             <p className="text-slate-500 font-bold text-sm mb-6 border-b pb-4">Tanggal PO: {poDate} &nbsp;|&nbsp; Target Selesai: {targetDate}</p>
                             <div className="flex-1 overflow-auto bg-slate-50 border rounded-2xl mb-6 shadow-inner p-2 custom-scrollbar">
                                 <table className="w-full text-left text-sm border-collapse">
-                                    <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
+                                    <thead className="bg-slate-100 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                                         <tr>
                                             <th className="p-3 font-black uppercase text-center border-r">Article</th>
                                             <th className="p-3 font-black uppercase text-center border-r">Warna</th>
                                             {previewSizes.map(sz => (
-                                                <th key={sz} className="p-3 text-center border-r font-black uppercase text-rose-600 w-12">{sz}</th>
+                                                <th key={sz} className="p-3 text-center border-r font-black uppercase text-orange-600 w-12">{sz}</th>
                                             ))}
-                                            <th className="p-3 text-center font-black uppercase bg-rose-100 text-blue-900 w-24">Total</th>
+                                            <th className="p-3 text-center font-black uppercase bg-orange-100 text-blue-900 w-24">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -9549,7 +9237,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             return (
                                                 <tr key={idx} className="border-b border-slate-100 hover:bg-white transition-colors whitespace-nowrap">
                                                     {isFirstRowForArticle && (
-                                                        <td className="p-3 border-r border-slate-100 font-black text-rose-800 text-base text-center align-middle bg-white" rowSpan={rowsForArticle}>
+                                                        <td className="p-3 border-r border-slate-100 font-black text-slate-800 text-base text-center align-middle bg-white" rowSpan={rowsForArticle}>
                                                             {group.article}
                                                         </td>
                                                     )}
@@ -9559,12 +9247,12 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                                     {previewSizes.map(sz => {
                                                         const qty = group.sizes[sz] || 0;
                                                         return (
-                                                            <td key={sz} className={`p-3 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>
+                                                            <td key={sz} className={`p-3 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-slate-800 font-black bg-slate-50'}`}>
                                                                 {qty > 0 ? qty : '-'}
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className="p-3 text-center font-black text-lg text-rose-600 bg-rose-50/50">
+                                                    <td className="p-3 text-center font-black text-lg text-orange-600 bg-orange-50/50">
                                                         {rowTotal}
                                                     </td>
                                                 </tr>
@@ -9577,12 +9265,12 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             {previewSizes.map(sz => {
                                                 const colTotal = previewGroups.reduce((acc, g) => acc + (g.sizes[sz] || 0), 0);
                                                 return (
-                                                    <td key={sz} className="p-3 text-center border-r border-slate-300 text-rose-800 text-lg">
+                                                    <td key={sz} className="p-3 text-center border-r border-slate-300 text-slate-800 text-lg">
                                                         {colTotal > 0 ? colTotal : '-'}
                                                     </td>
                                                 );
                                             })}
-                                            <td className="p-3 text-center text-rose-700 bg-rose-200 text-2xl border-t-2 border-rose-300">
+                                            <td className="p-3 text-center text-orange-700 bg-orange-200 text-2xl border-t-2 border-orange-300">
                                                 {previewGroups.reduce((acc, g) => acc + previewSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0), 0)}
                                             </td>
                                         </tr>
@@ -9591,7 +9279,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                             </div>
                             <div className="flex gap-4">
                                 <button onClick={() => setPreviewModal(false)} className="flex-1 px-6 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-xl transition-colors">KEMBALI KE DRAFT</button>
-                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-4 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
+                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
                             </div>
                         </div>
                     </div>
@@ -9600,64 +9288,37 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
             {showForm && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print mb-8">
-                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border shadow-sm flex flex-col h-[550px] sm:h-[650px]">
-                        <h3 className="text-sm sm:text-xl font-black mb-2 sm:mb-6 flex items-center gap-2 sm:gap-3 text-rose-800 border-b-2 border-slate-100 pb-2 sm:pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-2 sm:p-3 rounded-lg sm:rounded-xl"></i> Cari Produk</h3>
-                        <div className="space-y-2 sm:space-y-4 mb-2 sm:mb-4">
-                            <div className="flex gap-2 sm:gap-4">
+                    <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col h-[650px]">
+                        <h3 className="text-xl font-black mb-6 flex items-center gap-3 text-slate-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-orange-500 bg-orange-50 p-3 rounded-xl"></i> Cari Produk</h3>
+                        <div className="space-y-4 mb-4">
+                            <div className="flex gap-4">
                                 <div className="flex-1">
-                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
-                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
+                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-slate-800 outline-none focus:border-orange-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
-                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
+                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
+                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-slate-800 outline-none focus:border-orange-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
                                 </div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Nama Bengkel</label>
-                                <input type="text" placeholder="Masukkan Nama Bengkel..." className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={bengkelName} onChange={e => setBengkelName(e.target.value)} />
                             </div>
                             <div className="relative">
-                                <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
-                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
-                            </div>
-                            <div className="flex gap-2 items-center">
-                                <input type="number" placeholder="Target stok tiap SKU..." className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 font-bold bg-white" value={targetStock} onChange={e => setTargetStock(e.target.value)} />
-                                <button type="button" onClick={handleApplyTargetStock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-sm whitespace-nowrap shadow-md transition-colors"><i className="fa-solid fa-bolt mr-1 sm:mr-2"></i>Apply</button>
+                                <i className="fa-solid fa-search absolute left-5 top-4 text-slate-400 text-lg"></i>
+                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-orange-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
-                            {filteredVariants.map(v => {
-                                const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
-                                    if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
-                                    if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
-                                    return sum;
-                                }, 0);
-                                return (
-                                <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-4">
-                                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
-                                        <div className="min-w-0">
-                                            <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
-                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight">
-                                                {v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull; <span className="text-emerald-600 font-black">Stok: {variantStock}</span>
-                                                {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
-                                            </div>
-                                        </div>
+                            {filteredVariants.map(v => (
+                                <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-orange-400 transition-colors gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
+                                        <div><div className="text-base font-black text-slate-800">{v.article}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                     </div>
-                                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] !== undefined ? qtys[v.sku] : 1} onChange={e => setQtys({ ...qtys, [v.sku]: e.target.value === '' ? '' : parseInt(e.target.value) || 0 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
-                                        <div className="relative">
-                                            {mpoDraftList.find(x => x.sku === v.sku) && (
-                                                <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm z-20 flex items-center gap-1 animate-pulse">
-                                                    {mpoDraftList.find(x => x.sku === v.sku).qty} <i className="fa-solid fa-check"></i>
-                                                </div>
-                                            )}
-                                            <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
-                                        </div>
+                                    <div className="flex items-center gap-2 w-full md:w-auto">
+                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-orange-500 bg-slate-50" />
+                                        <button type="button" onClick={() => addToDraft(v)} className="flex-1 md:flex-none bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> PO</button>
                                     </div>
                                 </div>
-                            )})}
+                            ))}
                             {filteredVariants.length === 0 && (
                                 <div className="text-center text-sm font-bold text-slate-500 py-10">
                                     <i className="fa-solid fa-box-open text-4xl mb-3 text-slate-300 block"></i>
@@ -9667,49 +9328,45 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                         </div>
                     </div>
 
-                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
-                        <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
-                            <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
-                            <div className="flex gap-1 sm:gap-2 items-center">
-                                <button type="button" onClick={handleUndo} disabled={history.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Undo (Ctrl+Z)"><i className="fa-solid fa-rotate-left"></i></button>
-                                <button type="button" onClick={handleRedo} disabled={future.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Redo (Ctrl+Y)"><i className="fa-solid fa-rotate-right"></i></button>
-                                <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md ml-1">{mpoDraftList.length} Item</span>
-                            </div>
+                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-8xl"></i></div>
+                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 relative z-10">
+                            <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-orange-500"></i> Antrean PO (Draft: {newPoId})</h3>
+                            <span className="text-white font-black bg-orange-500 px-4 py-2 rounded-xl text-sm shadow-md">{mpoDraftList.length} Item</span>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-6 bg-slate-50 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-6 bg-slate-50 rounded-2xl p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                             {mpoDraftList.map((item) => (
                                 <div key={item.sku} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                     <div className="text-sm text-slate-600 flex items-center gap-3">
-                                        <span className="font-black text-rose-800 text-base">{item.article}</span>
-                                        <span className="font-bold text-slate-500">({item.colorName} - <b className="text-rose-500">{item.sizeName}</b>)</span>
+                                        <span className="font-black text-slate-800 text-base">{item.article}</span>
+                                        <span className="font-bold text-slate-500">({item.colorName} - <b className="text-orange-500">{item.sizeName}</b>)</span>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className="font-black text-lg text-rose-800">{item.qty} Pcs</span>
-                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                                        <span className="font-black text-lg text-slate-800">{item.qty} Pcs</span>
+                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
                                     </div>
                                 </div>
                             ))}
                             {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                         </div>
-                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-5 rounded-xl sm:rounded-2xl font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
+                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-slate-900 hover:bg-black text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-3"></i> LIHAT PREVIEW DAFTAR PO</button>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-                <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-base sm:text-xl text-rose-800"><i className="fa-solid fa-list-ul text-rose-500 mr-2"></i> Riwayat Daftar PO</h3>
-                    <span className="bg-blue-200 text-blue-900 font-black px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm shadow-inner">{mpoOrders.length} PO</span>
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-black text-xl text-slate-800"><i className="fa-solid fa-list-ul text-orange-500 mr-2"></i> Riwayat Daftar PO</h3>
+                    <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{mpoOrders.length} PO</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 text-[10px] sm:text-sm border-b-4 border-slate-200 whitespace-nowrap">
+                        <thead className="bg-slate-100 text-slate-700 text-sm border-b-4 border-slate-200">
                             <tr>
-                                <th className="p-3 sm:p-5 font-black uppercase">No. PO</th>
-                                <th className="p-3 sm:p-5 font-black uppercase">Info & Target</th>
-                                <th className="p-3 sm:p-5 font-black text-center uppercase">Aksi MPO</th>
-                                <th className="p-3 sm:p-5 font-black text-right uppercase">Setting</th>
+                                <th className="p-5 font-black uppercase">No. PO</th>
+                                <th className="p-5 font-black uppercase">Info & Target</th>
+                                <th className="p-5 font-black text-center uppercase">Aksi MPO</th>
+                                <th className="p-5 font-black text-right uppercase">Setting</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -9720,27 +9377,27 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
                                 return (
                                     <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-3 sm:p-5 align-top">
-                                            <div className="font-black text-sm sm:text-xl text-rose-900">{po.id}</div>
-                                            <div className="mt-1"><span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-700 text-[8px] sm:text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span></div>
+                                        <td className="p-5">
+                                            <div className="font-black text-xl text-slate-900">{po.id}</div>
+                                            <span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'amber')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'amber')}-700 text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span>
                                         </td>
-                                        <td className="p-3 sm:p-5 leading-relaxed align-top">
-                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
-                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
-                                            <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
+                                        <td className="p-5 leading-relaxed">
+                                            <div className="text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
+                                            <div className="text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
+                                            <div className="text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
-                                        <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
-                                                <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
+                                        <td className="p-5 text-center space-x-2">
+                                            <button type="button" onClick={() => cetakMPO(po)} className="px-3 py-2 rounded-xl border bg-white text-slate-600 hover:bg-slate-100 shadow-sm transition-colors text-xs font-bold" title="Cetak Surat Pesanan">
+                                                <i className="fa-solid fa-print mr-1"></i> SP
                                             </button>
-                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
-                                                <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
+                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-3 py-2 rounded-xl border bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white shadow-sm transition-colors text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
+                                                <i className="fa-solid fa-barcode mr-1"></i> LBL
                                             </button>
-                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
-                                                <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
+                                            <button type="button" onClick={() => handleDuplicatePO(po)} className="px-3 py-2 rounded-xl border bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Duplikat PO ke Keranjang">
+                                                <i className="fa-solid fa-copy mr-1"></i> DUP
                                             </button>
                                         </td>
-                                        <td className="p-3 sm:p-5 text-right whitespace-nowrap align-top">
+                                        <td className="p-5 text-right whitespace-nowrap">
                                             <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-xl hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
                                                 <i className="fa-solid fa-trash-can"></i>
                                             </button>
@@ -9755,13 +9412,6 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             </div>
         </div>
 
-            {/* Image Modal */}
-            {selectedImage && (
-                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
-                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
-                </div>
-            )}
         </>
     )
 }
@@ -9912,7 +9562,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             doc.setFontSize(18);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(220, 38, 38); // Red-600
-            doc.text('SISA PESANAN ONLINE SYAREN OFFICIAL', 105, 20, { align: 'center' });
+            doc.text('SISA PESANAN ONLINE FARADELA OFFICIAL', 105, 20, { align: 'center' });
 
             // Subheader (Tanpa Box) - Tampilkan semua sesi yang dipilih
             doc.setFontSize(11);
@@ -10142,18 +9792,18 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
         const totalQty = orders.reduce((s, o) => s + o.qty, 0);
 
         return (
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
                 <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
                     <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                         <div>
-                            <h3 className="font-black text-rose-800 text-lg">Audit Pesanan Online</h3>
+                            <h3 className="font-black text-slate-800 text-lg">Audit Pesanan Online</h3>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">{article} | Sesi {session} | {new Date(poDate).toLocaleDateString('id-ID')}</p>
                         </div>
                         <button onClick={() => setAuditModal(null)} className="text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                         <table className="w-full text-left text-sm border-collapse">
-                            <thead className="sticky top-0 bg-rose-50 text-slate-600 font-bold border-b border-slate-200">
+                            <thead className="sticky top-0 bg-slate-100 text-slate-600 font-bold border-b border-slate-200">
                                 <tr>
                                     <th className="p-3">No. Resi / Order</th>
                                     <th className="p-3">Platform</th>
@@ -10166,8 +9816,8 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                     <tr key={idx} className="hover:bg-slate-50 text-slate-700 font-semibold">
                                         <td className="p-3 font-mono text-xs text-blue-600">{o.resi}</td>
                                         <td className="p-3">
-                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${o.platform.toLowerCase().includes('shopee') ? 'bg-rose-100 text-rose-700' :
-                                                o.platform.toLowerCase().includes('tiktok') ? 'bg-rose-900 text-white' :
+                                            <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-black ${o.platform.toLowerCase().includes('shopee') ? 'bg-orange-100 text-orange-700' :
+                                                o.platform.toLowerCase().includes('tiktok') ? 'bg-slate-900 text-white' :
                                                     'bg-blue-100 text-blue-700'
                                                 }`}>{o.platform}</span>
                                         </td>
@@ -10361,7 +10011,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
     return (
         <div className="bg-white p-6 rounded-3xl border shadow-sm mb-6 no-print animate-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-industry text-rose-600 mr-2"></i> Target Produksi {activeTab === 'lery' ? "Lery's Workshop (F01)" : 'Pak Samin (F07)'}</h3>
+                <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-industry text-orange-600 mr-2"></i> Target Produksi {activeTab === 'lery' ? "Lery's Workshop (F01)" : 'Pak Samin (F07)'}</h3>
                 {(dashView === 'ONLINE' || dashView === 'PO') && (
                     <button onClick={() => setIsSisaFullscreen(!isSisaFullscreen)} className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-rose-100 text-rose-600 rounded-xl font-black hover:bg-rose-600 hover:text-white transition-all shadow-sm text-xs sm:text-sm">
                         <i className={`fa-solid ${isSisaFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
@@ -10370,9 +10020,9 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                 )}
             </div>
             <div className="grid grid-cols-2 gap-4 mb-6">
-                <div onClick={() => setDashView('PO')} className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${dashView === 'PO' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
+                <div onClick={() => setDashView('PO')} className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${dashView === 'PO' ? 'bg-orange-50 border-orange-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-orange-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa PO Bengkel</div>
-                    <div className="text-3xl font-black text-rose-600 mt-1">{pendingPO} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
+                    <div className="text-3xl font-black text-orange-600 mt-1">{pendingPO} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
                 </div>
                 <div onClick={() => setDashView('ONLINE')} className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${dashView === 'ONLINE' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa Online (Prioritas)</div>
@@ -10384,9 +10034,9 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             {dashView === 'PO' && (
                 <div className={isSisaFullscreen ? "fixed inset-0 z-[9999] bg-white p-2 sm:p-6 overflow-y-auto" : "relative border-t pt-4"}>
                     {isSisaFullscreen && (
-                        <div className="flex justify-between items-center mb-4 bg-rose-50 p-3 rounded-xl border-2 border-rose-200">
-                            <h3 className="text-sm sm:text-lg font-black text-rose-700 uppercase flex items-center gap-2"><i className="fa-solid fa-expand text-base"></i> Mode Fokus PO</h3>
-                            <button onClick={() => setIsSisaFullscreen(false)} className="bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md hover:bg-rose-700">
+                        <div className="flex justify-between items-center mb-4 bg-orange-50 p-3 rounded-xl border-2 border-orange-200">
+                            <h3 className="text-sm sm:text-lg font-black text-orange-700 uppercase flex items-center gap-2"><i className="fa-solid fa-expand text-base"></i> Mode Fokus PO</h3>
+                            <button onClick={() => setIsSisaFullscreen(false)} className="bg-orange-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md hover:bg-orange-700">
                                 <i className="fa-solid fa-compress mr-1"></i> TUTUP
                             </button>
                         </div>
@@ -10409,10 +10059,10 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                             });
                             return (
                                 <div key={po.id} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
-                                    <div onClick={() => setExpandedPO(isExpanded ? null : po.id)} className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center bg-rose-50/30">
+                                    <div onClick={() => setExpandedPO(isExpanded ? null : po.id)} className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center bg-orange-50/30">
                                         <div>
-                                            <div className="font-black text-lg text-rose-800"><i className="fa-solid fa-file-invoice mr-2 text-rose-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-2">({po.targetDate})</span></div>
-                                            <div className="text-sm font-bold mt-1 ml-6">{isDone ? <span className="text-teal-600"><i className="fa-solid fa-check-double mr-1"></i>Selesai Diterima ({totalReceived}/{totalQty})</span> : <span className="text-rose-600">Diterima Gudang: {totalReceived} / {totalQty} Pcs <span className="text-xs bg-rose-100 text-rose-600 px-2 py-0.5 rounded-md ml-2 border border-rose-200 font-black">Kurang {totalQty - totalReceived}</span></span>}</div>
+                                            <div className="font-black text-lg text-slate-800"><i className="fa-solid fa-file-invoice mr-2 text-orange-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-2">({po.targetDate})</span></div>
+                                            <div className="text-sm font-bold mt-1 ml-6">{isDone ? <span className="text-teal-600"><i className="fa-solid fa-check-double mr-1"></i>Selesai Diterima ({totalReceived}/{totalQty})</span> : <span className="text-orange-600">Diterima Gudang: {totalReceived} / {totalQty} Pcs <span className="text-xs bg-rose-100 text-rose-600 px-2 py-0.5 rounded-md ml-2 border border-rose-200 font-black">Kurang {totalQty - totalReceived}</span></span>}</div>
                                         </div>
                                         <div className="text-slate-400 bg-white w-10 h-10 flex items-center justify-center rounded-full border shadow-sm"><i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-xl`}></i></div>
                                     </div>
@@ -10423,8 +10073,8 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                                     <tr>
                                                         <th className={`${cellPadding} font-black border-r border-slate-100`}>ARTICLE</th>
                                                         <th className={`${cellPadding} font-black text-center border-r border-slate-100`}>WARNA</th>
-                                                        {sizes.map(sz => <th key={sz} className={`${cellPadding} font-black text-center text-rose-600`}>{sz}</th>)}
-                                                        <th className={`${cellPadding} font-black text-center bg-rose-50`}>DITRM</th>
+                                                        {sizes.map(sz => <th key={sz} className={`${cellPadding} font-black text-center text-orange-600`}>{sz}</th>)}
+                                                        <th className={`${cellPadding} font-black text-center bg-orange-50`}>DITRM</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
@@ -10436,15 +10086,15 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                                             const isRowDone = rowReceived >= rowTotal && rowTotal > 0;
                                                             return (
                                                                 <tr key={`${article}-${color}`} className={`hover:bg-slate-50 ${isRowDone ? 'bg-teal-50/30' : ''}`}>
-                                                                    {cIdx === 0 && <td rowSpan={colors.length} className={`${cellPadding} font-black text-rose-800 border-r border-slate-100 bg-white align-middle`}>{article}</td>}
+                                                                    {cIdx === 0 && <td rowSpan={colors.length} className={`${cellPadding} font-black text-slate-800 border-r border-slate-100 bg-white align-middle`}>{article}</td>}
                                                                     <td className={`${cellPadding} font-bold text-slate-600 text-center border-r border-slate-100`}>{color}</td>
                                                                     {sizes.map(sz => {
                                                                         const cell = articleGroups[article][color][sz];
                                                                         if (!cell || cell.qty === 0) return <td key={sz} className={`${cellPadding} text-center text-slate-300 border-r border-slate-100`}>-</td>;
                                                                         const isCellDone = cell.received >= cell.qty;
-                                                                        return <td key={sz} className={`${cellPadding} text-center font-bold border-r border-slate-100`}>{isCellDone ? <span className="text-teal-500">{cell.qty}</span> : <span><span className="text-rose-600 font-black">{cell.received}</span><span className="text-slate-400">/{cell.qty}</span></span>}</td>;
+                                                                        return <td key={sz} className={`${cellPadding} text-center font-bold border-r border-slate-100`}>{isCellDone ? <span className="text-teal-500">{cell.qty}</span> : <span><span className="text-orange-600 font-black">{cell.received}</span><span className="text-slate-400">/{cell.qty}</span></span>}</td>;
                                                                     })}
-                                                                    <td className={`${cellPadding} text-center font-black bg-rose-50/50`}>{isRowDone ? <span className="text-teal-600">{rowTotal}</span> : <span><span className="text-rose-600">{rowReceived}</span><span className="text-slate-400">/{rowTotal}</span></span>}</td>
+                                                                    <td className={`${cellPadding} text-center font-black bg-orange-50/50`}>{isRowDone ? <span className="text-teal-600">{rowTotal}</span> : <span><span className="text-orange-600">{rowReceived}</span><span className="text-slate-400">/{rowTotal}</span></span>}</td>
                                                                 </tr>
                                                             );
                                                         });
@@ -10471,13 +10121,13 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                         </div>
                     )}
                     <div className="flex justify-between items-center mb-4 px-2 no-print">
-                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-rose-50 px-3 py-1 rounded-lg">
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider bg-slate-100 px-3 py-1 rounded-lg">
                             {selectedSessions.size > 0 ? <><i className="fa-solid fa-square-check text-rose-500 mr-1"></i> {selectedSessions.size} Sesi Dipilih</> : 'Pilih sesi untuk direkap'}
                         </div>
                         <button
                             onClick={handleRekapSesi}
                             disabled={selectedSessions.size === 0}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black transition-all shadow-md text-sm ${selectedSessions.size > 0 ? 'bg-rose-600 text-white hover:bg-rose-700 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black transition-all shadow-md text-sm ${selectedSessions.size > 0 ? 'bg-orange-600 text-white hover:bg-orange-700 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                         >
                             <i className="fa-solid fa-file-pdf"></i> REKAP SESI TERPILIH
                         </button>
@@ -10544,7 +10194,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                     {isExpanded && (
                                         <div className="overflow-x-auto bg-white">
                                             <table className={`w-full ${fontSize} text-left bg-white`}>
-                                                <thead className="bg-rose-50 text-slate-600 border-b border-slate-200">
+                                                <thead className="bg-slate-100 text-slate-600 border-b border-slate-200">
                                                     <tr>
                                                         <th className={`${cellPadding} font-black text-left border-r border-slate-200`}>ARTICLE</th>
                                                         <th className={`${cellPadding} font-black text-left border-r border-slate-200`}>WARNA</th>
@@ -10567,9 +10217,9 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                                         let isTomorrow = it.deadline === tomStr;
                                                         return (
                                                             <tr key={j} className={`hover:bg-slate-50 border-b border-slate-100 last:border-0 ${it.isCanceled ? 'opacity-60 bg-slate-50' : ''}`}>
-                                                                <td className={`${cellPadding} font-black text-rose-800 border-r border-slate-100`}>{it.article}</td>
+                                                                <td className={`${cellPadding} font-black text-slate-800 border-r border-slate-100`}>{it.article}</td>
                                                                 <td className={`${cellPadding} font-bold text-slate-600 border-r border-slate-100`}>{it.colorName}</td>
-                                                                <td className={`${cellPadding} font-black text-rose-800 text-center border-r border-slate-100`}>{it.sizeName}</td>
+                                                                <td className={`${cellPadding} font-black text-slate-800 text-center border-r border-slate-100`}>{it.sizeName}</td>
                                                                 <td className={`${cellPadding} text-center font-bold border-r border-slate-100`}>
                                                                     {it.isCanceled ? (
                                                                         <span className={`${isSisaFullscreen ? 'text-[9px]' : 'text-xs'} text-slate-500 bg-slate-200 px-1 py-0.5 rounded font-black border border-slate-300 line-through`}>{it.qty}</span>
@@ -10582,11 +10232,11 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                                                         <span className="text-[9px] uppercase font-black tracking-wider px-1 py-0.5 rounded shadow-sm bg-slate-200 text-slate-500">BATAL</span>
                                                                     ) : (
                                                                         <div className="flex flex-col items-center gap-0.5">
-                                                                            <span className={`text-[9px] uppercase font-black tracking-wider px-1 py-0.5 rounded shadow-sm border ${isNow ? 'bg-red-100 border-red-300 text-red-600 animate-pulse' : (isLate ? 'bg-red-500 border-red-600 text-white animate-pulse' : (isTomorrow ? 'bg-indigo-100 border-indigo-200 text-indigo-600' : 'bg-rose-50 border-slate-200 text-slate-500'))}`}>
+                                                                            <span className={`text-[9px] uppercase font-black tracking-wider px-1 py-0.5 rounded shadow-sm border ${isNow ? 'bg-red-100 border-red-300 text-red-600 animate-pulse' : (isLate ? 'bg-red-500 border-red-600 text-white animate-pulse' : (isTomorrow ? 'bg-indigo-100 border-indigo-200 text-indigo-600' : 'bg-slate-100 border-slate-200 text-slate-500'))}`}>
                                                                                 {isNow ? 'SKRG' : (isLate ? `TELAT` : (isTomorrow ? 'BSK' : it.deadline.split('-').slice(1).join('/')))}
                                                                             </span>
                                                                             {it.deadlineMap && Object.keys(it.deadlineMap).length > 1 && (
-                                                                                <span className="text-[8px] font-black text-rose-600 bg-rose-50 px-1 rounded border border-rose-100 leading-tight">+{Object.keys(it.deadlineMap).length - 1} tgl</span>
+                                                                                <span className="text-[8px] font-black text-orange-600 bg-orange-50 px-1 rounded border border-orange-100 leading-tight">+{Object.keys(it.deadlineMap).length - 1} tgl</span>
                                                                             )}
                                                                         </div>
                                                                     )}
@@ -10631,13 +10281,13 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
 }
 
 // ==========================================
-// PRODUKSI BENGKEL DIGITAL (LERY, SAMIN, & SYAREN)
+// PRODUKSI BENGKEL DIGITAL (LERY, SAMIN, & FARADELA)
 // ==========================================
 function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transactions, showToast, setIsLoading }) {
     // Cek izin akses 3 Cabang
     const canLery = currentUser?.role === 'admin' || (currentUser?.access || []).includes('sj_lery');
     const canSamin = currentUser?.role === 'admin' || (currentUser?.access || []).includes('sj_samin');
-    const canSyaren = currentUser?.role === 'admin' || (currentUser?.access || []).includes('sj_syaren');
+    const canFaradela = currentUser?.role === 'admin' || (currentUser?.access || []).includes('sj_faradela');
 
     // Set tab default
     const [activeTab, setActiveTab] = useState(canLery ? 'lery' : (canSamin ? 'samin' : 'faradela'));
@@ -10659,7 +10309,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     const scanRefPengirim = useRef(null);
     const senderIdRef = useRef(null);
 
-    // ---- PENERIMA STATE (Syaren) ----
+    // ---- PENERIMA STATE (Faradela) ----
     const [activeReceiver, setActiveReceiver] = useState(null);
     const [receiverIdInput, setReceiverIdInput] = useState('');
     const [activeDraft, setActiveDraft] = useState(null);
@@ -10669,12 +10319,6 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     const [draftConfirmed, setDraftConfirmed] = useState(false);
     const scanRefPenerima = useRef(null);
     const receiverIdRef = useRef(null);
-
-    // ---- DIRECT SCAN STATE (Syaren Official - Scan Langsung Tanpa SJ) ----
-    const [isDirectScanMode, setIsDirectScanMode] = useState(false);
-    const [directScanDone, setDirectScanDone] = useState(false);
-    const [scannedTypesDirect, setScannedTypesDirect] = useState({});
-    const [directSjId, setDirectSjId] = useState(null);
 
     const draftSJs = mpoOrders.filter(o => o.status === 'SHIPPED' || o.status === 'SJ_CONFIRMED');
 
@@ -10753,15 +10397,16 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         // ==========================================
         // VALIDASI PABRIK (LERY vs SAMIN)
         // ==========================================
-        const isF07 = variantExists.article.toUpperCase().startsWith('F07-');
-        if (activeTab === 'lery' && isF07) {
+        const isSamin = variantExists.supplier === 'samin' || (!variantExists.supplier && variantExists.article.toUpperCase().startsWith('F07'));
+        const isLery = variantExists.supplier === 'lery' || (!variantExists.supplier && !variantExists.article.toUpperCase().startsWith('F07'));
+        if (activeTab === 'lery' && !isLery) {
             beep(false);
-            showToast('error', `DITOLAK! Lery Workshop (F01) tidak memproduksi artikel F07.`);
+            showToast('error', `DITOLAK! Barang ini tidak untuk Lery Workshop.`);
             return;
         }
-        if (activeTab === 'samin' && !isF07) {
+        if (activeTab === 'samin' && !isSamin) {
             beep(false);
-            showToast('error', `DITOLAK! Pak Samin (F07) HANYA memproduksi artikel F07.`);
+            showToast('error', `DITOLAK! Barang ini tidak untuk Pak Samin.`);
             return;
         }
 
@@ -10934,45 +10579,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         if (scanRefPenerima.current) scanRefPenerima.current.focus();
     };
 
-    // ---- DIRECT SCAN PROCESSOR (Syaren Official - Langsung Tanpa Surat Jalan) ----
-    const processScanDirect = (raw) => {
-        if (!activeReceiver) { showToast('error', 'Scan ID Card Penerima terlebih dahulu!'); return; }
-        const fullBarcode = raw.trim().toUpperCase();
-        const itemType = detectBarcodeType(fullBarcode);
-        if (itemType === 'UNKNOWN') {
-            beep(false);
-            showToast('error', 'Barcode tidak valid! Harus dari label PO (#) atau Online (*) yang dicetak sistem.');
-            return;
-        }
-        const sku = parseSku(fullBarcode);
-        const variantExists = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
-        if (!variantExists) {
-            beep(false);
-            showToast('error', `DITOLAK! Barang tidak terdaftar di Master Produk.`);
-            return;
-        }
-        if (itemType === 'PO') {
-            const poStr = fullBarcode.split('#')[1];
-            const poNum = fullBarcode.startsWith('$') ? parseInt(poStr, 36) : parseInt(poStr, 10);
-            const poExists = (mpoOrders || []).find(o => o.poNumber === poNum);
-            if (!poExists) {
-                beep(false);
-                showToast('error', `DITOLAK! PO Pabrik #${poStr} tidak ditemukan di sistem.`);
-                return;
-            }
-        }
-        setScannedItemsPenerima(prev => ({ ...prev, [fullBarcode]: (prev[fullBarcode] || 0) + 1 }));
-        setScannedTypesDirect(prev => ({ ...prev, [fullBarcode]: itemType }));
-        beep(true);
-        setScanInputPenerima('');
-        if (scanRefPenerima.current) scanRefPenerima.current.focus();
-    };
-
     const handleScanFormPenerima = (e) => {
         e.preventDefault();
         if (!scanInputPenerima.trim()) return;
-        if (isDirectScanMode) processScanDirect(scanInputPenerima);
-        else processScanPenerima(scanInputPenerima);
+        processScanPenerima(scanInputPenerima);
     };
 
     const handleKonfirmasi = async () => {
@@ -11178,9 +10788,9 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     <body>
                         <div class="super-compact-header">
                             <div class="brand-section">
-                                <img src="/LogoV2.png" alt="Logo Syaren" />
+                                <img src="/duolaigudang/LogoV2.png" alt="Logo Faradela" />
                                 <div class="brand-text">
-                                    <h2>SYAREN OFFICIAL</h2>
+                                    <h2>FARADELA OFFICIAL</h2>
                                     <p class="nota-title">TANDA TERIMA</p>
                                 </div>
                             </div>
@@ -11285,140 +10895,6 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         setIsLoading(false);
     };
 
-    // ---- KONFIRMASI & UPDATE STOK LANGSUNG (Tanpa Surat Jalan) ----
-    const handleKonfirmasiDirect = async () => {
-        if (!activeReceiver) return showToast('error', 'Scan ID Card Penerima terlebih dahulu!');
-        if (Object.keys(scannedItemsPenerima).length === 0) return showToast('error', 'Belum ada barang di-scan!');
-        setIsLoading(true);
-        try {
-            const sjId = 'SJ-DIRECT-' + Date.now();
-            const batchOp = db.batch();
-            const nowStr = new Date().toISOString();
-            const sjItems = Object.entries(scannedItemsPenerima).map(([barcode, qty]) => {
-                const sku = parseSku(barcode);
-                const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
-                return {
-                    fullBarcode: barcode, sku, qty,
-                    itemType: scannedTypesDirect[barcode] || 'UNKNOWN',
-                    article: variant ? variant.article : '-',
-                    colorName: variant ? variant.colorName : '-',
-                    sizeName: variant ? variant.sizeName : '-',
-                };
-            });
-            batchOp.set(db.collection('surat_jalan').doc(sjId), {
-                id: sjId, status: 'SJ_CONFIRMED', createdAt: nowStr, confirmedAt: nowStr,
-                workshop: 'Langsung (Gudang Syaren)', tglKirim: toLocalDateStr(),
-                namaPengirim: '-', pengirimId: '-',
-                namaPenerima: activeReceiver.nama, penerimaId: activeReceiver.idKaryawan,
-                penerimaPosisi: activeReceiver.posisi,
-                items: sjItems, totalPcs: sjItems.reduce((a, c) => a + c.qty, 0),
-                scanReceived: { ...scannedItemsPenerima }, directScan: true,
-            });
-            // Update PO received
-            const mpoUpdates = {};
-            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
-                if (barcode.includes('#')) {
-                    const poNumber = parseInt(barcode.split('#')[1], 10);
-                    if (!mpoUpdates[poNumber]) mpoUpdates[poNumber] = {};
-                    const cleanSku = parseSku(barcode);
-                    mpoUpdates[poNumber][cleanSku] = (mpoUpdates[poNumber][cleanSku] || 0) + qty;
-                }
-            }
-            for (const poNum of Object.keys(mpoUpdates)) {
-                const poDoc = (mpoOrders || []).find(o => o.poNumber === parseInt(poNum, 10));
-                if (poDoc) {
-                    let allReceived = true;
-                    const newItems = (poDoc.items || []).map(pit => {
-                        const safeSku = (pit.sku || '').trim().toUpperCase();
-                        const addQty = mpoUpdates[poNum][safeSku] || 0;
-                        const newReceived = (pit.received || 0) + addQty;
-                        if (newReceived < pit.qty) allReceived = false;
-                        return { ...pit, received: newReceived };
-                    });
-                    batchOp.update(db.collection('purchase_orders').doc(poDoc.id), { items: newItems, status: allReceived ? 'ARRIVED' : poDoc.status });
-                }
-            }
-            // Transaksi ONLINE_IN + update QC orders
-            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
-                const cleanSku = parseSku(barcode);
-                const isOnline = barcode.includes('*');
-                const txRef = db.collection('transactions').doc();
-                if (isOnline) {
-                    const finalBarcode = `${cleanSku}${toLocalDateStr().replace(/-/g, '')}`;
-                    batchOp.set(txRef, {
-                        sku: cleanSku, qty, type: 'ONLINE_IN', fullBarcode: finalBarcode,
-                        date: nowStr, orderNo: sjId, note: `Cross-Docking QC (Langsung) via ${sjId}`,
-                        user: activeReceiver.nama, batchId: sjId
-                    });
-                    const sessionNum = parseInt(barcode.split('*')[1], 10) || 1;
-                    let remainingToFulfill = qty;
-                    const targets = (qcOrders || []).filter(o =>
-                        (o.status === 'PENDING' || o.status === 'TRANSIT') &&
-                        (o.session || 1) === sessionNum &&
-                        (o.items || []).some(it => (it.prodStatus || it.status) === 'PO' && (it.sysSku === cleanSku || it.sku === cleanSku))
-                    ).sort((a, b) => (a.deadline || '').localeCompare(b.deadline || ''));
-                    for (const order of targets) {
-                        if (remainingToFulfill <= 0) break;
-                        let orderUpdated = false;
-                        const newItems = order.items.map(it => {
-                            if (remainingToFulfill > 0 && (it.prodStatus || it.status) === 'PO' && (it.sysSku === cleanSku || it.sku === cleanSku)) {
-                                remainingToFulfill -= it.qty; orderUpdated = true;
-                                return { ...it, status: 'READY', prodStatus: 'READY', fulfilledFromPO: true };
-                            }
-                            return it;
-                        });
-                        if (orderUpdated) batchOp.update(db.collection('qc_orders').doc(order.id), { items: newItems });
-                    }
-                }
-            }
-            await batchOp.commit();
-            setDirectSjId(sjId);
-            setDirectScanDone(true);
-            beep(true);
-            showToast('success', `✅ Penerimaan dikonfirmasi! ${sjItems.reduce((a,c)=>a+c.qty,0)} pcs diterima oleh ${activeReceiver.nama}.`);
-        } catch (err) {
-            showToast('error', 'Gagal konfirmasi: ' + err.message);
-        }
-        setIsLoading(false);
-    };
-
-    const handleUpdateStokDirect = async () => {
-        if (Object.keys(scannedItemsPenerima).length === 0) return showToast('error', 'Tidak ada data scan!');
-        if (!confirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data stok. Barang Online sudah otomatis tercatat saat Konfirmasi.`)) return;
-        setIsLoading(true);
-        try {
-            const batchOp = db.batch();
-            const sjId = directSjId || ('SJ-DIRECT-' + Date.now());
-            const nowStr = new Date().toISOString();
-            const operatorName = activeReceiver?.nama || 'Staff Gudang';
-            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
-                if (qty > 0 && !barcode.includes('*')) {
-                    const cleanSku = parseSku(barcode);
-                    const txRef = db.collection('transactions').doc();
-                    batchOp.set(txRef, {
-                        sku: cleanSku, qty, type: 'IN', fullBarcode: barcode,
-                        date: nowStr, orderNo: sjId, batchId: sjId,
-                        user: operatorName, note: `Penerimaan Langsung Gudang via ${sjId}`
-                    });
-                }
-            }
-            if (directSjId) {
-                batchOp.update(db.collection('surat_jalan').doc(directSjId), { status: 'ARRIVED', arrivedAt: nowStr });
-            }
-            await batchOp.commit();
-            beep(true);
-            showToast('success', 'Rak fisik gudang berhasil ditambah dari penerimaan langsung!');
-            setIsDirectScanMode(false);
-            setDirectScanDone(false);
-            setScannedItemsPenerima({});
-            setScannedTypesDirect({});
-            setDirectSjId(null);
-        } catch (err) {
-            showToast('error', 'Gagal update stok: ' + err.message);
-        }
-        setIsLoading(false);
-    };
-
     const openDraft = (sj) => {
         setActiveDraft(sj);
         setScannedItemsPenerima(sj.scanReceived || {});
@@ -11453,7 +10929,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-xl flex items-center gap-2">
-                                <i className="fa-solid fa-camera text-rose-500"></i> {scannerLabel}
+                                <i className="fa-solid fa-camera text-orange-500"></i> {scannerLabel}
                             </h3>
                             <button type="button" onClick={() => setShowScanner(false)} className="bg-red-50 text-red-600 p-2 rounded-full">
                                 <i className="fa-solid fa-xmark text-xl"></i>
@@ -11463,10 +10939,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             if (scannerType === 'senderId') handleScanSenderId(null, text);
                             else if (scannerType === 'receiverId') handleScanReceiverId(null, text);
                             else if (scannerType === 'itemsPengirim') processScanPengirim(text);
-                            else if (scannerType === 'itemsPenerima') {
-                                if (isDirectScanMode) processScanDirect(text);
-                                else processScanPenerima(text);
-                            }
+                            else if (scannerType === 'itemsPenerima') processScanPenerima(text);
                         }} />
                     </div>
                 </div>
@@ -11474,18 +10947,18 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
             {/* Header Pilihan Bengkel */}
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm">
-                <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Produksi Bengkel</h2>
+                <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-industry text-orange-500"></i> Produksi Bengkel</h2>
                 <p className="text-slate-500 font-bold text-sm mt-1">Pilih Bengkel Pengirim atau Bagian Penerima Gudang.</p>
 
                 <div className="flex gap-2 mt-5 border-b border-slate-100 overflow-x-auto custom-scrollbar">
                     {canLery && (
-                        <button onClick={() => setActiveTab('lery')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'lery' ? 'bg-rose-500 text-white shadow' : 'text-slate-500 hover:bg-rose-50'}`}><i className="fa-solid fa-industry mr-2"></i>Lery's Workshop (F01)</button>
+                        <button onClick={() => setActiveTab('lery')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'lery' ? 'bg-orange-500 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}><i className="fa-solid fa-industry mr-2"></i>Lery's Workshop (F01)</button>
                     )}
                     {canSamin && (
-                        <button onClick={() => setActiveTab('samin')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'samin' ? 'bg-rose-600 text-white shadow' : 'text-slate-500 hover:bg-rose-50'}`}><i className="fa-solid fa-scissors mr-2"></i>Pak Samin (F07)</button>
+                        <button onClick={() => setActiveTab('samin')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'samin' ? 'bg-amber-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}><i className="fa-solid fa-scissors mr-2"></i>Pak Samin (F07)</button>
                     )}
-                    {canSyaren && (
-                        <button onClick={() => setActiveTab('faradela')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'faradela' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:bg-rose-50'}`}><i className="fa-solid fa-building-circle-check mr-2"></i>Syaren Official</button>
+                    {canFaradela && (
+                        <button onClick={() => setActiveTab('faradela')} className={`px-4 md:px-6 py-3 rounded-t-xl font-black text-sm transition-colors whitespace-nowrap ${activeTab === 'faradela' ? 'bg-blue-600 text-white shadow' : 'text-slate-500 hover:bg-slate-100'}`}><i className="fa-solid fa-building-circle-check mr-2"></i>Faradela Official</button>
                     )}
                 </div>
             </div>
@@ -11497,14 +10970,14 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {(activeTab === 'lery' || activeTab === 'samin') && (
                 !activeSender ? (
                     <div className="bg-white p-8 md:p-12 rounded-3xl border shadow-sm max-w-lg mx-auto text-center space-y-6">
-                        <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${activeTab === 'lery' ? 'bg-rose-100 text-rose-500' : 'bg-rose-100 text-rose-500'}`}><i className="fa-solid fa-id-card text-5xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800">Scan ID Card {activeTab === 'lery' ? "Lery's Workshop" : 'Pak Samin'}</h3>
+                        <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${activeTab === 'lery' ? 'bg-orange-100 text-orange-500' : 'bg-amber-100 text-amber-500'}`}><i className="fa-solid fa-id-card text-5xl"></i></div>
+                        <h3 className="text-2xl font-black text-slate-800">Scan ID Card {activeTab === 'lery' ? "Lery's Workshop" : 'Pak Samin'}</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai pengiriman.</p>
                         <form onSubmit={handleScanSenderId} className="flex gap-2">
-                            <input ref={senderIdRef} type="text" placeholder="Scan ID Card..." value={senderIdInput} onChange={e => setSenderIdInput(e.target.value)} className={`flex-1 p-4 border-2 rounded-xl font-bold outline-none text-center text-lg ${activeTab === 'lery' ? 'border-rose-300 bg-rose-50 focus:border-rose-500' : 'border-rose-300 bg-rose-50 focus:border-rose-500'}`} autoFocus />
-                            <button type="submit" className={`px-6 py-3 text-white rounded-xl font-black text-lg ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
+                            <input ref={senderIdRef} type="text" placeholder="Scan ID Card..." value={senderIdInput} onChange={e => setSenderIdInput(e.target.value)} className={`flex-1 p-4 border-2 rounded-xl font-bold outline-none text-center text-lg ${activeTab === 'lery' ? 'border-orange-300 bg-orange-50 focus:border-orange-500' : 'border-amber-300 bg-amber-50 focus:border-amber-500'}`} autoFocus />
+                            <button type="submit" className={`px-6 py-3 text-white rounded-xl font-black text-lg ${activeTab === 'lery' ? 'bg-orange-500' : 'bg-amber-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
-                        <button onClick={() => openScanner('senderId', `Scan ID Card ${activeTab === 'lery' ? 'Lery' : 'Samin'}`)} className="w-full py-4 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => openScanner('senderId', `Scan ID Card ${activeTab === 'lery' ? 'Lery' : 'Samin'}`)} className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
                         </button>
                     </div>
@@ -11512,15 +10985,15 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-clipboard-check mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Form Kirim {activeTab === 'lery' ? '(Lery)' : '(Samin)'}</h3>
+                                <h3 className="text-xl font-black text-slate-800"><i className={`fa-solid fa-clipboard-check mr-2 ${activeTab === 'lery' ? 'text-orange-500' : 'text-amber-500'}`}></i>Form Kirim {activeTab === 'lery' ? '(Lery)' : '(Samin)'}</h3>
                                 <button onClick={() => { setActiveSender(null); setScannedItemsPengirim({}); setScannedTypePengirim({}); }} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Pengirim</button>
                             </div>
 
-                            <div className={`border-2 p-4 rounded-xl flex items-center gap-4 ${activeTab === 'lery' ? 'bg-rose-50 border-rose-200' : 'bg-rose-50 border-rose-200'}`}>
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl flex-shrink-0 ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-500'}`}><i className="fa-solid fa-user-check"></i></div>
+                            <div className={`border-2 p-4 rounded-xl flex items-center gap-4 ${activeTab === 'lery' ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'}`}>
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl flex-shrink-0 ${activeTab === 'lery' ? 'bg-orange-500' : 'bg-amber-500'}`}><i className="fa-solid fa-user-check"></i></div>
                                 <div>
-                                    <div className="font-black text-rose-800 text-lg">{activeSender.nama}</div>
-                                    <div className={`text-xs font-bold uppercase ${activeTab === 'lery' ? 'text-rose-600' : 'text-rose-600'}`}>{activeSender.posisi} &bull; ID: {activeSender.idKaryawan}</div>
+                                    <div className="font-black text-slate-800 text-lg">{activeSender.nama}</div>
+                                    <div className={`text-xs font-bold uppercase ${activeTab === 'lery' ? 'text-orange-600' : 'text-amber-600'}`}>{activeSender.posisi} &bull; ID: {activeSender.idKaryawan}</div>
                                 </div>
                             </div>
                             <div>
@@ -11532,9 +11005,9 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode Barang</label>
                                 <form onSubmit={handleScanFormPengirim} className="flex gap-2 mt-1.5">
                                     <input ref={scanRefPengirim} type="text" placeholder={`Scan produk ${activeTab === 'lery' ? 'F01' : 'F07'}...`} value={scanInputPengirim} onChange={e => setScanInputPengirim(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-slate-500" autoFocus />
-                                    <button type="submit" className={`px-5 py-3 text-white rounded-xl font-black ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-qrcode"></i></button>
+                                    <button type="submit" className={`px-5 py-3 text-white rounded-xl font-black ${activeTab === 'lery' ? 'bg-orange-500' : 'bg-amber-600'}`}><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
-                                <button onClick={() => openScanner('itemsPengirim', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                <button onClick={() => openScanner('itemsPengirim', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
                                     <i className="fa-solid fa-camera text-2xl text-slate-300"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
@@ -11542,15 +11015,15 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     </div>
                                 </button>
                             </div>
-                            <button onClick={handleKirimSJ} disabled={Object.keys(scannedItemsPengirim).length === 0} className={`w-full text-white py-4 rounded-2xl font-black text-lg transition-colors shadow-lg disabled:bg-slate-200 disabled:text-slate-400 ${activeTab === 'lery' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'}`}>
+                            <button onClick={handleKirimSJ} disabled={Object.keys(scannedItemsPengirim).length === 0} className={`w-full text-white py-4 rounded-2xl font-black text-lg transition-colors shadow-lg disabled:bg-slate-200 disabled:text-slate-400 ${activeTab === 'lery' ? 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/30' : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/30'}`}>
                                 <i className="fa-solid fa-paper-plane mr-2"></i> KIRIM SURAT JALAN
                             </button>
                         </div>
 
                         <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-boxes-stacked mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Barang Ter-scan</h3>
-                                <span className={`text-white font-black px-4 py-1.5 rounded-xl text-sm ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}>{Object.values(scannedItemsPengirim).reduce((a, b) => a + b, 0)} Pcs</span>
+                                <h3 className="text-xl font-black text-slate-800"><i className={`fa-solid fa-boxes-stacked mr-2 ${activeTab === 'lery' ? 'text-orange-500' : 'text-amber-500'}`}></i>Barang Ter-scan</h3>
+                                <span className={`text-white font-black px-4 py-1.5 rounded-xl text-sm ${activeTab === 'lery' ? 'bg-orange-500' : 'bg-amber-600'}`}>{Object.values(scannedItemsPengirim).reduce((a, b) => a + b, 0)} Pcs</span>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                                 {Object.keys(scannedItemsPengirim).length > 0 ? Object.entries(scannedItemsPengirim).map(([barcode, qty]) => {
@@ -11560,7 +11033,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     return (
                                         <div key={barcode} className="p-4 rounded-xl border-2 border-slate-200 bg-white flex justify-between items-center">
                                             <div>
-                                                <div className="font-black text-rose-800">{variant ? variant.article : sku} <span className={activeTab === 'lery' ? 'text-rose-500' : 'text-rose-600'}>{variant ? variant.sizeName : ''}</span></div>
+                                                <div className="font-black text-slate-800">{variant ? variant.article : sku} <span className={activeTab === 'lery' ? 'text-orange-500' : 'text-amber-600'}>{variant ? variant.sizeName : ''}</span></div>
                                                 <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
                                                 <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                                     <i className={`fa-solid ${itemType === 'ONLINE' ? 'fa-cart-shopping' : 'fa-industry'} mr-1`}></i>{itemType === 'ONLINE' ? 'ONLINE ORDER' : 'PO PABRIK'}
@@ -11579,7 +11052,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     <i className="fa-solid fa-minus"></i>
                                                 </button>
                                                 <div className="text-right">
-                                                    <span className="font-black text-2xl text-rose-800">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
+                                                    <span className="font-black text-2xl text-slate-800">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -11591,18 +11064,18 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 )
             )}
 
-            {/* ============ TAB PENERIMA SYAREN ============ */}
+            {/* ============ TAB PENERIMA FARADELA ============ */}
             {activeTab === 'faradela' && (
                 !activeReceiver ? (
                     <div className="bg-white p-8 md:p-12 rounded-3xl border shadow-sm max-w-lg mx-auto text-center space-y-6">
                         <div className="w-24 h-24 mx-auto bg-blue-100 rounded-full flex items-center justify-center"><i className="fa-solid fa-id-card text-blue-600 text-5xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800">Scan ID Card Penerima</h3>
+                        <h3 className="text-2xl font-black text-slate-800">Scan ID Card Penerima</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai penerimaan barang.</p>
                         <form onSubmit={handleScanReceiverId} className="flex gap-2">
                             <input ref={receiverIdRef} type="text" placeholder="Scan ID Card..." value={receiverIdInput} onChange={e => setReceiverIdInput(e.target.value)} className="flex-1 p-4 border-2 border-blue-300 rounded-xl font-bold bg-blue-50 outline-none focus:border-blue-500 text-center text-lg" autoFocus />
                             <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-lg"><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
-                        <button onClick={() => openScanner('receiverId', 'Scan ID Card Penerima')} className="w-full py-4 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => openScanner('receiverId', 'Scan ID Card Penerima')} className="w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
                         </button>
                     </div>
@@ -11610,24 +11083,25 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-barcode text-blue-600 mr-2"></i>Verifikasi: {activeDraft.id}</h3>
-                                <button onClick={() => { setActiveDraft(null); setScannedItemsPenerima({}); setDraftConfirmed(false); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
+                                <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-barcode text-blue-600 mr-2"></i>Verifikasi: {activeDraft.id}</h3>
+                                <button onClick={() => { setActiveDraft(null); setScannedItemsPenerima({}); setDraftConfirmed(false); }} className="text-sm text-slate-500 hover:text-slate-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
                             </div>
                             <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl flex items-center gap-4">
                                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0"><i className="fa-solid fa-user-check"></i></div>
                                 <div>
-                                    <div className="font-black text-rose-800">{activeReceiver.nama} <span className="text-xs text-blue-600">({activeReceiver.posisi})</span></div>
+                                    <div className="font-black text-slate-800">{activeReceiver.nama} <span className="text-xs text-blue-600">({activeReceiver.posisi})</span></div>
                                     <div className="text-xs font-bold text-slate-500">Pengirim: <b>{activeDraft.workshop || 'Bengkel'}</b> &bull; Tgl: {activeDraft.tglKirim || '-'}</div>
                                 </div>
                             </div>
+                            
                             <div>
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode</label>
                                 <form onSubmit={handleScanFormPenerima} className="flex gap-2 mt-1.5">
                                     <input ref={scanRefPenerima} type="text" placeholder="Scan atau ketik barcode..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-blue-500" autoFocus />
                                     <button type="submit" className="px-5 py-3 bg-blue-600 text-white rounded-xl font-black"><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
-                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
-                                    <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
+                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                    <i className="fa-solid fa-camera text-2xl text-orange-400"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
                                         <div className="text-sm">SCAN BARCODE HP</div>
@@ -11650,14 +11124,17 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     <i className={`fa-solid ${activeDraft?.status === 'ARRIVED' ? 'fa-check-double' : 'fa-boxes-packing'} mr-2`}></i>
                                     {activeDraft?.status === 'ARRIVED' ? 'STOK SUDAH MASUK GUDANG' : 'UPDATE STOK GUDANG'}
                                 </button>
-                                <button onClick={handleCetakSuratJalan} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl font-black transition-colors shadow-lg mt-4 border-2 border-rose-600/50">
+
+                                {/* TOMBOL BARU: CETAK SURAT JALAN (GANTI WARNA ORANGE) */}
+                                <button onClick={handleCetakSuratJalan} className="w-full bg-orange-500 hover:bg-orange-600 text-white py-4 rounded-2xl font-black transition-colors shadow-lg mt-4 border-2 border-orange-600/50">
                                     <i className="fa-solid fa-print mr-2"></i> CETAK NOTA TANDA TERIMA
                                 </button>
                             </div>
                         </div>
+
                         <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-list-check text-blue-600 mr-2"></i>Cek Barang</h3>
+                                <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-list-check text-blue-600 mr-2"></i>Cek Barang</h3>
                                 <span className="bg-blue-600 text-white font-black px-4 py-1.5 rounded-xl text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
@@ -11668,7 +11145,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     return (
                                         <div key={item.fullBarcode} className={`p-4 rounded-xl border-2 flex justify-between items-center ${full ? 'border-teal-400 bg-teal-50' : 'border-slate-200'}`}>
                                             <div>
-                                                <div className="font-black text-rose-800">{item.article} <span className="text-blue-500">{item.sizeName}</span></div>
+                                                <div className="font-black text-slate-800">{item.article} <span className="text-blue-500">{item.sizeName}</span></div>
                                                 <div className="text-xs text-slate-500 font-bold">{item.colorName}</div>
                                                 {item.itemType && <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${item.itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{item.itemType === 'ONLINE' ? 'ONLINE' : 'PO'}</span>}
                                             </div>
@@ -11679,7 +11156,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     </button>
                                                 )}
                                                 <div className="text-right">
-                                                    <span className={`font-black text-2xl ${full ? 'text-teal-600' : 'text-rose-800'}`}>{scanned}</span><span className="text-slate-400 font-bold">/{expected}</span>
+                                                    <span className={`font-black text-2xl ${full ? 'text-teal-600' : 'text-slate-800'}`}>{scanned}</span><span className="text-slate-400 font-bold">/{expected}</span>
                                                     {full && <div><i className="fa-solid fa-check-circle text-teal-500 text-sm"></i></div>}
                                                 </div>
                                             </div>
@@ -11689,118 +11166,21 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             </div>
                         </div>
                     </div>
-                ) : isDirectScanMode ? (
-                    // ===== MODE SCAN LANGSUNG (TANPA SURAT JALAN) =====
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
-                            <div className="flex justify-between items-center border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-bolt text-teal-600 mr-2"></i>Penerimaan Langsung</h3>
-                                <button onClick={() => { setIsDirectScanMode(false); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
-                            </div>
-                            <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl flex items-center gap-4">
-                                <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0"><i className="fa-solid fa-user-check"></i></div>
-                                <div>
-                                    <div className="font-black text-rose-800">{activeReceiver.nama} <span className="text-xs text-teal-600">({activeReceiver.posisi})</span></div>
-                                    <div className="text-xs font-bold text-slate-500">Scan Langsung Tanpa Surat Jalan &bull; {toLocalDateStr()}</div>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode Barang (PO # atau Online *)</label>
-                                <form onSubmit={handleScanFormPenerima} className="flex gap-2 mt-1.5">
-                                    <input ref={scanRefPenerima} type="text" placeholder="Scan barcode PO (#) atau Online (*)..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-teal-500" autoFocus disabled={directScanDone} />
-                                    <button type="submit" disabled={directScanDone} className="px-5 py-3 bg-teal-600 disabled:bg-slate-300 text-white rounded-xl font-black"><i className="fa-solid fa-qrcode"></i></button>
-                                </form>
-                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barang Masuk Gudang')} disabled={directScanDone} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 disabled:bg-slate-300 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
-                                    <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
-                                    <div className="text-left">
-                                        <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
-                                        <div className="text-sm">SCAN BARCODE HP</div>
-                                    </div>
-                                </button>
-                            </div>
-                            <div className="space-y-3">
-                                <button onClick={handleKonfirmasiDirect}
-                                    disabled={directScanDone || Object.keys(scannedItemsPenerima).length === 0}
-                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black transition-colors shadow-lg">
-                                    <i className="fa-solid fa-clipboard-check mr-2"></i>
-                                    {directScanDone ? 'DIKONFIRMASI ✅' : 'KONFIRMASI PENERIMAAN'}
-                                </button>
-                                <button
-                                    onClick={handleUpdateStokDirect}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black transition-colors shadow-lg"
-                                >
-                                    <i className="fa-solid fa-boxes-packing mr-2"></i> UPDATE STOK GUDANG
-                                </button>
-                            </div>
-                        </div>
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-boxes-stacked text-teal-600 mr-2"></i>Barang Ter-scan</h3>
-                                <span className="bg-teal-600 text-white font-black px-4 py-1.5 rounded-xl text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
-                            </div>
-                            <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
-                                {Object.keys(scannedItemsPenerima).length > 0 ? Object.entries(scannedItemsPenerima).map(([barcode, qty]) => {
-                                    const sku = parseSku(barcode);
-                                    const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
-                                    const itemType = scannedTypesDirect[barcode] || 'UNKNOWN';
-                                    return (
-                                        <div key={barcode} className="p-4 rounded-xl border-2 border-slate-200 bg-white flex justify-between items-center">
-                                            <div>
-                                                <div className="font-black text-rose-800">{variant ? variant.article : sku} <span className="text-teal-500">{variant ? variant.sizeName : ''}</span></div>
-                                                <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
-                                                <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                    <i className={`fa-solid ${itemType === 'ONLINE' ? 'fa-cart-shopping' : 'fa-industry'} mr-1`}></i>
-                                                    {itemType === 'ONLINE' ? 'ONLINE ORDER' : 'PO PABRIK'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                {!directScanDone && (
-                                                    <button onClick={() => {
-                                                        setScannedItemsPenerima(prev => {
-                                                            const newQty = (prev[barcode] || 0) - 1;
-                                                            const newState = { ...prev };
-                                                            if (newQty <= 0) delete newState[barcode];
-                                                            else newState[barcode] = newQty;
-                                                            return newState;
-                                                        });
-                                                    }} className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors border border-rose-200 flex items-center justify-center shadow-sm" title="Batal Scan 1 Pcs">
-                                                        <i className="fa-solid fa-minus"></i>
-                                                    </button>
-                                                )}
-                                                <div className="text-right">
-                                                    <span className="font-black text-2xl text-teal-600">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    );
-                                }) : <div className="text-center text-slate-400 font-bold py-16"><i className="fa-solid fa-barcode text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
-                            </div>
-                        </div>
-                    </div>
                 ) : (
-                    // ===== DAFTAR SURAT JALAN + TOMBOL SCAN LANGSUNG =====
                     <div>
-                        <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white"><i className="fa-solid fa-user-check"></i></div>
-                                <div><span className="font-black text-rose-800">{activeReceiver.nama}</span> <span className="text-xs text-blue-600 font-bold">({activeReceiver.posisi})</span></div>
+                                <div><span className="font-black text-slate-800">{activeReceiver.nama}</span> <span className="text-xs text-blue-600 font-bold">({activeReceiver.posisi})</span></div>
                             </div>
-                            <div className="flex items-center gap-2 w-full sm:w-auto">
-                                <button
-                                    onClick={() => { setIsDirectScanMode(true); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }}
-                                    className="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-500/30"
-                                >
-                                    <i className="fa-solid fa-bolt"></i> Scan Langsung
-                                </button>
-                                <button onClick={() => setActiveReceiver(null)} className="text-sm text-slate-500 hover:text-red-600 font-bold whitespace-nowrap"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Penerima</button>
-                            </div>
+                            <button onClick={() => setActiveReceiver(null)} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Penerima</button>
                         </div>
                         <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                             {allDraftSJs.length === 0 && (
                                 <div className="text-center p-10 bg-white rounded-3xl border shadow-sm text-slate-400">
                                     <i className="fa-regular fa-folder-open text-5xl mb-3 block"></i>
                                     <h3 className="text-base font-bold">Belum Ada Surat Jalan Masuk</h3>
-                                    <p className="text-xs mt-1">Minta tim Bengkel mengirim barang via tab Lery/Samin, atau gunakan tombol <b>Scan Langsung</b> di atas.</p>
+                                    <p className="text-xs mt-1">Minta tim Bengkel mengirim barang via tab Lery/Samin.</p>
                                 </div>
                             )}
                             {allDraftSJs.map(sj => {
@@ -11810,16 +11190,15 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     <div key={sj.id} className="bg-white border-2 hover:border-blue-300 p-4 rounded-2xl shadow-sm transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div className="flex-1 cursor-pointer" onClick={() => openDraft(sj)}>
                                             <div className="flex items-center gap-3 mb-1">
-                                                <div className="font-black text-lg text-rose-800">{sj.id}</div>
+                                                <div className="font-black text-lg text-slate-800">{sj.id}</div>
                                                 <span className={`font-black px-2 py-0.5 rounded text-[10px] uppercase ${isConfirmed ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
                                                     {isConfirmed ? 'SELESAI' : 'MENUNGGU'}
                                                 </span>
-                                                {sj.directScan && <span className="font-black px-2 py-0.5 rounded text-[10px] uppercase bg-teal-50 text-teal-600 border border-teal-200"><i className="fa-solid fa-bolt mr-1"></i>LANGSUNG</span>}
                                             </div>
                                             <div className="text-xs font-bold text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
                                                 <span><i className="fa-solid fa-industry mr-1"></i>{sj.workshop || 'Bengkel'}</span>
                                                 <span><i className="fa-solid fa-user mr-1"></i>{sj.namaPengirim || '-'}</span>
-                                                <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded"><i className="fa-solid fa-box mr-1"></i>{totalPcs} Pcs</span>
+                                                <span className="text-orange-600 bg-orange-50 px-2 py-0.5 rounded"><i className="fa-solid fa-box mr-1"></i>{totalPcs} Pcs</span>
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
@@ -12003,57 +11382,57 @@ function KasOperasional({ showToast }) {
             {/* Header & Papan Saldo */}
             <div className="bg-white p-6 rounded-3xl border shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
                 <div>
-                    <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-wallet text-rose-500"></i> Kas Operasional</h2>
+                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-wallet text-orange-500"></i> Kas Operasional</h2>
                 </div>
                 <button onClick={copyToWA} className="w-full md:w-auto bg-emerald-500 text-white px-6 py-3.5 rounded-xl font-black text-sm hover:bg-emerald-600 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30">
                     <i className="fa-brands fa-whatsapp text-xl mr-2"></i> COPY FORMAT WA
                 </button>
             </div>
 
-            <div className={`p-8 rounded-3xl shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-rose-900'}`}>
+            <div className={`p-8 rounded-3xl shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-slate-900'}`}>
                 <i className="fa-solid fa-coins absolute -right-4 -bottom-4 text-8xl opacity-20"></i>
-                <p className="text-sm opacity-90 uppercase tracking-widest mb-1 text-rose-400">Sisa Saldo Saat Ini</p>
+                <p className="text-sm opacity-90 uppercase tracking-widest mb-1 text-orange-400">Sisa Saldo Saat Ini</p>
                 <h3 className="text-5xl font-black">Rp {sisaSaldo.toLocaleString('id-ID')}</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Form Input */}
                 <div className="bg-white p-6 rounded-3xl border shadow-sm h-fit">
-                    <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-pen-to-square mr-2 text-rose-500"></i> Catat Transaksi</h4>
+                    <h4 className="font-black mb-5 text-slate-800 border-b pb-3"><i className="fa-solid fa-pen-to-square mr-2 text-orange-500"></i> Catat Transaksi</h4>
                     <form onSubmit={handleSimpan} className="space-y-4">
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal</label>
-                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" />
+                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-orange-500 mt-1" />
                         </div>
                         <div className="flex gap-4">
-                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'keluar' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
+                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'keluar' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
                                 <input type="radio" name="jenis" className="hidden" checked={form.jenis === 'keluar'} onChange={() => setForm({ ...form, jenis: 'keluar' })} />
                                 <i className="fa-solid fa-arrow-trend-down mr-2"></i> Keluar
                             </label>
-                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'masuk' ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
+                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'masuk' ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-slate-100'}`}>
                                 <input type="radio" name="jenis" className="hidden" checked={form.jenis === 'masuk'} onChange={() => setForm({ ...form, jenis: 'masuk' })} />
                                 <i className="fa-solid fa-arrow-trend-up mr-2"></i> Masuk
                             </label>
                         </div>
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Nominal (Rp)</label>
-                            <input type="number" value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
+                            <input type="number" value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-orange-500 mt-1" required />
                         </div>
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Keterangan</label>
-                            <input type="text" value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
+                            <input type="text" value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-orange-500 mt-1" required />
                         </div>
 
                         {/* TOMBOL BUKA KAMERA ATAU PREVIEW FOTO */}
                         <div className="bg-slate-50 p-4 rounded-xl border-2 border-slate-100 mt-2">
-                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-2"><i className="fa-solid fa-camera mr-2 text-rose-500"></i> Foto Nota (Opsional)</label>
+                            <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-2"><i className="fa-solid fa-camera mr-2 text-orange-500"></i> Foto Nota (Opsional)</label>
 
                             {!fotoPreview ? (
-                                <button type="button" onClick={() => startCamera('environment')} className="w-full border-2 border-dashed border-rose-300 bg-rose-50 text-rose-600 font-bold py-4 rounded-xl hover:bg-rose-100 transition-colors flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => startCamera('environment')} className="w-full border-2 border-dashed border-orange-300 bg-orange-50 text-orange-600 font-bold py-4 rounded-xl hover:bg-orange-100 transition-colors flex items-center justify-center gap-2">
                                     <i className="fa-solid fa-camera text-xl"></i> BUKA KAMERA NOTA
                                 </button>
                             ) : (
-                                <div className="relative group rounded-xl overflow-hidden border-2 border-rose-200">
+                                <div className="relative group rounded-xl overflow-hidden border-2 border-orange-200">
                                     <img src={fotoPreview} alt="Preview Nota" className="w-full h-48 object-cover" />
                                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button type="button" onClick={() => setFotoPreview(null)} className="bg-rose-500 text-white px-4 py-2 rounded-lg font-bold">
@@ -12064,7 +11443,7 @@ function KasOperasional({ showToast }) {
                             )}
                         </div>
 
-                        <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white font-black py-4 rounded-xl hover:bg-rose-600 transition-transform transform hover:-translate-y-1 shadow-lg mt-2 relative overflow-hidden">
+                        <button type="submit" disabled={loading} className="w-full bg-orange-500 text-white font-black py-4 rounded-xl hover:bg-orange-600 transition-transform transform hover:-translate-y-1 shadow-lg mt-2 relative overflow-hidden">
                             {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <><i className="fa-solid fa-save mr-2"></i> SIMPAN TRANSAKSI</>}
                         </button>
                     </form>
@@ -12072,7 +11451,7 @@ function KasOperasional({ showToast }) {
 
                 {/* Riwayat */}
                 <div className="bg-white p-6 rounded-3xl border shadow-sm flex flex-col h-[650px]">
-                    <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-list-check mr-2 text-rose-500"></i> Riwayat Tanggal: <span className="text-rose-500">{tanggal}</span></h4>
+                    <h4 className="font-black mb-5 text-slate-800 border-b pb-3"><i className="fa-solid fa-list-check mr-2 text-orange-500"></i> Riwayat Tanggal: <span className="text-orange-500">{tanggal}</span></h4>
                     <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
                         {dataHariIni.map((item) => (
                             <div key={item.id} className="flex justify-between items-center bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl">
@@ -12081,13 +11460,13 @@ function KasOperasional({ showToast }) {
                                         <i className={`fa-solid ${item.jenis === 'masuk' ? 'fa-plus' : 'fa-minus'}`}></i>
                                     </div>
                                     <div>
-                                        <p className="font-black text-rose-800 text-base">{item.keterangan}</p>
+                                        <p className="font-black text-slate-800 text-base">{item.keterangan}</p>
                                         <div className="flex items-center gap-3">
                                             <p className={`text-sm font-bold ${item.jenis === 'masuk' ? 'text-emerald-600' : 'text-red-600'}`}>
                                                 Rp {item.nominal.toLocaleString('id-ID')}
                                             </p>
                                             {item.buktiUrl && (
-                                                <a href={item.buktiUrl} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors">
+                                                <a href={item.buktiUrl} target="_blank" rel="noopener noreferrer" className="w-8 h-8 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center hover:bg-orange-500 hover:text-white transition-colors">
                                                     <i className="fa-solid fa-camera text-sm"></i>
                                                 </a>
                                             )}
@@ -12117,16 +11496,16 @@ function KasOperasional({ showToast }) {
                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-64 h-64 border-2 border-white/30 rounded-3xl relative">
-                                <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-rose-500 rounded-tl-xl"></div>
-                                <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-rose-500 rounded-tr-xl"></div>
-                                <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-rose-500 rounded-bl-xl"></div>
-                                <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-rose-500 rounded-br-xl"></div>
+                                <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-orange-500 rounded-tl-xl"></div>
+                                <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-orange-500 rounded-tr-xl"></div>
+                                <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-orange-500 rounded-bl-xl"></div>
+                                <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-orange-500 rounded-br-xl"></div>
                             </div>
                         </div>
                     </div>
 
                     <div className="p-8 pb-12 bg-black flex justify-center items-center">
-                        <button onClick={jepretFoto} className="w-20 h-20 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-rose-600">
+                        <button onClick={jepretFoto} className="w-20 h-20 bg-orange-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-orange-600">
                             <i className="fa-solid fa-camera text-3xl text-white"></i>
                         </button>
                     </div>
@@ -12148,7 +11527,7 @@ function LoginPage({ onLogin }) {
     const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
-        const emailFormat = username.toLowerCase() + '@syaren.com';
+        const emailFormat = username.toLowerCase() + '@faradela.com';
 
         try {
             // Animasi selama 2 detik sebelum cek ke database
@@ -12160,11 +11539,11 @@ function LoginPage({ onLogin }) {
             } catch (authError) {
                 // Jika akun belum ada, otomatis buatkan (Khusus Admin)
                 if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-login-credentials' || authError.code === 'auth/invalid-credential') {
-                    if (username === 'minsyaren' && password === 'Syaren@2026') {
+                    if (username === 'mindela' && password === 'Sukses@2026') {
                         await firebase.auth().createUserWithEmailAndPassword(emailFormat, password);
 
                         // PERBAIKAN FINAL: Gunakan variabel 'db' langsung bawaan aplikasi Anda!
-                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: 'Syaren@2026', role: 'admin', access: [] });
+                        await db.collection('users').doc('mindela').set({ username: 'mindela', password: 'Sukses@2026', role: 'admin', access: [] });
 
                         alert('âœ… Akun Berhasil Terdaftar! Silakan klik MASUK SEKARANG sekali lagi.');
                         setLoading(false);
@@ -12173,7 +11552,7 @@ function LoginPage({ onLogin }) {
                         throw new Error("Username atau Password salah!");
                     }
                 } else if (authError.code === 'auth/email-already-in-use') {
-                    throw new Error("Akun nyangkut! Hapus minsyaren@syaren.com di tab Authentication Firebase.");
+                    throw new Error("Akun nyangkut! Hapus mindela@faradela.com di tab Authentication Firebase.");
                 } else {
                     throw authError; // Lempar error lain
                 }
@@ -12197,21 +11576,21 @@ function LoginPage({ onLogin }) {
     };
 
     return (
-        <div className="min-h-screen bg-[#d4c4b7] flex items-center justify-center p-4 font-sans relative overflow-hidden">
-            <div className="absolute inset-0 opacity-10 flex items-center justify-center pointer-events-none"><i className="fa-solid fa-cubes text-[30rem] text-rose-500"></i></div>
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans relative overflow-hidden">
+            <div className="absolute inset-0 opacity-10 flex items-center justify-center pointer-events-none"><i className="fa-solid fa-cubes text-[30rem] text-orange-500"></i></div>
             <div className={`w-full max-w-md rounded-3xl relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-10 shadow-2xl' : ''}`}>
                 {!loading ? (
                     <>
-                        <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
+                        <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-slate-800">Faradela Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
                         <form onSubmit={handleLogin} action="javascript:void(0);" className="space-y-6">
-                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
-                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
-                            <button className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/40 mt-4">MASUK SEKARANG</button>
+                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-orange-500 outline-none transition-colors font-bold text-slate-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
+                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-orange-500 outline-none transition-colors font-bold text-slate-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
+                            <button className="w-full bg-orange-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-orange-600 transition-colors shadow-lg shadow-orange-500/40 mt-4">MASUK SEKARANG</button>
                         </form>
                     </>
                 ) : (
                     <div className="flex items-center justify-center pointer-events-none scale-110">
-                        <img src="/LogoV2.png" alt="Logo" className="w-72 h-72 sm:w-80 sm:h-80 object-contain animate-logo-flip" />
+                        <img src="/duolaigudang/LogoV2.png" alt="Logo" className="w-72 h-72 sm:w-80 sm:h-80 object-contain animate-logo-flip" />
                     </div>
                 )}
             </div>
@@ -12221,4 +11600,3 @@ function LoginPage({ onLogin }) {
 
 
 export default App;
-
