@@ -5637,25 +5637,25 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             playError(); return showToast('error', 'Resi / Chart ini sudah ada dalam daftar.');
         }
 
-        const cartOrders = qcOrders.filter(o => o.cartId === val && o.status === 'PACKED' && o.cartClosed === true);
+        // Scan Cart/Karung — semua status diterima (tidak perlu sudah PACKED)
+        const cartOrders = qcOrders.filter(o => o.cartId === val && o.status !== 'SHIPPED');
         if (cartOrders.length > 0) {
             setStagedList(prev => {
                 const filtered = prev.filter(s => !(s.type === 'RESI' && s.order && s.order.cartId === val));
                 return [...filtered, { type: 'CART', id: val, cartId: val, orders: cartOrders, count: cartOrders.length }];
             });
-            playSuccess(); showToast('success', `âœ… Chart [${val}] masuk daftar.`);
+            playSuccess(); showToast('success', `✅ Chart [${val}] masuk daftar (${cartOrders.length} paket).`);
             return;
         }
 
         const order = qcOrders.find(o => o.id.toUpperCase() === val);
         if (!order) { playError(); return showToast('error', 'Resi tidak dikenali di sistem.'); }
         if (order.status === 'SHIPPED') { playError(); return showToast('error', 'Paket ini sudah dikirim sebelumnya.'); }
-        if (order.status !== 'PACKED') { playError(); return showToast('error', `Paket belum selesai QC! Status: ${order.status}`); }
-        if (order.cartId && order.cartClosed !== true) { playError(); return showToast('error', `Paket ini ada di Keranjang [${order.cartId}] yang BELUM DISELESAIKAN QC-nya!`); }
+        // QC check dihapus — semua status selain SHIPPED bisa masuk ke daftar handover
         if (order.cartId && stagedListRef.current.some(s => s.type === 'CART' && s.cartId === order.cartId)) { playError(); return showToast('error', `Resi ini sudah termasuk dalam Chart [${order.cartId}].`); }
 
         setStagedList(prev => [...prev, { type: 'RESI', id: val, order, count: 1 }]);
-        playSuccess(); showToast('success', `âœ… Resi [${val}] masuk daftar.`);
+        playSuccess(); showToast('success', `✅ Resi [${val}] masuk daftar.`);
     };
 
     const handleScan = async (e) => {
