@@ -1,4 +1,4 @@
-﻿const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
+const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import html2canvas from 'html2canvas';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
@@ -9192,7 +9192,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         groups.forEach((g) => {
             const rowTotal = allSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0);
             rowsHtml += `<tr>`;
-            rowsHtml += `<td style="font-weight:900;font-size:12px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+            if (!articleRendered[g.article]) {
+                const rowspan = articleRowCount[g.article];
+                rowsHtml += `<td rowspan="${rowspan}" style="font-weight:900;font-size:12px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+                articleRendered[g.article] = true;
+            }
             rowsHtml += `<td style="text-align:center;vertical-align:middle;">${colorCell(g.colorName)}</td>`;
             allSizes.forEach(sz => {
                 const qty = g.sizes[sz] || 0;
