@@ -61,7 +61,7 @@ function GlobalConfirmModal() {
                     <i className={`fa-solid ${config.isAlert ? 'fa-circle-exclamation' : 'fa-circle-question'} text-xl`}></i>
                     <h3 className="font-bold text-lg">{config.title}</h3>
                 </div>
-                <div className="p-6 text-slate-700 text-sm whitespace-pre-wrap leading-relaxed font-semibold">
+                <div className="p-4 md:p-6 text-slate-700 text-sm whitespace-pre-wrap leading-relaxed font-semibold">
                     {config.message}
                 </div>
                 <div className="p-4 bg-slate-50 flex gap-3 border-t border-slate-200">
@@ -764,8 +764,8 @@ function App() {
         toastTimeoutRef.current = setTimeout(() => setToast(null), 3500);
     };
 
-    if (isAuthChecking) return <div className="flex h-screen items-center justify-center bg-rose-900 text-rose-500 font-black text-2xl"><i className="fa-solid fa-circle-notch fa-spin mr-3"></i> Memeriksa Sesi...</div>;
-    if (dbError) return <div className="p-6 text-center text-red-600 font-bold">Koneksi Database Gagal. Cek Aturan Firebase.</div>;
+    if (isAuthChecking) return <div className="flex h-screen items-center justify-center bg-rose-900 text-rose-500 font-black text-lg md:text-2xl"><i className="fa-solid fa-circle-notch fa-spin mr-3"></i> Memeriksa Sesi...</div>;
+    if (dbError) return <div className="p-4 md:p-6 text-center text-red-600 font-bold">Koneksi Database Gagal. Cek Aturan Firebase.</div>;
     if (!currentUser) return <LoginPage onLogin={(userObj) => {
         localStorage.setItem('syaren_lastActivity', Date.now().toString());
         setCurrentUser(userObj);
@@ -825,7 +825,7 @@ function App() {
             <GlobalConfirmModal />
             {toast && (
                 <div className={`fixed top-4 right-4 z-[99999] px-5 py-3 rounded-md shadow-2xl flex items-center gap-3 text-rose-950 animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
-                    <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-3xl flex-shrink-0`}></i>
+                    <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-xl md:text-3xl flex-shrink-0`}></i>
                     <div>
                         <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'Peringatan!' : 'Berhasil'}</h4>
                         <p className="text-sm font-semibold mt-0.5 leading-snug">{toast.message}</p>
@@ -834,7 +834,7 @@ function App() {
             )}
 
             <aside className="hidden md:flex flex-col w-64 bg-white text-rose-900 shadow-xl z-20 flex-shrink-0">
-                <div className="flex flex-col items-center justify-center h-16 bg-[#d4c4b7] text-rose-950 font-bold text-sm py-2 border-b border-r border-[#d6909a] flex-shrink-0">
+                <div className="flex flex-col items-center justify-center h-12 md:h-14 bg-[#d4c4b7] text-rose-950 font-bold text-sm py-2 border-b border-r border-[#d6909a] flex-shrink-0">
                     <div className="flex items-center"><img src="/LogoV2.png" alt="Logo" className="w-6 h-6 mr-2 object-contain animate-logo-flip" /> SYAREN MANAGEMENT</div>
                     <div className="text-[10px] text-rose-800 font-normal mt-0 tracking-wider">(Versi 2.0 by Ahmad)</div>
                 </div>
@@ -876,7 +876,7 @@ function App() {
             )}
 
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                {isLoading && <div className="absolute inset-0 bg-white/70 z-50 flex flex-col items-center justify-center font-black text-xl text-rose-500 backdrop-blur-sm"><i className="fa-solid fa-circle-notch fa-spin mb-3 text-3xl"></i> Loading...</div>}
+                {isLoading && <div className="absolute inset-0 bg-white/70 z-50 flex flex-col items-center justify-center font-black text-xl text-rose-500 backdrop-blur-sm"><i className="fa-solid fa-circle-notch fa-spin mb-3 text-xl md:text-3xl"></i> Loading...</div>}
 
                 <header className="flex items-center justify-between h-14 md:h-16 px-4 md:px-6 bg-[#d4c4b7] border-b border-[#d6909a] shadow-sm z-10 no-print">
                     <div className="flex items-center min-w-0">
@@ -1285,14 +1285,14 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                     <h2 className="text-xl font-black text-rose-800"><i className="fa-solid fa-envelope-open-text text-rose-500 mr-2"></i> Pesanan Manual</h2>
                     <p className="text-sm font-semibold text-slate-500">Kelola pesanan dari WA, Endorse, dan lainnya yang tidak memiliki resi marketplace otomatis.</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-6 py-3 rounded-md font-bold transition-all shadow-md shadow-rose-500/30 flex items-center justify-center">
+                <button onClick={() => setShowModal(true)} className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-4 md:px-6 py-3 rounded-md font-bold transition-all shadow-md shadow-rose-500/30 flex items-center justify-center">
                     <i className="fa-solid fa-plus mr-2"></i> Buat Pesanan
                 </button>
             </div>
 
             <div className="flex bg-slate-200/50 p-1.5 rounded-md w-fit">
-                <button onClick={() => setActiveTab('DRAFT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'DRAFT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Draft ({draftList.length})</button>
-                <button onClick={() => setActiveTab('RIWAYAT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'RIWAYAT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Riwayat Proses ({riwayatList.length})</button>
+                <button onClick={() => setActiveTab('DRAFT')} className={`px-4 md:px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'DRAFT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Draft ({draftList.length})</button>
+                <button onClick={() => setActiveTab('RIWAYAT')} className={`px-4 md:px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'RIWAYAT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Riwayat Proses ({riwayatList.length})</button>
             </div>
 
             {activeTab === 'DRAFT' && (
@@ -1302,7 +1302,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                         <span className="text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full"><i className="fa-solid fa-info-circle mr-1"></i> Centang opsi 'Sertakan Pesanan Manual' di menu GRPA untuk memproses data ini.</span>
                     </div>
                     {draftList.length === 0 ? (
-                        <div className="p-10 text-center text-slate-400 font-semibold"><i className="fa-solid fa-inbox text-5xl mb-3 opacity-30 block"></i> Tidak ada draft pesanan manual.</div>
+                        <div className="p-5 md:p-8 text-center text-slate-400 font-semibold"><i className="fa-solid fa-inbox text-xl md:text-3xl md:text-5xl mb-3 opacity-30 block"></i> Tidak ada draft pesanan manual.</div>
                     ) : (
                         <div className="divide-y divide-slate-100">
                             {draftList.map(order => (
@@ -1347,34 +1347,34 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
             {activeTab === 'RIWAYAT' && (
                 <div className="bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
                     {riwayatList.length === 0 ? (
-                        <div className="p-10 text-center text-slate-400 font-semibold"><i className="fa-regular fa-folder-open text-5xl mb-3 opacity-30 block"></i> Tidak ada riwayat pesanan.</div>
+                        <div className="p-5 md:p-8 text-center text-slate-400 font-semibold"><i className="fa-regular fa-folder-open text-xl md:text-3xl md:text-5xl mb-3 opacity-30 block"></i> Tidak ada riwayat pesanan.</div>
                     ) : (
-                        <table className="w-full text-xs md:text-sm text-left text-sm whitespace-nowrap">
+                        <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm whitespace-nowrap">
                             <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 border-b border-slate-200">
                                 <tr>
-                                    <th className="p-4 py-3">ID Pesanan</th>
-                                    <th className="p-4 py-3">Penerima</th>
-                                    <th className="p-4 py-3">Telepon</th>
-                                    <th className="p-4 py-3">Kurir</th>
-                                    <th className="p-4 py-3">Status</th>
-                                    <th className="p-4 py-3 text-right">Aksi</th>
+                                    <th className="p-3 md:p-4 py-3">ID Pesanan</th>
+                                    <th className="p-3 md:p-4 py-3">Penerima</th>
+                                    <th className="p-3 md:p-4 py-3">Telepon</th>
+                                    <th className="p-3 md:p-4 py-3">Kurir</th>
+                                    <th className="p-3 md:p-4 py-3">Status</th>
+                                    <th className="p-3 md:p-4 py-3 text-right">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                                 {riwayatList.map(order => (
                                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-4">
+                                        <td className="p-3 md:p-4">
                                             <div className="font-black text-rose-800">{order.id_pesanan}</div>
                                             <div className="text-[10px] text-slate-400 uppercase mt-0.5">{order.sumber} &bull; {new Date(order.createdAt).toLocaleDateString('id-ID')}</div>
                                         </td>
-                                        <td className="p-4">{order.nama_penerima}</td>
-                                        <td className="p-4 font-mono text-xs">{order.nomor_telepon || '-'}</td>
-                                        <td className="p-4"><span className="bg-rose-50 text-slate-700 px-2 py-1 rounded font-bold text-xs border border-slate-200">{order.ekspedisi}</span></td>
-                                        <td className="p-4">
+                                        <td className="p-3 md:p-4">{order.nama_penerima}</td>
+                                        <td className="p-3 md:p-4 font-mono text-xs">{order.nomor_telepon || '-'}</td>
+                                        <td className="p-3 md:p-4"><span className="bg-rose-50 text-slate-700 px-2 py-1 rounded font-bold text-xs border border-slate-200">{order.ekspedisi}</span></td>
+                                        <td className="p-3 md:p-4">
                                             {order.status === 'direkap' && <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded"><i className="fa-solid fa-server mr-1"></i> Diproses GRPA</span>}
                                             {order.status === 'instan_diproses' && <span className="text-emerald-600 bg-emerald-50 px-2 py-1 rounded"><i className="fa-solid fa-bolt mr-1"></i> Instan (Selesai)</span>}
                                         </td>
-                                        <td className="p-4 text-right">
+                                        <td className="p-3 md:p-4 text-right">
                                             <button onClick={() => handleCetakResiManual(order, variants)} className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-lg font-bold text-xs border border-rose-200 transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak Resi</button>
                                         </td>
                                     </tr>
@@ -1391,9 +1391,9 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                     <div className="bg-white rounded-md shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                             <h3 className="font-black text-lg text-rose-800"><i className="fa-solid fa-pen-to-square text-rose-500 mr-2"></i> Buat Pesanan Manual</h3>
-                            <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                            <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6 font-semibold custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 font-semibold custom-scrollbar">
                             <form id="formPesananManual" onSubmit={handleSimpanDraft}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
                                     {/* Kolom Kiri: Info Konsumen */}
@@ -1506,7 +1506,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         {/* List Produk Terpilih */}
                                         <div className="bg-slate-50 rounded-md border border-slate-200 min-h-[150px] p-3 space-y-2">
                                             {listProduk.length === 0 ? (
-                                                <div className="text-center text-slate-400 text-sm py-10 font-semibold italic">Belum ada produk yang dipilih.</div>
+                                                <div className="text-center text-slate-400 text-sm py-5 md:py-8 font-semibold italic">Belum ada produk yang dipilih.</div>
                                             ) : (
                                                 listProduk.map(item => {
                                                     const varInfo = variants.find(v => v.sku === item.sku || (v.legacySkus || []).includes(item.sku));
@@ -1534,8 +1534,8 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                         <div className="p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
                             <div className="text-sm font-semibold text-slate-500">Total: <span className="font-black text-lg text-rose-800">{listProduk.reduce((a, c) => a + c.qty, 0)} Pcs</span></div>
                             <div className="flex gap-3">
-                                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 rounded-md font-bold text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                                <button form="formPesananManual" type="submit" className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-8 py-3 rounded-md font-bold shadow-md shadow-rose-500/30 transition-all focus:ring-4 focus:ring-rose-500/20">Simpan Draf</button>
+                                <button type="button" onClick={() => setShowModal(false)} className="px-4 md:px-6 py-3 rounded-md font-bold text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
+                                <button form="formPesananManual" type="submit" className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-4 md:px-6 py-3 rounded-md font-bold shadow-md shadow-rose-500/30 transition-all focus:ring-4 focus:ring-rose-500/20">Simpan Draf</button>
                             </div>
                         </div>
                     </div>
@@ -4578,19 +4578,19 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
     const FileBox = ({ title, accept, files, onUpload, onRemove, icon, colorClass, borderClass, bgClass, stats }) => (
         <div className={`border-2 rounded-md p-5 ${borderClass} ${bgClass} relative overflow-hidden flex flex-col h-full`}>
-            <i className={`fa-solid ${icon} absolute -bottom-4 -right-4 text-7xl opacity-5 ${colorClass}`}></i>
+            <i className={`fa-solid ${icon} absolute -bottom-4 -right-4 text-xl md:text-3xl md:text-5xl md:text-7xl opacity-5 ${colorClass}`}></i>
             <div className="relative z-10 flex-1 flex flex-col">
                 <h3 className={`font-black text-lg mb-3 flex items-center gap-2 ${colorClass}`}><i className={`fa-solid ${icon}`}></i> {title}</h3>
                 <input type="file" multiple accept={accept} onChange={onUpload} className="w-full text-xs font-bold text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-black file:bg-white file:shadow-sm cursor-pointer mb-3" />
-                <div className="flex-1 max-h-24 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                <div className="flex-1 max-h-12 md:h-14 md:h-20 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {files.map((f, i) => (
                         <div key={i} className="flex justify-between items-center text-[11px] bg-white/70 p-2 rounded-lg border border-white"><span className="truncate pr-2 font-mono font-bold text-slate-700">{f.name}</span><button onClick={() => onRemove(i)} className="text-rose-500 hover:bg-rose-100 w-5 h-5 rounded flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark"></i></button></div>
                     ))}
                 </div>
                 {stats && (
                     <div className="mt-4 pt-3 border-t border-slate-200/50 flex justify-between items-center">
-                        <div className="text-center w-1/2 border-r border-slate-200/50"><div className={`text-[10px] font-black uppercase ${colorClass} opacity-70`}>Total Resi</div><div className={`text-2xl font-black ${colorClass}`}>{stats.resi}</div></div>
-                        <div className="text-center w-1/2"><div className={`text-[10px] font-black uppercase ${colorClass} opacity-70`}>Total Barang</div><div className={`text-2xl font-black ${colorClass}`}>{stats.pcs}</div></div>
+                        <div className="text-center w-1/2 border-r border-slate-200/50"><div className={`text-[10px] font-black uppercase ${colorClass} opacity-70`}>Total Resi</div><div className={`text-lg md:text-2xl font-black ${colorClass}`}>{stats.resi}</div></div>
+                        <div className="text-center w-1/2"><div className={`text-[10px] font-black uppercase ${colorClass} opacity-70`}>Total Barang</div><div className={`text-lg md:text-2xl font-black ${colorClass}`}>{stats.pcs}</div></div>
                     </div>
                 )}
             </div>
@@ -4599,8 +4599,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
-            <div className="bg-white p-6 md:p-6 rounded-md shadow-xl border border-slate-200 no-print">
-                <div className="mb-4 text-center"><h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-rose-500"></i> Generator Rekapan Pesanan </h2></div>
+            <div className="bg-white p-4 md:p-6 md:p-6 rounded-md shadow-xl border border-slate-200 no-print">
+                <div className="mb-4 text-center"><h2 className="text-xl md:text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-rose-500"></i> Generator Rekapan Pesanan </h2></div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
                     {/* KOTAK SHOPEE SEKARANG MENERIMA PDF (Shopee Seller Centre) */}
                     <FileBox title="Shopee (PDF)" accept=".pdf" files={shopeeFiles} onUpload={handleUploadShopee} onRemove={(i) => setShopeeFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-bag-shopping" colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-50" stats={platformStats?.shopee} />
@@ -4669,9 +4669,9 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             {/* MODAL PREVIEW RESI (FITUR BARU) - TABEL EDITABLE */}
             {showResiPreview && Object.keys(resiPreviews).length > 0 && (
-                <div className="bg-white p-6 md:p-6 rounded-md shadow-xl border border-blue-200 no-print">
+                <div className="bg-white p-4 md:p-6 md:p-6 rounded-md shadow-xl border border-blue-200 no-print">
                     <div className="mb-4 text-center">
-                        <h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2">
+                        <h2 className="text-xl md:text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2">
                             <i className="fa-solid fa-magnifying-glass text-blue-500"></i> Daftar Resi Pesanan
                         </h2>
                         <p className="text-sm text-slate-600">Edit kolom Article, Warna, Size, dan Batas Kirim jika diperlukan sebelum melakukan rekap</p>
@@ -4680,26 +4680,26 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     {/* TAB PLATFORM FILTER & MASS UPDATE */}
                     <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 mb-4 pb-2">
                         <div className="flex overflow-x-auto gap-2 custom-scrollbar max-w-full pb-2 xl:pb-0">
-                            <button onClick={() => setActivePreviewTab('PREV-ALL')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-ALL' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 border-2 border-blue-200 hover:bg-blue-100'}`}>
+                            <button onClick={() => setActivePreviewTab('PREV-ALL')} className={`flex-shrink-0 px-4 md:px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-ALL' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 border-2 border-blue-200 hover:bg-blue-100'}`}>
                                 <i className="fa-solid fa-list mr-2"></i> Semua ({Object.keys(resiPreviews).length})
                             </button>
                             {platformStats?.shopee && platformStats.shopee.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-4 md:px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
                                     <i className="fa-solid fa-bag-shopping mr-2"></i> Shopee ({platformStats.shopee.resi})
                                 </button>
                             )}
                             {platformStats?.tiktok && platformStats.tiktok.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-rose-800 text-white shadow-md' : 'bg-rose-50 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-4 md:px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-rose-800 text-white shadow-md' : 'bg-rose-50 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
                                     <i className="fa-solid fa-music mr-2"></i> TikTok ({platformStats.tiktok.resi})
                                 </button>
                             )}
                             {platformStats?.lazada && platformStats.lazada.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-4 md:px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
                                     <i className="fa-solid fa-heart mr-2"></i> Lazada ({platformStats.lazada.resi})
                                 </button>
                             )}
                             {platformStats?.manual && platformStats.manual.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-MANUAL')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-MANUAL' ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-MANUAL')} className={`flex-shrink-0 px-4 md:px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-MANUAL' ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100'}`}>
                                     <i className="fa-solid fa-file-invoice mr-2"></i> Manual ({platformStats.manual.resi})
                                 </button>
                             )}
@@ -4708,7 +4708,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
                     {/* TABEL DAFTAR RESI EDITABLE */}
                     <div className="overflow-x-auto border border-slate-300 rounded-md mb-4">
-                        <table className="w-full text-xs md:text-sm border-collapse bg-white">
+                        <table className="w-full text-xs md:text-sm text-xs md:text-sm border-collapse bg-white">
                             <thead>
                                 <tr className="bg-blue-50 border-b-2 border-blue-300">
                                     <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 w-40">Nomer Resi</th>
@@ -4732,7 +4732,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                         </div>
                                     </th>
                                     <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 flex-1">Catatan</th>
-                                    <th className="px-4 py-3 text-center font-black text-rose-800 w-20">Qty</th>
+                                    <th className="px-4 py-3 text-center font-black text-rose-800 w-14 md:w-16">Qty</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -4811,10 +4811,10 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
                     {/* TOMBOL AKSI */}
                     <div className="flex gap-3 items-center justify-center flex-wrap">
-                        <button onClick={handleRekapSekarang} disabled={isLoadingLocal} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-black rounded-md shadow-lg transition-transform transform hover:-translate-y-1">
+                        <button onClick={handleRekapSekarang} disabled={isLoadingLocal} className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-black rounded-md shadow-lg transition-transform transform hover:-translate-y-1">
                             <i className="fa-solid fa-chart-pie mr-2"></i> {isLoadingLocal ? 'MEMPROSES...' : 'REKAP SEKARANG'}
                         </button>
-                        <button onClick={() => window.location.reload()} className="flex-1 md:flex-none px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md shadow-md transition-colors">
+                        <button onClick={() => window.location.reload()} className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md shadow-md transition-colors">
                             <i className="fa-solid fa-arrow-rotate-left mr-2"></i> MULAI ULANG
                         </button>
                     </div>
@@ -4826,21 +4826,21 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     <div className="bg-white rounded-md shadow-xl overflow-hidden border border-slate-200">
                         {/* KEMBALI KE DESAIN TAB YANG LAMA (Besar, Icon di Atas) */}
                         <div className="flex overflow-x-auto bg-rose-50 p-2 gap-2 border-b-4 border-slate-200 no-print custom-scrollbar">
-                            <button onClick={() => setActiveTab('PO')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'PO' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
-                                <i className="fa-solid fa-triangle-exclamation text-2xl mb-1"></i> Pesan Bengkel (Online) <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.poList.reduce((a, c) => a + c.missingQty, 0)} Pcs</span>
+                            <button onClick={() => setActiveTab('PO')} className={`flex-1 flex flex-col items-center py-3 px-4 md:px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'PO' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                                <i className="fa-solid fa-triangle-exclamation text-lg md:text-2xl mb-1"></i> Pesan Bengkel (Online) <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.poList.reduce((a, c) => a + c.missingQty, 0)} Pcs</span>
                             </button>
-                            <button onClick={() => setActiveTab('READY')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'READY' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
-                                <i className="fa-solid fa-check-double text-2xl mb-1"></i> Barang Ready <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.readyList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
+                            <button onClick={() => setActiveTab('READY')} className={`flex-1 flex flex-col items-center py-3 px-4 md:px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'READY' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                                <i className="fa-solid fa-check-double text-lg md:text-2xl mb-1"></i> Barang Ready <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.readyList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
-                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-rose-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
-                                <i className="fa-solid fa-circle-question text-2xl mb-1"></i> Tidak Dikenali <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.unrecognizedList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
+                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-3 px-4 md:px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-rose-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                                <i className="fa-solid fa-circle-question text-lg md:text-2xl mb-1"></i> Tidak Dikenali <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.unrecognizedList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
                         </div>
 
-                        <div className={`p-6 bg-slate-50 ${activeTab !== 'READY' && 'hidden'}`}>
+                        <div className={`p-4 md:p-6 bg-slate-50 ${activeTab !== 'READY' && 'hidden'}`}>
                             <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b pb-4 border-slate-300 gap-3 no-print">
                                 <div><h3 className="text-xl font-black text-emerald-700 flex items-center"><i className="fa-solid fa-clipboard-list mr-2"></i> Daftar Barang Siap Ambil (Untuk Picker)</h3></div>
-                                <button onClick={handlePrintPickingList} disabled={analysisResult.readyList.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1">
+                                <button onClick={handlePrintPickingList} disabled={analysisResult.readyList.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 md:px-6 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1">
                                     <i className="fa-solid fa-print mr-2"></i> DOWNLOAD PDF DAFTAR AMBIL
                                 </button>
                             </div>
@@ -4896,11 +4896,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         </div>
 
                         {/* KERTAS PO */}
-                        <div className={`p-6 bg-slate-50 ${activeTab !== 'PO' && 'hidden'}`}>
+                        <div className={`p-4 md:p-6 bg-slate-50 ${activeTab !== 'PO' && 'hidden'}`}>
                             <div className="flex flex-col md:flex-row justify-between items-center mb-4 no-print border-b pb-4 border-slate-300 gap-3">
                                 <h3 className="text-xl font-black text-rose-700 flex items-center"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Daftar Kekurangan (Harus Produksi)</h3>
                                 <div className="flex flex-wrap gap-3 w-full md:w-auto items-center justify-end">
-                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-rose-900 hover:bg-rose-800 text-white px-8 py-3.5 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
+                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-rose-900 hover:bg-rose-800 text-white px-4 md:px-6 py-3.5 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
                                         <i className="fa-solid fa-print mr-2 text-lg"></i> CETAK PESANAN KERTAS
                                     </button>
                                 </div>
@@ -4975,16 +4975,16 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                         <i className="fa-solid fa-tags"></i> Cetak Label
                                     </button>
                                     <button onClick={handleKirimProduksi} disabled={poDrafts.length === 0 || poDraftLoading}
-                                        className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white px-8 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
+                                        className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white px-4 md:px-6 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
                                         {poDraftLoading ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Proses...</> : <><i className="fa-solid fa-paper-plane"></i> Kirim ke Produksi</>}
                                     </button>
                                 </div>
                             </div>
 
                             {analysisResult.poList.length === 0 ? (
-                                <div className="text-center py-16 text-emerald-600"><i className="fa-solid fa-face-smile-beam text-6xl mb-4"></i><h2 className="text-2xl font-black">STOK GUDANG AMAN!</h2><p className="font-bold">Semua pesanan ada di rak.</p></div>
+                                <div className="text-center py-4 md:py-6 md:py-12 text-emerald-600"><i className="fa-solid fa-face-smile-beam text-lg md:text-2xl md:text-4xl md:text-6xl mb-4"></i><h2 className="text-lg md:text-2xl font-black">STOK GUDANG AMAN!</h2><p className="font-bold">Semua pesanan ada di rak.</p></div>
                             ) : (
-                                <div className="overflow-x-auto flex justify-center bg-white p-6 rounded-md border border-slate-200 shadow-inner">
+                                <div className="overflow-x-auto flex justify-center bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-inner">
                                     <div id="print-po-area" className="bg-white w-full max-w-[800px]">
                                         <h2 style={{ fontFamily: "'Times New Roman', serif", textAlign: 'center', color: '#dc2626', textTransform: 'uppercase', fontWeight: '900', fontSize: '22pt', margin: '0 0 10px 0' }}>PESANAN ONLINE SYAREN OFFICIAL</h2>
                                         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -5054,7 +5054,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         </div>
 
                         {/* TAB TIDAK DIKENALI */}
-                        <div className={`p-6 bg-slate-50 ${activeTab !== 'UNREC' && 'hidden'}`}>
+                        <div className={`p-4 md:p-6 bg-slate-50 ${activeTab !== 'UNREC' && 'hidden'}`}>
                             <div className="mb-4 border-b pb-4 border-slate-300 no-print">
                                 <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-circle-question mr-2"></i> SKU Tidak Dikenali</h3>
                                 <p className="text-sm text-slate-500 font-semibold mt-1">Teks SKU di bawah ini <b className="text-rose-500">TIDAK ADA</b> di Master Produk Anda (Mungkin salah ketik di marketplace).</p>
@@ -5071,7 +5071,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                         </div>
                                     </div>
                                 ))}
-                                {analysisResult.unrecognizedList.length === 0 && <div className="text-center py-10 text-slate-400 font-bold">Hebat! Semua data sinkron dengan aplikasi Anda.</div>}
+                                {analysisResult.unrecognizedList.length === 0 && <div className="text-center py-5 md:py-8 text-slate-400 font-bold">Hebat! Semua data sinkron dengan aplikasi Anda.</div>}
                             </div>
                         </div>
                     </div>
@@ -5080,26 +5080,26 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             {/* RIWAYAT PESANAN ONLINE (SPO) - MIRIP MPO */}
             <div className="mt-8 bg-white rounded-md border border-slate-200 shadow-xl overflow-hidden no-print animate-in fade-in slide-in-from-bottom-4 duration-700">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <div className="p-4 md:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-xl text-rose-800 uppercase tracking-widest"><i className="fa-solid fa-clock-rotate-left text-emerald-600 mr-3"></i> Daftar Riwayat Pesanan</h3>
                     <span className={`font-bold px-4 py-1.5 rounded-full text-xs shadow-inner uppercase tracking-wider ${onlineHistory.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}`}>{onlineHistory.length} Batch Tersimpan</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs md:text-sm text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-[10px] border-b-4 border-slate-200">
                             <tr>
-                                <th className="p-6 font-black uppercase tracking-tighter w-48">SESI & TANGGAL</th>
-                                <th className="p-6 font-black uppercase tracking-tighter w-48">INFO BATCH</th>
-                                <th className="p-6 font-black text-center uppercase tracking-tighter">AKSI RESI EKSPEDISI</th>
-                                <th className="p-6 font-black text-center uppercase tracking-tighter">AKSI DOKUMEN PRODUKSI</th>
-                                <th className="p-6 font-black text-right uppercase tracking-tighter w-24">SET</th>
+                                <th className="p-3 md:p-4 md:p-6 font-black uppercase tracking-tighter w-48">SESI & TANGGAL</th>
+                                <th className="p-3 md:p-4 md:p-6 font-black uppercase tracking-tighter w-48">INFO BATCH</th>
+                                <th className="p-3 md:p-4 md:p-6 font-black text-center uppercase tracking-tighter">AKSI RESI EKSPEDISI</th>
+                                <th className="p-3 md:p-4 md:p-6 font-black text-center uppercase tracking-tighter">AKSI DOKUMEN PRODUKSI</th>
+                                <th className="p-3 md:p-4 md:p-6 font-black text-right uppercase tracking-tighter w-12 md:w-14 md:w-20">SET</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {onlineHistory.length === 0 ? (
                                 <tr>
-                                    <td colSpan="5" className="p-12 text-center text-slate-400">
-                                        <i className="fa-solid fa-folder-open text-5xl mb-4 block text-slate-200"></i>
+                                    <td colSpan="5" className="p-5 md:p-10 text-center text-slate-400">
+                                        <i className="fa-solid fa-folder-open text-xl md:text-3xl md:text-5xl mb-4 block text-slate-200"></i>
                                         <p className="font-black text-slate-500 text-lg">BELUM ADA RIWAYAT PESANAN</p>
                                         <p className="text-sm font-bold mt-2">Kirim antrean PO ke produksi untuk menyimpan riwayat di sini.</p>
                                     </td>
@@ -5112,22 +5112,22 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
                                     return (
                                         <tr key={batch.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="p-6">
+                                            <td className="p-3 md:p-4 md:p-6">
                                                 <div className="font-black text-xl text-rose-900 leading-none">SESI {batch.session}</div>
                                                 <div className="text-xs font-bold text-slate-400 mt-2 flex items-center gap-1.5"><i className="fa-regular fa-calendar-check text-emerald-500"></i> {dateDisplay}</div>
                                             </td>
-                                            <td className="p-6">
+                                            <td className="p-3 md:p-4 md:p-6">
                                                 <div className="flex items-center gap-3 mt-2">
-                                                    <div className="text-3xl font-black text-blue-600 leading-none">
+                                                    <div className="text-xl md:text-3xl font-black text-blue-600 leading-none">
                                                         {batch.totalResiAll || '-'} <span className="text-[11px] text-slate-400 uppercase font-bold tracking-widest">Resi</span>
                                                     </div>
-                                                    <div className="text-3xl font-black text-slate-200 leading-none">/</div>
-                                                    <div className="text-3xl font-black text-rose-600 leading-none">
+                                                    <div className="text-xl md:text-3xl font-black text-slate-200 leading-none">/</div>
+                                                    <div className="text-xl md:text-3xl font-black text-rose-600 leading-none">
                                                         {batch.totalPcsAll || '-'} <span className="text-[11px] text-slate-400 uppercase font-bold tracking-widest">Pcs</span>
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="p-6 text-center border-l border-slate-100">
+                                            <td className="p-3 md:p-4 md:p-6 text-center border-l border-slate-100">
                                                 <div className="flex items-center justify-center gap-2 flex-col sm:flex-row">
                                                     <button type="button" title="Cetak Semua Resi (Ready + PO)" onClick={() => handleRePrintResi(batch, 'all')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-print mr-1"></i> SEMUA
@@ -5143,7 +5143,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="p-6 text-center border-l border-slate-100">
+                                            <td className="p-3 md:p-4 md:p-6 text-center border-l border-slate-100">
                                                 <div className="flex items-center justify-center gap-2 flex-col sm:flex-row">
                                                     <button type="button" onClick={() => handleRePrintSPO(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-md border-2 border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
                                                         <i className="fa-solid fa-file-invoice mr-1.5 group-hover:scale-125 transition-transform"></i> SPO
@@ -5153,7 +5153,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                                     </button>
                                                 </div>
                                             </td>
-                                            <td className="p-6 text-right">
+                                            <td className="p-3 md:p-4 md:p-6 text-right">
                                                 <button type="button" onClick={() => handleDeleteHistory(batch.id)} className="w-10 h-10 bg-white border border-rose-100 shadow-sm rounded-md hover:bg-rose-500 hover:text-white text-rose-500 transition-all">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
@@ -5418,16 +5418,16 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             {!activeCart ? (
-                <div className="bg-white p-16 rounded-md border border-slate-200 shadow-2xl text-center">
-                    <i className="fa-solid fa-id-card text-8xl text-rose-500 mb-5 mt-4 animate-bounce"></i>
-                    <h2 className="text-4xl font-black text-rose-800 mb-4">SCAN ID CHART KAMU</h2>
+                <div className="bg-white p-4 md:p-6 md:p-12 rounded-md border border-slate-200 shadow-2xl text-center">
+                    <i className="fa-solid fa-id-card text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl text-rose-500 mb-5 mt-4 animate-bounce"></i>
+                    <h2 className="text-lg md:text-2xl md:text-4xl font-black text-rose-800 mb-4">SCAN ID CHART KAMU</h2>
                     <p className="text-slate-500 font-bold mb-5 text-lg">Silakan scan Barcode ID Chart/Keranjang Anda sebelum memulai QC.</p>
                     <form onSubmit={handleCartSubmit}>
-                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-6 text-3xl font-mono text-center border-2 border-rose-200 focus:border-rose-600 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
+                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-4 md:p-6 text-xl md:text-3xl font-mono text-center border-2 border-rose-200 focus:border-rose-600 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
                     </form>
                 </div>
             ) : !activeOrder ? (
-                <div className="bg-white p-10 rounded-md border-2 border-slate-200 shadow-2xl text-center relative overflow-hidden min-h-[480px]">
+                <div className="bg-white p-5 md:p-8 rounded-md border-2 border-slate-200 shadow-2xl text-center relative overflow-hidden min-h-[480px]">
                     {/* TOMBOL SELESAI QC SAJA (tanpa istirahat) */}
                     <div className="absolute z-10 top-6 right-6 flex gap-2">
                         <button onClick={handleSelesaiQC} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-black py-3 px-5 rounded-md flex items-center gap-2 transition-colors border-2 border-emerald-300 shadow-sm">
@@ -5443,31 +5443,31 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                         {/* FOTO KARYAWAN + UCAPAN SEMANGAT */}
                         {activeEmployee ? (
                             <div className="flex flex-col items-center mb-4">
-                                <div className="w-24 h-28 rounded-md border-2 border-rose-200 overflow-hidden bg-rose-50 shadow-lg mb-3">
+                                <div className="w-12 md:w-14 md:w-20 h-28 rounded-md border-2 border-rose-200 overflow-hidden bg-rose-50 shadow-lg mb-3">
                                     {activeEmployee.foto
                                         ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
-                                        : <div className="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i className="fa-solid fa-user"></i></div>
+                                        : <div className="w-full h-full flex items-center justify-center text-slate-300 text-lg md:text-2xl md:text-4xl"><i className="fa-solid fa-user"></i></div>
                                     }
                                 </div>
-                                <h2 className="text-3xl font-black text-rose-800 mb-1">{activeEmployee.nama}</h2>
+                                <h2 className="text-xl md:text-3xl font-black text-rose-800 mb-1">{activeEmployee.nama}</h2>
                                 <span className="bg-rose-100 text-rose-600 text-xs font-black uppercase px-3 py-1 rounded-full mb-3">{activeEmployee.posisi}</span>
                             </div>
                         ) : (
                             <div className="mb-4">
-                                <i className="fa-solid fa-barcode text-6xl text-rose-500 mb-4 animate-pulse block"></i>
-                                <h2 className="text-4xl font-black text-rose-800 mb-2">TIM QC</h2>
+                                <i className="fa-solid fa-barcode text-lg md:text-2xl md:text-4xl md:text-6xl text-rose-500 mb-4 animate-pulse block"></i>
+                                <h2 className="text-lg md:text-2xl md:text-4xl font-black text-rose-800 mb-2">TIM QC</h2>
                             </div>
                         )}
                         <p className="text-slate-400 font-bold mb-4 uppercase tracking-widest text-xs">Siap Menerima Scan Resi</p>
 
                         {/* STATS ANTREAN */}
                         <div className="flex justify-center gap-3 mb-4">
-                            <div className="bg-rose-50 border-2 border-rose-200 rounded-md px-6 py-3 text-center shadow-sm min-w-[140px]">
-                                <div className="text-3xl font-black text-rose-600">{pendingOrders.length}</div>
+                            <div className="bg-rose-50 border-2 border-rose-200 rounded-md px-4 md:px-6 py-3 text-center shadow-sm min-w-[140px]">
+                                <div className="text-xl md:text-3xl font-black text-rose-600">{pendingOrders.length}</div>
                                 <div className="text-xs font-black text-rose-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-clock-rotate-left mr-1"></i>Antrean QC</div>
                             </div>
-                            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-md px-6 py-3 text-center shadow-sm min-w-[140px]">
-                                <div className="text-3xl font-black text-emerald-600">{qcOrders.filter(o => o.status === 'PACKED' && o.cartId === activeCart).length}</div>
+                            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-md px-4 md:px-6 py-3 text-center shadow-sm min-w-[140px]">
+                                <div className="text-xl md:text-3xl font-black text-emerald-600">{qcOrders.filter(o => o.status === 'PACKED' && o.cartId === activeCart).length}</div>
                                 <div className="text-xs font-black text-emerald-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-box-open mr-1"></i>Selesai QC</div>
                             </div>
                         </div>
@@ -5481,7 +5481,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                 <div className={`p-4 md:p-6 rounded-md border-2 shadow-xl transition-all duration-300 ${isDefectMode ? 'bg-red-50 border-red-500 shadow-red-100' : 'bg-white border-indigo-500 shadow-indigo-100'}`}>
                     <div className="flex justify-between items-start mb-4 border-b pb-6 border-slate-100">
                         <div>
-                            <h3 className="text-3xl font-black flex items-center gap-3">
+                            <h3 className="text-xl md:text-3xl font-black flex items-center gap-3">
                                 {isDefectMode ? <i className="fa-solid fa-triangle-exclamation text-rose-600 animate-bounce"></i> : <i className="fa-solid fa-box-open text-rose-500"></i>}
                                 {activeOrder.id}
                             </h3>
@@ -5605,7 +5605,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
         <div className="max-w-4xl mx-auto space-y-6 relative">
             {showCamera && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                    <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera ({cameraTarget === 'wrong' ? 'Barang Salah' : 'Barang Benar'})</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -5625,15 +5625,15 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                 </div>
             )}
 
-            <div className="bg-rose-900 p-6 rounded-md shadow-xl flex items-center justify-between text-white">
+            <div className="bg-rose-900 p-4 md:p-6 rounded-md shadow-xl flex items-center justify-between text-white">
                 <div>
-                    <h2 className="text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-right-left text-rose-500"></i> Menu Koreksi & Tukar Barang</h2>
+                    <h2 className="text-xl md:text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-right-left text-rose-500"></i> Menu Koreksi & Tukar Barang</h2>
                     <p className="text-slate-400 font-bold mt-2">Untuk Tim Picker: Kembalikan barang yang salah, ambil barang yang benar.</p>
                 </div>
             </div>
             <form onSubmit={handleSwap} className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                <div className="bg-rose-50 p-6 rounded-md border-2 border-rose-200 text-center shadow-sm">
-                    <i className="fa-solid fa-arrow-turn-down text-5xl text-rose-400 mb-4"></i>
+                <div className="bg-rose-50 p-4 md:p-6 rounded-md border-2 border-rose-200 text-center shadow-sm">
+                    <i className="fa-solid fa-arrow-turn-down text-xl md:text-3xl md:text-5xl text-rose-400 mb-4"></i>
                     <h3 className="font-black text-rose-800 text-xl mb-4">1. Scan Barang Salah</h3>
                     <div className="flex gap-2">
                         <input ref={inputWrong} required value={wrongBarcode} onChange={e => setWrongBarcode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRight.current.focus(); } }} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 rounded-md outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
@@ -5641,8 +5641,8 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                     </div>
                     {wrongBarcode && getVariantByFullBarcode(wrongBarcode) && <div className="mt-4 font-bold text-rose-700 bg-rose-200 p-2 rounded-lg">{getVariantByFullBarcode(wrongBarcode).article} - {getVariantByFullBarcode(wrongBarcode).sizeName}</div>}
                 </div>
-                <div className="bg-emerald-50 p-6 rounded-md border-2 border-emerald-200 text-center shadow-sm">
-                    <i className="fa-solid fa-arrow-turn-up text-5xl text-emerald-400 mb-4"></i>
+                <div className="bg-emerald-50 p-4 md:p-6 rounded-md border-2 border-emerald-200 text-center shadow-sm">
+                    <i className="fa-solid fa-arrow-turn-up text-xl md:text-3xl md:text-5xl text-emerald-400 mb-4"></i>
                     <h3 className="font-black text-emerald-800 text-xl mb-4">2. Scan Barang Benar</h3>
                     <div className="flex gap-2">
                         <input ref={inputRight} required value={rightBarcode} onChange={e => setRightBarcode(e.target.value)} className="w-full p-4 border-2 border-emerald-300 focus:border-emerald-600 rounded-md outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
@@ -5865,9 +5865,9 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
         <div className="max-w-4xl mx-auto space-y-6">
             {!isWorking ? (
                 // LAYAR SCAN ID KARYAWAN
-                <div className="bg-white p-16 rounded-md border border-slate-200 shadow-2xl text-center">
-                    <i className="fa-solid fa-id-card text-8xl text-emerald-500 mb-5 mt-4 animate-bounce"></i>
-                    <h2 className="text-4xl font-black text-rose-800 mb-4">HANDOVER KURIR</h2>
+                <div className="bg-white p-4 md:p-6 md:p-12 rounded-md border border-slate-200 shadow-2xl text-center">
+                    <i className="fa-solid fa-id-card text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl text-emerald-500 mb-5 mt-4 animate-bounce"></i>
+                    <h2 className="text-lg md:text-2xl md:text-4xl font-black text-rose-800 mb-4">HANDOVER KURIR</h2>
                     <p className="text-slate-500 font-bold mb-5 text-lg">Scan ID Card karyawan untuk mulai menyerahkan paket ke kurir.</p>
                     <form onSubmit={handleIdSubmit}>
                         <input ref={idInputRef} autoFocus value={idInput} onChange={e => setIdInput(e.target.value)} className="scan-input-big w-full max-w-xl p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-2 border-teal-200 focus:border-teal-600 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN ID KARYAWAN..." />
@@ -5876,14 +5876,14 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             ) : (
                 <div className="space-y-4">
                     {/* HEADER: foto karyawan + tombol aksi */}
-                    <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl flex items-center justify-between gap-3">
+                    <div className="bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-xl flex items-center justify-between gap-3">
                         <div className="flex items-center gap-5">
                             {activeEmployee && (
                                 <>
-                                    <div className="w-16 h-20 rounded-md border-2 border-emerald-200 overflow-hidden bg-rose-50 shadow-md flex-shrink-0">
+                                    <div className="w-12 md:w-14 h-14 md:h-16 rounded-md border-2 border-emerald-200 overflow-hidden bg-rose-50 shadow-md flex-shrink-0">
                                         {activeEmployee.foto
                                             ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
-                                            : <div className="w-full h-full flex items-center justify-center text-slate-300 text-2xl"><i className="fa-solid fa-user"></i></div>
+                                            : <div className="w-full h-full flex items-center justify-center text-slate-300 text-lg md:text-2xl"><i className="fa-solid fa-user"></i></div>
                                         }
                                     </div>
                                     <div>
@@ -5899,7 +5899,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                     {/* OVERLAY KAMERA */}
                     {showCamera && (
                         <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                            <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                            <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-emerald-600"></i> Scan Resi (Continuous)</h3>
                                     <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -5912,14 +5912,14 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                     )}
 
                     {/* INPUT SCAN */}
-                    <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl">
+                    <div className="bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-xl">
                         <p className="text-slate-500 font-bold text-sm mb-3 text-center uppercase tracking-wide">Scan Resi atau ID Karung/Chart</p>
                         <div className="flex gap-3">
                             <form onSubmit={handleScan} className="flex-1">
                                 <input ref={inputRef} autoFocus value={resi} onChange={e => setResi(e.target.value)} className="scan-input-big w-full p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-2 border-slate-300 focus:border-teal-500 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN RESI / ID CHART..." />
                             </form>
-                            <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
-                                <i className="fa-solid fa-camera text-3xl mb-1 text-emerald-400"></i> Kamera
+                            <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-4 md:px-6 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                                <i className="fa-solid fa-camera text-xl md:text-3xl mb-1 text-emerald-400"></i> Kamera
                             </button>
                         </div>
                     </div>
@@ -5927,13 +5927,13 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                     {/* DAFTAR STAGED */}
                     {stagedList.length > 0 ? (
                         <div className="bg-white rounded-md border border-slate-200 shadow-xl overflow-hidden">
-                            <div className="bg-emerald-600 px-6 py-3 flex justify-between items-center">
+                            <div className="bg-emerald-600 px-4 md:px-6 py-3 flex justify-between items-center">
                                 <span className="text-white font-black text-lg"><i className="fa-solid fa-list-check mr-2"></i> Daftar Paket Siap Serah</span>
                                 <span className="bg-white text-emerald-700 font-black px-4 py-1 rounded-full text-sm">{totalStagedPaket} Paket</span>
                             </div>
                             <div className="divide-y divide-slate-100">
                                 {stagedList.map((s, idx) => (
-                                    <div key={idx} className="flex items-center justify-between px-6 py-3 hover:bg-slate-50 transition-colors">
+                                    <div key={idx} className="flex items-center justify-between px-4 md:px-6 py-3 hover:bg-slate-50 transition-colors">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                                                 <i className={`fa-solid ${s.type === 'CART' ? 'fa-boxes-stacked' : 'fa-box'} text-emerald-600`}></i>
@@ -5949,16 +5949,16 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                                     </div>
                                 ))}
                             </div>
-                            <div className="bg-slate-50 px-6 py-3 flex justify-between items-center border-t border-slate-200">
+                            <div className="bg-slate-50 px-4 md:px-6 py-3 flex justify-between items-center border-t border-slate-200">
                                 <span className="text-slate-500 font-bold text-sm">Total Terkirim Hari Ini: <b className="text-emerald-700">{shippedCount} paket</b></span>
-                                <button onClick={handleSelesai} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-3 rounded-md shadow-md flex items-center gap-2 transition-all hover:-translate-y-0.5">
+                                <button onClick={handleSelesai} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 md:px-6 py-3 rounded-md shadow-md flex items-center gap-2 transition-all hover:-translate-y-0.5">
                                     <i className="fa-solid fa-truck-fast"></i> SERAHKAN KE KURIR
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-slate-50 rounded-md border-2 border-dashed border-slate-200 py-12 text-center text-slate-400">
-                            <i className="fa-solid fa-inbox text-5xl mb-3 block opacity-50"></i>
+                        <div className="bg-slate-50 rounded-md border-2 border-dashed border-slate-200 py-5 md:py-10 text-center text-slate-400">
+                            <i className="fa-solid fa-inbox text-xl md:text-3xl md:text-5xl mb-3 block opacity-50"></i>
                             <p className="font-bold">Scan resi atau karung untuk mulai membuat daftar serah.</p>
                             <p className="text-xs mt-1">Daftar akan muncul di sini. Klik SELESAI untuk menyerahkan semua sekaligus.</p>
                         </div>
@@ -6231,7 +6231,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <div className="bg-white p-4 md:p-6 md:p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div>
                     <h2 className="text-xl md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-id-card text-rose-500"></i> Manajemen Karyawan</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Data staf dan pembuatan ID Card Barcode.</p>
@@ -6242,7 +6242,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
             </div>
 
             {showForm && (
-                <div className="bg-slate-50 p-6 md:p-6 rounded-md border-2 border-slate-200 shadow-inner animate-in fade-in zoom-in duration-300">
+                <div className="bg-slate-50 p-4 md:p-6 md:p-6 rounded-md border-2 border-slate-200 shadow-inner animate-in fade-in zoom-in duration-300">
                     <h3 className="text-xl font-black text-rose-800 mb-4 border-b pb-4"><i className="fa-solid fa-user-pen mr-2 text-rose-500"></i> {editId ? 'Edit Data Karyawan' : 'Input Karyawan Baru'}</h3>
                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
@@ -6259,13 +6259,13 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
                                 {form.foto ? (
                                     <img src={form.foto} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-400"><i className="fa-solid fa-camera-retro text-6xl mb-4"></i><p className="text-sm font-bold">Klik untuk upload foto</p></div>
+                                    <div className="flex flex-col items-center justify-center pt-5 pb-6 text-slate-400"><i className="fa-solid fa-camera-retro text-lg md:text-2xl md:text-4xl md:text-6xl mb-4"></i><p className="text-sm font-bold">Klik untuk upload foto</p></div>
                                 )}
                                 <input type="file" className="hidden" accept="image/*" onChange={handlePhotoUpload} />
                             </label>
                         </div>
                         <div className="md:col-span-2 pt-6 border-t border-slate-200">
-                            <button type="submit" className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-8 py-3.5 rounded-md font-black shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
+                            <button type="submit" className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-4 md:px-6 py-3.5 rounded-md font-black shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
                         </div>
                     </form>
                 </div>
@@ -6273,11 +6273,11 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {employees.map(emp => (
-                    <div key={emp.id} className="bg-white p-6 rounded-md border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-rose-300 transition-colors relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
+                    <div key={emp.id} className="bg-white p-4 md:p-6 rounded-md border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-rose-300 transition-colors relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 w-12 md:w-14 md:w-20 h-12 md:h-14 md:h-20 bg-rose-50 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
                         <div className="flex items-start gap-3 mb-4">
-                            <div className="w-20 h-24 rounded-md border-2 border-slate-200 overflow-hidden bg-rose-50 flex-shrink-0 shadow-sm">
-                                {emp.foto ? <img src={emp.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 text-3xl"><i className="fa-solid fa-user"></i></div>}
+                            <div className="w-14 md:w-16 h-12 md:h-14 md:h-20 rounded-md border-2 border-slate-200 overflow-hidden bg-rose-50 flex-shrink-0 shadow-sm">
+                                {emp.foto ? <img src={emp.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xl md:text-3xl"><i className="fa-solid fa-user"></i></div>}
                             </div>
                             <div>
                                 <h3 className="font-black text-rose-800 text-lg leading-tight mb-1">{emp.nama}</h3>
@@ -6294,8 +6294,8 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
                 ))}
 
                 {employees.length === 0 && (
-                    <div className="md:col-span-2 lg:col-span-3 text-center py-16 text-slate-400 bg-white rounded-md border-2 border-dashed border-slate-200">
-                        <i className="fa-solid fa-users-slash text-6xl mb-4 opacity-50"></i>
+                    <div className="md:col-span-2 lg:col-span-3 text-center py-4 md:py-6 md:py-12 text-slate-400 bg-white rounded-md border-2 border-dashed border-slate-200">
+                        <i className="fa-solid fa-users-slash text-lg md:text-2xl md:text-4xl md:text-6xl mb-4 opacity-50"></i>
                         <h3 className="text-xl font-black text-slate-600 mb-1">Belum Ada Data Karyawan</h3>
                         <p className="font-bold text-sm">Klik tombol "Tambah Karyawan" di atas untuk memasukkan data.</p>
                     </div>
@@ -6681,9 +6681,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             </div>
             {showSettings && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-md p-6 w-full max-w-md shadow-2xl relative border-2 border-rose-100">
-                        <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4"><i className="fa-brands fa-whatsapp text-3xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800 text-center mb-4">Pengaturan Laporan WA</h3>
+                    <div className="bg-white rounded-md p-4 md:p-6 w-full max-w-md shadow-2xl relative border-2 border-rose-100">
+                        <div className="w-12 md:w-14 h-12 md:h-14 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4"><i className="fa-brands fa-whatsapp text-xl md:text-3xl"></i></div>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-800 text-center mb-4">Pengaturan Laporan WA</h3>
                         <form onSubmit={saveWaSettings} className="space-y-5">
                             <div>
                                 <label className="block text-sm font-bold text-rose-700 mb-2">Nomor WhatsApp Tujuan</label>
@@ -6741,7 +6741,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                     className="cursor-pointer bg-gradient-to-br from-rose-500 to-rose-600 p-4 md:p-5 rounded-md shadow-md hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-3 group"
                 >
                     <div className="w-12 h-12 md:w-14 md:h-14 rounded-md bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
-                        <i className="fa-solid fa-wallet text-white text-2xl"></i>
+                        <i className="fa-solid fa-wallet text-white text-lg md:text-2xl"></i>
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="text-white/80 text-xs font-black uppercase tracking-widest">Saldo Kas Operasional</div>
@@ -6772,19 +6772,19 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-white border p-4 rounded-md shadow-sm text-center">
-                        <div className="text-2xl md:text-3xl font-black text-slate-400">{qcStats.pending}</div>
+                        <div className="text-lg md:text-2xl md:text-3xl font-black text-slate-400">{qcStats.pending}</div>
                         <div className="text-xs font-bold text-slate-500 uppercase mt-1">Antrean Masuk</div>
                     </div>
                     <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-3xl font-black text-rose-600">{tungguOnline}</div>
+                        <div className="text-xl md:text-3xl font-black text-rose-600">{tungguOnline}</div>
                         <div className="text-xs font-bold text-rose-700 uppercase mt-1">Tunggu Pesanan Online</div>
                     </div>
                     <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-2xl md:text-3xl font-black text-rose-500">{qcStats.packed}</div>
+                        <div className="text-lg md:text-2xl md:text-3xl font-black text-rose-500">{qcStats.packed}</div>
                         <div className="text-xs font-bold text-rose-600 uppercase mt-1">Selesai QC (Siap Kirim)</div>
                     </div>
                     <div className="bg-teal-50 border border-teal-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-3xl font-black text-teal-700">{qcStats.shipped}</div>
+                        <div className="text-xl md:text-3xl font-black text-teal-700">{qcStats.shipped}</div>
                         <div className="text-xs font-bold text-teal-700 uppercase mt-1">Sudah di Kurir</div>
                     </div>
                 </div>
@@ -6799,14 +6799,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             </div>
                         </div>
                         <div className="bg-slate-50 border rounded-md overflow-hidden shadow-inner">
-                            <table className="w-full text-xs md:text-sm text-left bg-white">
+                            <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left bg-white">
                                 <thead className="bg-rose-50 text-slate-700 border-b-2">
                                     <tr>
-                                        <th className="p-4 font-black">No. PO</th>
-                                        <th className="p-4 font-black">Target Selesai</th>
+                                        <th className="p-3 md:p-4 font-black">No. PO</th>
+                                        <th className="p-3 md:p-4 font-black">Target Selesai</th>
                                         {/* KOLOM TERKIRIM DIHAPUS */}
-                                        <th className="p-4 font-black text-center">Progress (Diterima Gudang)</th>
-                                        <th className="p-4 font-black text-center">Status</th>
+                                        <th className="p-3 md:p-4 font-black text-center">Progress (Diterima Gudang)</th>
+                                        <th className="p-3 md:p-4 font-black text-center">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -6817,8 +6817,8 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                         const isArrived = po.status === 'ARRIVED';
                                         return (
                                             <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-4 font-black text-rose-800">{po.id}</td>
-                                                <td className="p-4 font-bold text-slate-600">
+                                                <td className="p-3 md:p-4 font-black text-rose-800">{po.id}</td>
+                                                <td className="p-3 md:p-4 font-bold text-slate-600">
                                                     {(() => {
                                                         const curDate = toLocalDateStr();
                                                         const dt = po.targetDate || curDate;
@@ -6827,13 +6827,13 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                         return dt;
                                                     })()}
                                                 </td>
-                                                <td className="p-4 text-center">
+                                                <td className="p-3 md:p-4 text-center">
                                                     <div className="font-bold text-sm mb-1 text-rose-600">{totalRcvQty} / {totalOrderQty} Pcs</div>
                                                     <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                                                         <div className={`bg-${isArrived ? 'teal-500' : 'rose-500'} h-1.5 rounded-full`} style={{ width: `${Math.round((totalRcvQty / totalOrderQty) * 100) || 0}%` }}></div>
                                                     </div>
                                                 </td>
-                                                <td className="p-4 text-center">
+                                                <td className="p-3 md:p-4 text-center">
                                                     <span className={`bg-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-700 text-xs font-black uppercase px-2 py-1 rounded-md`}>{po.status}</span>
                                                 </td>
                                             </tr>
@@ -6906,12 +6906,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     <div className="flex-1 overflow-y-auto p-2 md:p-6 custom-scrollbar bg-slate-50">
                                         {sessions.length === 0 ? (
                                             <div className="text-center py-20 text-slate-400">
-                                                <i className="fa-solid fa-clock-rotate-left text-5xl mb-4 opacity-20 block"></i>
+                                                <i className="fa-solid fa-clock-rotate-left text-xl md:text-3xl md:text-5xl mb-4 opacity-20 block"></i>
                                                 <p className="font-bold uppercase tracking-widest text-sm">Belum ada aktivitas scan</p>
                                             </div>
                                         ) : (
                                             <div className="bg-white border rounded-md overflow-x-auto custom-scrollbar shadow-sm">
-                                                <table className="w-full text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
+                                                <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
                                                     <thead className="bg-rose-50/50 border-b">
                                                         <tr className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
                                                             <th className="px-2 py-3 md:p-4 font-black">Tanggal</th>
@@ -6963,7 +6963,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                             </div>
                                         </div>
                                         <div className="bg-white border rounded-md overflow-x-auto custom-scrollbar shadow-sm">
-                                            <table className="w-full text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
+                                            <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
                                                 <thead className="sticky top-0 bg-white z-10 shadow-sm border-b">
                                                     <tr className="text-slate-400 text-[10px] sm:text-xs font-black uppercase tracking-widest">
                                                         <th className="pb-3 md:pb-4 font-black px-2">Waktu</th>
@@ -7005,7 +7005,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             {/* FOOTER */}
                             <div className="p-4 bg-slate-50 border-t flex justify-between items-center no-print">
                                 <p className="text-[10px] font-bold text-slate-400 italic">Klik baris atau tombol detail untuk melihat pemecahan per item.</p>
-                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-4 md:px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                             </div>
                         </div>
                     </div>
@@ -7016,11 +7016,11 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             {laporanModal && (
                 <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
                     <div className="bg-white rounded-md w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-                        <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
+                        <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
                             <h3 className="font-black text-xl text-rose-800 flex items-center gap-3"><i className="fa-solid fa-clipboard-list text-emerald-500"></i> Buat Laporan Harian</h3>
                             <button onClick={() => setLaporanModal(false)} className="text-slate-400 hover:text-rose-500 bg-white hover:bg-rose-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm border"><i className="fa-solid fa-xmark"></i></button>
                         </div>
-                        <div className="p-6">
+                        <div className="p-4 md:p-6">
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Waktu Mulai</label>
@@ -7117,13 +7117,13 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     </div>
 
                                     {kasFiltered.length === 0 ? (
-                                        <div className="text-center py-16 text-slate-400">
-                                            <i className="fa-solid fa-wallet text-5xl mb-4 opacity-20 block"></i>
+                                        <div className="text-center py-4 md:py-6 md:py-12 text-slate-400">
+                                            <i className="fa-solid fa-wallet text-xl md:text-3xl md:text-5xl mb-4 opacity-20 block"></i>
                                             <p className="font-bold uppercase tracking-widest text-sm">Tidak ada transaksi di periode ini</p>
                                         </div>
                                     ) : (
                                         <div className="bg-white border rounded-md overflow-hidden shadow-sm">
-                                            <table className="w-full text-xs md:text-sm text-left border-collapse">
+                                            <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse">
                                                 <thead className="bg-slate-50 border-b">
                                                     <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
                                                         <th className="px-3 py-3">Tanggal</th>
@@ -7202,7 +7202,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
                         {/* FOOTER */}
                         <div className="p-4 bg-slate-50 border-t flex justify-end">
-                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-4 md:px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                         </div>
                     </div>
                 </div>
@@ -7352,10 +7352,10 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
     return (
         <div className="space-y-8">
-            <div className={`p-6 rounded-md border-2 shadow-xl transition-colors ${editId ? 'bg-rose-50 border-rose-300' : 'bg-white border-white'}`}>
+            <div className={`p-4 md:p-6 rounded-md border-2 shadow-xl transition-colors ${editId ? 'bg-rose-50 border-rose-300' : 'bg-white border-white'}`}>
                 <div className="flex justify-between items-center border-b border-slate-200 pb-5 mb-5">
-                    <h3 className="text-2xl font-black text-rose-800 flex items-center">
-                        <div className={`w-14 h-14 flex items-center justify-center rounded-md mr-4 text-white shadow-md ${editId ? 'bg-rose-500' : 'bg-rose-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-2xl`}></i></div>
+                    <h3 className="text-lg md:text-2xl font-black text-rose-800 flex items-center">
+                        <div className={`w-14 h-14 flex items-center justify-center rounded-md mr-4 text-white shadow-md ${editId ? 'bg-rose-500' : 'bg-rose-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-lg md:text-2xl`}></i></div>
                         {editId ? 'Edit Master Produk' : 'Input Master Produk Baru'}
                     </h3>
                     {editId && <button type="button" onClick={cancelEdit} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3 rounded-md font-bold shadow-sm transition-colors"><i className="fa-solid fa-xmark mr-2"></i> Batal Edit</button>}
@@ -7376,7 +7376,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Foto SKU (Max 800Kb)</label>
                                     <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-300 border-dashed rounded-md cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-md" /> : <><i className="fa-solid fa-cloud-arrow-up text-5xl mb-4 text-rose-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
+                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-md" /> : <><i className="fa-solid fa-cloud-arrow-up text-xl md:text-3xl md:text-5xl mb-4 text-rose-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
                                         </div>
                                         <input type="file" className="hidden" accept="image/*" onChange={e => {
                                             const file = e.target.files[0];
@@ -7436,7 +7436,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                         </div>
                     </div>
                     <div className="mt-10 pt-8 border-t border-slate-200 flex justify-end">
-                        <button type="submit" className={`w-full md:w-auto px-12 py-3.5 rounded-md font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30'}`}>
+                        <button type="submit" className={`w-full md:w-auto px-5 md:px-10 py-3.5 rounded-md font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30'}`}>
                             <i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-save'} mr-3`}></i> {editId ? 'UPDATE MASTER PRODUK' : 'SIMPAN MASTER PRODUK'}
                         </button>
                     </div>
@@ -7444,14 +7444,14 @@ function UploadProduk({ products, setIsLoading, showToast }) {
             </div>
 
             <div className="bg-white rounded-md border border-slate-200 shadow-lg overflow-hidden">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <div className="p-4 md:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-xl text-rose-800 flex items-center">
                         <i className="fa-solid fa-list-ul text-rose-500 mr-3"></i> Daftar Produk 
                     </h3>
                     <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{products.length} Produk</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs md:text-sm text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-sm border-b-4 border-slate-200">
                             <tr><th className="p-3 md:p-4 font-black uppercase">Detail Produk</th><th className="p-3 md:p-4 font-black uppercase">Harga Beli / Jual</th><th className="p-3 md:p-4 font-black uppercase">Status</th><th className="p-3 md:p-4 font-black text-right uppercase">Aksi</th></tr>
                         </thead>
@@ -7459,7 +7459,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                             {products.map(p => (
                                 <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${!p.isActive ? 'bg-slate-50 opacity-60' : ''}`}>
                                     <td className="p-3 md:p-4 flex items-center gap-5">
-                                        <img src={p.photo} className="w-16 h-16 rounded-md object-cover shadow-md border-2 border-white" />
+                                        <img src={p.photo} className="w-12 md:w-14 h-12 md:h-14 rounded-md object-cover shadow-md border-2 border-white" />
                                         <div><div className="font-black text-rose-900 text-lg">{p.article}</div><div className="text-xs font-mono text-rose-600 font-bold bg-rose-100 px-2 py-1 rounded-md inline-block mt-1">Kode: {p.baseCode}</div></div>
                                     </td>
                                     <td className="p-3 md:p-4">
@@ -7482,7 +7482,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                     </td>
                                 </tr>
                             ))}
-                            {products.length === 0 && <tr><td colSpan="4" className="p-12 text-center text-slate-500 font-bold text-lg"><i className="fa-solid fa-box-open text-4xl block mb-3 text-slate-300"></i> Belum ada master produk.</td></tr>}
+                            {products.length === 0 && <tr><td colSpan="4" className="p-5 md:p-10 text-center text-slate-500 font-bold text-lg"><i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl block mb-3 text-slate-300"></i> Belum ada master produk.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -7764,9 +7764,9 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         <div className="max-w-3xl mx-auto bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-xl relative">
             {unmappedBarcode && (
                 <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-md w-full max-w-lg shadow-2xl relative">
-                        <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-5xl text-rose-500"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800 text-center mb-2">Barcode Terputus!</h3>
+                    <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-lg shadow-2xl relative">
+                        <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-xl md:text-3xl md:text-5xl text-rose-500"></i></div>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-800 text-center mb-2">Barcode Terputus!</h3>
                         <p className="text-slate-600 text-center text-sm mb-4">Sistem mendeteksi label <b>{unmappedBarcode.fullBarcode}</b> menggunakan kode usang (<b>{unmappedBarcode.shortCode}</b>). Pilih barang yang sesuai agar kode ini dapat tersambung kembali selamanya.</p>
                         
                         <div className="mb-4">
@@ -7822,7 +7822,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
             {showCamera && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                    <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -7840,7 +7840,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                     </h2>
                     <p className="text-slate-400 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Item Belum Disimpan</p>
                 </div>
-                <div className={`text-3xl md:text-5xl font-black ${isMasuk ? 'text-teal-400' : 'text-red-400'}`}>{scannedItems.length}</div>
+                <div className={`text-xl md:text-3xl md:text-5xl font-black ${isMasuk ? 'text-teal-400' : 'text-red-400'}`}>{scannedItems.length}</div>
             </div>
 
             <div className="flex flex-col gap-3 mb-5 border-b-4 border-slate-100 pb-5">
@@ -7883,7 +7883,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
                 <div className="flex gap-3 mt-2">
                     <div className="relative flex-1">
-                        <i className="fa-solid fa-barcode absolute left-6 top-5 text-slate-400 text-2xl"></i>
+                        <i className="fa-solid fa-barcode absolute left-6 top-5 text-slate-400 text-lg md:text-2xl"></i>
                         <input
                             ref={inputRef}
                             autoFocus
@@ -7899,8 +7899,8 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                             placeholder="KODE..."
                         />
                     </div>
-                    <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
-                        <i className="fa-solid fa-camera text-3xl mb-1 text-rose-400"></i> Kamera
+                    <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-4 md:px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                        <i className="fa-solid fa-camera text-xl md:text-3xl mb-1 text-rose-400"></i> Kamera
                     </button>
                 </div>
 
@@ -7912,7 +7912,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                     {scannedItems.slice(0, 10).map((item, idx) => (
                         <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-md bg-white shadow-sm animate-in slide-in-from-left-4">
                             <div className="flex items-center gap-3 md:gap-5">
-                                <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
+                                <span className="text-slate-300 font-black text-lg md:text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                 <div>
                                     <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
                                     <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 text-base">{item.variantInfo.sizeName}</span></div>
@@ -7927,7 +7927,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                             + {scannedItems.length - 10} item disembunyikan
                         </div>
                     )}
-                    {scannedItems.length === 0 && <div className="py-16 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Belum ada barang di-scan</span></div>}
+                    {scannedItems.length === 0 && <div className="py-4 md:py-6 md:py-12 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl md:text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Belum ada barang di-scan</span></div>}
                 </div>
             </div>
         </div>
@@ -8101,7 +8101,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
             <div className="max-w-3xl mx-auto bg-white p-4 md:p-6 rounded-md border-2 border-purple-200 shadow-xl relative">
                 {showCamera && (
                     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                        <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-purple-600"></i> Kamera Opname</h3>
                                 <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
@@ -8111,14 +8111,14 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                     </div>
                 )}
 
-                <div className="flex justify-between items-center bg-purple-900 text-white p-6 md:p-6 rounded-md shadow-inner mb-4 relative overflow-hidden">
-                    <i className="fa-solid fa-cloud-arrow-down absolute -right-4 -bottom-4 text-purple-800 text-8xl opacity-40"></i>
+                <div className="flex justify-between items-center bg-purple-900 text-white p-4 md:p-6 md:p-6 rounded-md shadow-inner mb-4 relative overflow-hidden">
+                    <i className="fa-solid fa-cloud-arrow-down absolute -right-4 -bottom-4 text-purple-800 text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl opacity-40"></i>
                     <div className="relative z-10"><h2 className="text-xl md:text-2xl font-black flex items-center gap-3"><i className="fa-solid fa-clipboard-check text-purple-400"></i> Stok Opname</h2><p className="text-purple-200 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Scan Fisik Sementara</p></div>
-                    <div className="text-5xl md:text-6xl font-black text-purple-300 relative z-10">{scannedItems.length}</div>
+                    <div className="text-xl md:text-3xl md:text-5xl md:text-6xl font-black text-purple-300 relative z-10">{scannedItems.length}</div>
                 </div>
 
                 <div className="flex flex-col gap-3 mb-4 border-b-4 border-slate-100 pb-6">
-                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-md font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-2xl"></i> SELESAI SCAN & EVALUASI</button>
+                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-md font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-lg md:text-2xl"></i> SELESAI SCAN & EVALUASI</button>
                     <div className="flex gap-3">
                         <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-md font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
                         <button type="button" onClick={async () => { if (await showConfirm('Hapus semua draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border-2 border-rose-200 rounded-md font-bold flex justify-center items-center gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
@@ -8128,10 +8128,10 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                 <div className="mb-4">
                     <div className="flex gap-3 mt-2">
                         <div className="relative flex-1">
-                            <i className="fa-solid fa-barcode absolute left-6 top-5 text-purple-400 text-2xl"></i>
+                            <i className="fa-solid fa-barcode absolute left-6 top-5 text-purple-400 text-lg md:text-2xl"></i>
                             <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-16 pr-6 py-3.5 text-xl md:text-2xl border-2 border-purple-200 focus:border-purple-500 rounded-md font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner" placeholder="KODE..." />
                         </div>
-                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-3xl mb-1 text-purple-400"></i> Kamera</button>
+                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-4 md:px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-xl md:text-3xl mb-1 text-purple-400"></i> Kamera</button>
                     </div>
                 </div>
 
@@ -8141,7 +8141,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                         {scannedItems.slice(0, 10).map((item, idx) => (
                             <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-md bg-white shadow-sm animate-in slide-in-from-left-4">
                                 <div className="flex items-center gap-3 md:gap-5">
-                                    <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
+                                    <span className="text-slate-300 font-black text-lg md:text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                     <div>
                                         <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
                                         <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 font-black">{item.variantInfo.sizeName}</span></div>
@@ -8150,7 +8150,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                                 <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-md transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
                             </div>
                         ))}
-                        {scannedItems.length === 0 && <div className="py-16 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Mulai scan barang fisik di gudang.</span></div>}
+                        {scannedItems.length === 0 && <div className="py-4 md:py-6 md:py-12 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl md:text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Mulai scan barang fisik di gudang.</span></div>}
                     </div>
                 </div>
             </div>
@@ -8160,23 +8160,23 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
     return (
         <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-md border shadow-sm">
-                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-md font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
+                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-4 md:px-6 py-3 rounded-md font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
                 <div className="flex gap-3 w-full md:w-auto">
-                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-6 py-3 rounded-md font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
-                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-md font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
+                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-4 md:px-6 py-3 rounded-md font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
+                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-4 md:px-6 py-3 rounded-md font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-rose-900 text-white p-6 rounded-md border-2 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-5xl font-black">{totalSystem}</div></div>
-                <div className="bg-rose-500 text-white p-6 rounded-md border-2 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-5xl font-black">{totalScanned}</div></div>
-                <div className={`p-6 rounded-md border-2 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-5xl font-black">{totalDiffAbsolute}</div></div>
+                <div className="bg-rose-900 text-white p-4 md:p-6 rounded-md border-2 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalSystem}</div></div>
+                <div className="bg-rose-500 text-white p-4 md:p-6 rounded-md border-2 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalScanned}</div></div>
+                <div className={`p-4 md:p-6 rounded-md border-2 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalDiffAbsolute}</div></div>
             </div>
 
             <div className="bg-white rounded-md border shadow-lg overflow-hidden">
-                <div className="p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
+                <div className="p-4 md:p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
                 <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
-                    <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
+                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm border-collapse">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
                             <tr><th className="p-3 md:p-4 font-black uppercase">Detail Produk</th><th className="p-3 md:p-4 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-3 md:p-4 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-3 md:p-4 font-black uppercase text-center bg-rose-50">Stok Scan Fisik</th><th className="p-3 md:p-4 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
                         </thead>
@@ -8193,7 +8193,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                                     </tr>
                                 );
                             })}
-                            {(!comparisonResult || comparisonResult.length === 0) && <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                            {(!comparisonResult || comparisonResult.length === 0) && <tr><td colSpan="5" className="p-5 md:p-10 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -8333,8 +8333,8 @@ function CetakLabel({ products, variants, showToast }) {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
-                <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
-                    <h3 className="text-2xl font-black mb-4 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-md"></i> Cari Produk</h3>
+                <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
+                    <h3 className="text-lg md:text-2xl font-black mb-4 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-md"></i> Cari Produk</h3>
                     <div className="space-y-4 mb-4">
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal Cetak Barcode</label>
@@ -8353,24 +8353,24 @@ function CetakLabel({ products, variants, showToast }) {
                                     <div><div className="text-base font-black text-rose-800">{v.article} <span className="text-xs text-rose-500 bg-rose-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-rose-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                 </div>
                                 <div className="flex items-center gap-2 w-full md:w-auto">
-                                    <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-rose-500 bg-slate-50" />
+                                    <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-12 md:w-14 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-rose-500 bg-slate-50" />
                                     <button type="button" onClick={() => addToPrint(v)} className="flex-1 md:flex-none bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-4 py-3 rounded-md font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> CETAK</button>
                                 </div>
                             </div>
                         ))}
                         {filteredVariants.length === 0 && (
-                            <div className="text-center text-sm font-bold text-slate-500 py-10">
-                                <i className="fa-solid fa-box-open text-4xl mb-3 text-slate-300 block"></i>
+                            <div className="text-center text-sm font-bold text-slate-500 py-5 md:py-8">
+                                <i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl mb-3 text-slate-300 block"></i>
                                 {!query ? 'Ketik nama, warna, size, atau scan barcode untuk mencari...' : 'Produk tidak ditemukan. Cek kembali kata kunci Anda.'}
                             </div>
                         )}
                     </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-6 opacity-5 text-slate-400"><i className="fa-solid fa-print text-8xl"></i></div>
+                <div className="bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 md:p-6 opacity-5 text-slate-400"><i className="fa-solid fa-print text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl"></i></div>
                     <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4 relative z-10">
-                        <h3 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean Label</h3>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean Label</h3>
                         <div className="flex items-center gap-3">
                             <button type="button" onClick={() => setPrintList([])} disabled={printList.length === 0} className="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-4 py-2 rounded-md text-xs font-bold transition-colors disabled:opacity-50 border border-red-200"><i className="fa-solid fa-trash-can mr-1"></i> Hapus Semua</button>
                             <span className="text-white font-black bg-rose-500 px-4 py-2 rounded-md text-sm shadow-md">{printList.length} Item</span>
@@ -8386,14 +8386,14 @@ function CetakLabel({ products, variants, showToast }) {
                                 <button type="button" onClick={() => removePrint(idx)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-md transition-colors"><i className="fa-solid fa-xmark text-lg font-black"></i></button>
                             </div>
                         ))}
-                        {printList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
+                        {printList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-5 md:py-8">Pilih produk dari kolom di sebelah kiri</div>}
                     </div>
-                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3.5 rounded-md font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-rose-500/30 relative z-10"><i className="fa-solid fa-print text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
+                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3.5 rounded-md font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-rose-500/30 relative z-10"><i className="fa-solid fa-print text-lg md:text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
                 </div>
             </div>
 
             {/* Pratinjau Visual */}
-            <div className="bg-white p-6 rounded-md border shadow-sm no-print">
+            <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm no-print">
                 <h3 className="text-lg font-bold text-rose-800 mb-4 border-b pb-4 flex items-center gap-2">
                     <i className="fa-solid fa-magnifying-glass text-rose-500 bg-rose-50 p-2 rounded-lg"></i> Pratinjau Desain Stiker (471x215 px)
                 </h3>
@@ -8430,12 +8430,12 @@ function CetakLabel({ products, variants, showToast }) {
                                 </div>
                             )
                         })}
-                        {printList.length > 3 && <div className="flex items-center justify-center px-8 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md text-slate-500 font-bold text-sm">
+                        {printList.length > 3 && <div className="flex items-center justify-center px-4 md:px-6 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md text-slate-500 font-bold text-sm">
                             + {printList.length - 3} Label Lainnya...
                         </div>}
                     </div>
                 ) : (
-                    <p className="text-sm font-medium text-slate-500 py-6 text-center bg-slate-50 rounded-md border border-dashed">Tambahkan produk ke antrean cetak untuk melihat pratinjau stiker.</p>
+                    <p className="text-sm font-medium text-slate-500 py-4 md:py-6 text-center bg-slate-50 rounded-md border border-dashed">Tambahkan produk ke antrean cetak untuk melihat pratinjau stiker.</p>
                 )}
             </div>
         </div>
@@ -8582,9 +8582,9 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
         <div className="space-y-6 relative">
             {showResetModal && (
                 <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl relative">
-                        <button type="button" onClick={() => setShowResetModal(false)} className="absolute top-5 right-5 text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
-                        <h3 className="text-2xl font-black text-rose-600 mb-2"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Reset Data Stok</h3>
+                    <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl relative">
+                        <button type="button" onClick={() => setShowResetModal(false)} className="absolute top-5 right-5 text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-600 mb-2"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Reset Data Stok</h3>
                         <p className="text-slate-600 text-sm mb-4 font-semibold leading-relaxed">Tindakan ini akan <b>menghapus seluruh riwayat transaksi scan</b> (Barang Masuk/Keluar) dan mengembalikan semua stok menjadi 0. <span className="text-emerald-600">Master Produk Anda tidak akan dihapus.</span><br /><br />Masukkan Password Anda untuk memverifikasi.</p>
                         <form onSubmit={handleResetStok} action="javascript:void(0);" className="space-y-4">
                             <input required type="password" placeholder="Masukkan Password Anda..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-200 focus:border-rose-500 outline-none rounded-md font-bold bg-rose-50 focus:bg-white transition-colors" />
@@ -8594,13 +8594,13 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 </div>
             )}
 
-            <div className="bg-rose-900 rounded-md p-6 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-10 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
-                <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
-                <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
+            <div className="bg-rose-900 rounded-md p-4 md:p-6 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-5 md:p-8 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
+                <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-xl md:text-3xl md:text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
+                <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-xl md:text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
                 <div className="px-4 pt-6 md:pt-0 relative z-10">
                     <div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div>
-                    <p className="text-3xl font-black text-rose-400">{formatRp(totalSellValue * (1 - omzetDiscount / 100))}</p>
+                    <p className="text-xl md:text-3xl font-black text-rose-400">{formatRp(totalSellValue * (1 - omzetDiscount / 100))}</p>
                     <div className="mt-3 flex items-center gap-2 bg-rose-800 p-1.5 rounded-lg border border-rose-700/50 w-max relative z-20 shadow-inner">
                         <span className="text-xs font-bold text-rose-300 ml-1">Diskon:</span>
                         <input type="number" min="0" max="100" placeholder="0" value={localDiscount} onChange={e => setLocalDiscount(e.target.value)} className="w-12 bg-rose-950 border border-rose-600 rounded-md text-white text-xs font-bold px-1.5 py-1 outline-none focus:border-rose-400 text-center" />
@@ -8612,16 +8612,16 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
             </div>
 
             <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-md overflow-hidden mt-8'}`}>
-                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-center shrink-0">
+                <div className="p-4 md:p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-center shrink-0">
                     <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-table-list text-rose-500 mr-3"></i> Detail Stok Per Article</h3>
                     <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
                         <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-md font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
                         <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-md font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
-                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-md font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
+                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-4 md:px-6 py-3 rounded-md font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
                     </div>
                 </div>
                 <div className={`overflow-auto custom-scrollbar ${isFullScreenLaporan ? 'flex-1 h-full' : 'pb-4'}`}>
-                    <table className="w-full text-xs md:text-sm text-left text-sm border-collapse min-w-max">
+                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm border-collapse min-w-max">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
                                 <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th>
@@ -8673,7 +8673,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                     </tr>
                                 );
                             })}
-                            {tableRows.length === 0 && <tr><td colSpan={allSizeNames.length + 5} className="text-center p-12 text-slate-500 font-bold text-lg"><i className="fa-solid fa-box-open text-4xl block mb-3 text-slate-300"></i> Belum ada data stok.</td></tr>}
+                            {tableRows.length === 0 && <tr><td colSpan={allSizeNames.length + 5} className="text-center p-5 md:p-10 text-slate-500 font-bold text-lg"><i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl block mb-3 text-slate-300"></i> Belum ada data stok.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -8681,7 +8681,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
             {/* Image Modal */}
             {selectedImage && (
                 <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
                     <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
@@ -8790,9 +8790,9 @@ function PantauStok({ variants, transactions, showToast }) {
         const totalItems = data.reduce((acc, curr) => acc + curr.qty, 0);
         return (
             <div className={`bg-white rounded-md border-2 ${borderClass} overflow-hidden shadow-lg transition-all`}>
-                <div onClick={() => toggleExp(dataKey)} className={`p-6 ${bgClass} flex justify-between items-center cursor-pointer select-none hover:brightness-95 transition-all`}>
-                    <div className="flex items-center gap-5"><div className={`w-14 h-14 rounded-md bg-white shadow-md flex items-center justify-center ${colorClass}`}><i className={`fa-solid ${icon} text-2xl`}></i></div><div><h3 className={`font-black text-2xl ${colorClass}`}>{title}</h3><p className="text-sm font-bold text-slate-600 mt-1">{subtitle} &bull; Sisa: <span className="underline">{totalItems} Pcs</span></p></div></div>
-                    {isExp ? <i className={`fa-solid fa-chevron-up text-2xl ${colorClass}`}></i> : <i className={`fa-solid fa-chevron-down text-2xl ${colorClass}`}></i>}
+                <div onClick={() => toggleExp(dataKey)} className={`p-4 md:p-6 ${bgClass} flex justify-between items-center cursor-pointer select-none hover:brightness-95 transition-all`}>
+                    <div className="flex items-center gap-5"><div className={`w-14 h-14 rounded-md bg-white shadow-md flex items-center justify-center ${colorClass}`}><i className={`fa-solid ${icon} text-lg md:text-2xl`}></i></div><div><h3 className={`font-black text-lg md:text-2xl ${colorClass}`}>{title}</h3><p className="text-sm font-bold text-slate-600 mt-1">{subtitle} &bull; Sisa: <span className="underline">{totalItems} Pcs</span></p></div></div>
+                    {isExp ? <i className={`fa-solid fa-chevron-up text-lg md:text-2xl ${colorClass}`}></i> : <i className={`fa-solid fa-chevron-down text-lg md:text-2xl ${colorClass}`}></i>}
                 </div>
                 {isExp && (
                     <div className="p-5 bg-white max-h-96 overflow-y-auto space-y-3 custom-scrollbar">
@@ -8806,7 +8806,7 @@ function PantauStok({ variants, transactions, showToast }) {
                                 <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-md border-2 shadow-sm text-rose-600">{item.qty} Pcs</span></div>
                             </div>
                         ))}
-                        {data.length === 0 && <div className="text-center py-10 text-slate-400"><i className="fa-solid fa-box-open text-5xl mb-4 opacity-30"></i><p className="font-bold">Stok kategori ini kosong / habis terjual.</p></div>}
+                        {data.length === 0 && <div className="text-center py-5 md:py-8 text-slate-400"><i className="fa-solid fa-box-open text-xl md:text-3xl md:text-5xl mb-4 opacity-30"></i><p className="font-bold">Stok kategori ini kosong / habis terjual.</p></div>}
                     </div>
                 )}
             </div>
@@ -8815,10 +8815,10 @@ function PantauStok({ variants, transactions, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-rose-900 p-6 rounded-md text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="absolute top-0 right-0 p-6 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
-                <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-rose-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
-                <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-3 rounded-md shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
+            <div className="bg-rose-900 p-4 md:p-6 rounded-md text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="absolute top-0 right-0 p-4 md:p-6 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
+                <div className="relative z-10"><h2 className="text-xl md:text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-rose-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
+                <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-4 md:px-6 py-3 rounded-md shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-lg md:text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <CategorySection title="Stok Baru" subtitle="0 s/d 3 Bulan" dataKey="baru" data={inventoryData.baru} colorClass="text-emerald-600" borderClass="border-emerald-200" bgClass="bg-emerald-100" icon="fa-leaf" />
@@ -8906,18 +8906,18 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
         }
     };
 
-    if (currentUser.role !== 'admin') return <div className="p-10 font-bold text-red-500 text-center text-xl bg-red-50 rounded-md border-2 border-red-200">Akses Ditolak. Halaman ini hanya untuk Admin Utama.</div>;
+    if (currentUser.role !== 'admin') return <div className="p-5 md:p-8 font-bold text-red-500 text-center text-xl bg-red-50 rounded-md border-2 border-red-200">Akses Ditolak. Halaman ini hanya untuk Admin Utama.</div>;
 
     return (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-md border shadow-sm">
+            <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm">
                 <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-4">
                     <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-users-gear text-rose-500 mr-2"></i> Manajemen Sub-Akun</h3>
                     <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-4 py-2 rounded-md font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
                 </div>
 
                 {showAdd && (
-                    <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-5 p-6 bg-slate-50 border-2 border-slate-200 rounded-md space-y-5 shadow-inner">
+                    <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-5 p-4 md:p-6 bg-slate-50 border-2 border-slate-200 rounded-md space-y-5 shadow-inner">
                         <div className="grid grid-cols-2 gap-3">
                             <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-md focus:border-rose-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
                             <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-md focus:border-rose-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
@@ -8965,9 +8965,9 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                 </div>
             </div>
 
-            <div className="bg-rose-50 p-6 rounded-md border-2 border-rose-200 h-fit shadow-sm relative overflow-hidden">
-                <i className="fa-solid fa-triangle-exclamation absolute top-5 right-5 text-rose-500 text-8xl opacity-10"></i>
-                <h3 className="text-2xl font-black text-rose-800 mb-3 relative z-10"><i className="fa-solid fa-skull text-rose-600 mr-2"></i> Danger Zone: Reset Data</h3>
+            <div className="bg-rose-50 p-4 md:p-6 rounded-md border-2 border-rose-200 h-fit shadow-sm relative overflow-hidden">
+                <i className="fa-solid fa-triangle-exclamation absolute top-5 right-5 text-rose-500 text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl opacity-10"></i>
+                <h3 className="text-lg md:text-2xl font-black text-rose-800 mb-3 relative z-10"><i className="fa-solid fa-skull text-rose-600 mr-2"></i> Danger Zone: Reset Data</h3>
                 <p className="text-sm text-rose-700 font-semibold mb-4 relative z-10">Tindakan ini akan <b className="uppercase">menghapus seluruh</b> Master Produk dan Riwayat Transaksi secara permanen. Database akan dikosongkan. Masukkan Password Admin Utama untuk memverifikasi.</p>
                 <form onSubmit={handleReset} action="javascript:void(0);" className="space-y-4 relative z-10">
                     <input required type="password" placeholder="Masukkan Password Admin..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 outline-none rounded-md font-bold bg-white" />
@@ -9561,9 +9561,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     return (
         <>
         <div className="space-y-6">
-            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm flex justify-between items-center">
+            <div className="bg-white p-4 md:p-6 md:p-6 rounded-md border shadow-sm flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Manajemen PO Bengkel</h2>
+                    <h2 className="text-lg md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Manajemen PO Bengkel</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Buat Matrix Order, cetak SP dan label barcode</p>
                 </div>
                 {showForm ? (
@@ -9604,11 +9604,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
                 return (
                     <div className="fixed inset-0 bg-rose-900/80 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-md p-6 md:p-6 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-                            <h3 className="text-2xl font-black text-rose-800 mb-2">Preview PO <span className="text-rose-500">{newPoId}</span></h3>
+                        <div className="bg-white rounded-md p-4 md:p-6 md:p-6 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+                            <h3 className="text-lg md:text-2xl font-black text-rose-800 mb-2">Preview PO <span className="text-rose-500">{newPoId}</span></h3>
                             <p className="text-slate-500 font-bold text-sm mb-4 border-b pb-4">Tanggal PO: {poDate} &nbsp;|&nbsp; Target Selesai: {targetDate}</p>
                             <div className="flex-1 overflow-auto bg-slate-50 border rounded-md mb-4 shadow-inner p-2 custom-scrollbar">
-                                <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
+                                <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm border-collapse">
                                     <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                                         <tr>
                                             <th className="p-3 font-black uppercase text-center border-r">Article</th>
@@ -9616,7 +9616,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             {previewSizes.map(sz => (
                                                 <th key={sz} className="p-3 text-center border-r font-black uppercase text-rose-600 w-12">{sz}</th>
                                             ))}
-                                            <th className="p-3 text-center font-black uppercase bg-rose-100 text-blue-900 w-24">Total</th>
+                                            <th className="p-3 text-center font-black uppercase bg-rose-100 text-blue-900 w-12 md:w-14 md:w-20">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -9661,7 +9661,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                                     </td>
                                                 );
                                             })}
-                                            <td className="p-3 text-center text-rose-700 bg-rose-200 text-2xl border-t-2 border-rose-300">
+                                            <td className="p-3 text-center text-rose-700 bg-rose-200 text-lg md:text-2xl border-t-2 border-rose-300">
                                                 {previewGroups.reduce((acc, g) => acc + previewSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0), 0)}
                                             </td>
                                         </tr>
@@ -9669,8 +9669,8 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                 </table>
                             </div>
                             <div className="flex gap-3">
-                                <button onClick={() => setPreviewModal(false)} className="flex-1 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md transition-colors">KEMBALI KE DRAFT</button>
-                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-md transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
+                                <button onClick={() => setPreviewModal(false)} className="flex-1 px-4 md:px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md transition-colors">KEMBALI KE DRAFT</button>
+                                <button onClick={handleSaveMPO} className="flex-1 px-4 md:px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-md transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
                             </div>
                         </div>
                     </div>
@@ -9738,8 +9738,8 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                 </div>
                             )})}
                             {filteredVariants.length === 0 && (
-                                <div className="text-center text-sm font-bold text-slate-500 py-10">
-                                    <i className="fa-solid fa-box-open text-4xl mb-3 text-slate-300 block"></i>
+                                <div className="text-center text-sm font-bold text-slate-500 py-5 md:py-8">
+                                    <i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl mb-3 text-slate-300 block"></i>
                                     {!query ? 'Ketik nama, warna, size, atau scan barcode untuk mencari...' : 'Produk tidak ditemukan.'}
                                 </div>
                             )}
@@ -9747,7 +9747,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                     </div>
 
                     <div className="bg-white p-4 sm:p-6 rounded-md sm:rounded-md border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
+                        <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-lg md:text-2xl md:text-4xl md:text-6xl sm:text-8xl"></i></div>
                         <div className="flex justify-between items-center mb-3 sm:mb-4 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
                             <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
                             <div className="flex gap-1 sm:gap-2 items-center">
@@ -9769,7 +9769,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     </div>
                                 </div>
                             ))}
-                            {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
+                            {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-5 md:py-8">Pilih produk dari kolom di sebelah kiri</div>}
                         </div>
                         <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-3.5 rounded-md sm:rounded-md font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
                     </div>
@@ -9782,7 +9782,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                     <span className="bg-blue-200 text-blue-900 font-black px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm shadow-inner">{mpoOrders.length} PO</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-xs md:text-sm text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-[10px] sm:text-sm border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
                                 <th className="p-3 sm:p-5 font-black uppercase">No. PO</th>
@@ -9827,7 +9827,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     </tr>
                                 )
                             })}
-                            {mpoOrders.length === 0 && <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold text-lg"><i className="fa-solid fa-file-invoice text-4xl block mb-3 opacity-30"></i> Belum ada pesanan pabrik.</td></tr>}
+                            {mpoOrders.length === 0 && <tr><td colSpan="4" className="p-5 md:p-10 text-center text-slate-400 font-bold text-lg"><i className="fa-solid fa-file-invoice text-lg md:text-2xl md:text-4xl block mb-3 opacity-30"></i> Belum ada pesanan pabrik.</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -9837,7 +9837,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             {/* Image Modal */}
             {selectedImage && (
                 <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
-                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
                     <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
@@ -10228,10 +10228,10 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                             <h3 className="font-black text-rose-800 text-lg">Audit Pesanan Online</h3>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-tight">{article} | Sesi {session} | {new Date(poDate).toLocaleDateString('id-ID')}</p>
                         </div>
-                        <button onClick={() => setAuditModal(null)} className="text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                        <button onClick={() => setAuditModal(null)} className="text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                        <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
+                        <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm border-collapse">
                             <thead className="sticky top-0 bg-rose-50 text-slate-600 font-bold border-b border-slate-200">
                                 <tr>
                                     <th className="p-3">No. Resi / Order</th>
@@ -10438,7 +10438,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
     const mpoToDisplay = filteredMpo.filter(o => o.status === 'OPEN' || o.status === 'SHIPPED');
 
     return (
-        <div className="bg-white p-6 rounded-md border shadow-sm mb-4 no-print animate-in zoom-in duration-300">
+        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm mb-4 no-print animate-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-industry text-rose-600 mr-2"></i> Target Produksi {activeTab === 'lery' ? "Lery's Workshop (F01)" : 'Pak Samin (F07)'}</h3>
                 {(dashView === 'ONLINE' || dashView === 'PO') && (
@@ -10451,11 +10451,11 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             <div className="grid grid-cols-2 gap-3 mb-4">
                 <div onClick={() => setDashView('PO')} className={`cursor-pointer p-4 rounded-md border-2 transition-all ${dashView === 'PO' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa PO Bengkel</div>
-                    <div className="text-3xl font-black text-rose-600 mt-1">{pendingPO} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
+                    <div className="text-xl md:text-3xl font-black text-rose-600 mt-1">{pendingPO} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
                 </div>
                 <div onClick={() => setDashView('ONLINE')} className={`cursor-pointer p-4 rounded-md border-2 transition-all ${dashView === 'ONLINE' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa Online (Prioritas)</div>
-                    <div className="text-3xl font-black text-rose-600 mt-1">{pendingOnline} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
+                    <div className="text-xl md:text-3xl font-black text-rose-600 mt-1">{pendingOnline} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
                 </div>
             </div>
 
@@ -10700,7 +10700,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                 </div>
                             );
                         })}
-                        {Object.keys(onlineBySession).length === 0 && <div className="text-center p-6 text-slate-400 font-bold border-2 border-dashed border-slate-300 rounded-md">Mantap! Tidak ada antrean prioritas Online saat ini.</div>}
+                        {Object.keys(onlineBySession).length === 0 && <div className="text-center p-4 md:p-6 text-slate-400 font-bold border-2 border-dashed border-slate-300 rounded-md">Mantap! Tidak ada antrean prioritas Online saat ini.</div>}
                     </div>
                 </div>
             )}
@@ -11529,7 +11529,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* Modal Scanner */}
             {showScanner && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                    <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2">
                                 <i className="fa-solid fa-camera text-rose-500"></i> {scannerLabel}
@@ -11552,8 +11552,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             )}
 
             {/* Header Pilihan Bengkel */}
-            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm">
-                <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Produksi Bengkel</h2>
+            <div className="bg-white p-4 md:p-6 md:p-6 rounded-md border shadow-sm">
+                <h2 className="text-lg md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Produksi Bengkel</h2>
                 <p className="text-slate-500 font-bold text-sm mt-1">Pilih Bengkel Pengirim atau Bagian Penerima Gudang.</p>
 
                 <div className="flex gap-2 mt-5 border-b border-slate-100 overflow-x-auto custom-scrollbar">
@@ -11575,13 +11575,13 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* ============ TAB BENGKEL (PENGIRIM) ============ */}
             {(activeTab === 'lery' || activeTab === 'samin') && (
                 !activeSender ? (
-                    <div className="bg-white p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
-                        <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${activeTab === 'lery' ? 'bg-rose-100 text-rose-500' : 'bg-rose-100 text-rose-500'}`}><i className="fa-solid fa-id-card text-5xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800">Scan ID Card {activeTab === 'lery' ? "Lery's Workshop" : 'Pak Samin'}</h3>
+                    <div className="bg-white p-4 md:p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
+                        <div className={`w-12 md:w-14 md:w-20 h-12 md:h-14 md:h-20 mx-auto rounded-full flex items-center justify-center ${activeTab === 'lery' ? 'bg-rose-100 text-rose-500' : 'bg-rose-100 text-rose-500'}`}><i className="fa-solid fa-id-card text-xl md:text-3xl md:text-5xl"></i></div>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-800">Scan ID Card {activeTab === 'lery' ? "Lery's Workshop" : 'Pak Samin'}</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai pengiriman.</p>
                         <form onSubmit={handleScanSenderId} className="flex gap-2">
                             <input ref={senderIdRef} type="text" placeholder="Scan ID Card..." value={senderIdInput} onChange={e => setSenderIdInput(e.target.value)} className={`flex-1 p-4 border-2 rounded-md font-bold outline-none text-center text-lg ${activeTab === 'lery' ? 'border-rose-300 bg-rose-50 focus:border-rose-500' : 'border-rose-300 bg-rose-50 focus:border-rose-500'}`} autoFocus />
-                            <button type="submit" className={`px-6 py-3 text-white rounded-md font-black text-lg ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
+                            <button type="submit" className={`px-4 md:px-6 py-3 text-white rounded-md font-black text-lg ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
                         <button onClick={() => openScanner('senderId', `Scan ID Card ${activeTab === 'lery' ? 'Lery' : 'Samin'}`)} className="w-full py-3 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-md font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
@@ -11589,14 +11589,14 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-clipboard-check mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Form Kirim {activeTab === 'lery' ? '(Lery)' : '(Samin)'}</h3>
                                 <button onClick={() => { setActiveSender(null); setScannedItemsPengirim({}); setScannedTypePengirim({}); }} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Pengirim</button>
                             </div>
 
                             <div className={`border-2 p-4 rounded-md flex items-center gap-3 ${activeTab === 'lery' ? 'bg-rose-50 border-rose-200' : 'bg-rose-50 border-rose-200'}`}>
-                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl flex-shrink-0 ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-500'}`}><i className="fa-solid fa-user-check"></i></div>
+                                <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-lg md:text-2xl flex-shrink-0 ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-500'}`}><i className="fa-solid fa-user-check"></i></div>
                                 <div>
                                     <div className="font-black text-rose-800 text-lg">{activeSender.nama}</div>
                                     <div className={`text-xs font-bold uppercase ${activeTab === 'lery' ? 'text-rose-600' : 'text-rose-600'}`}>{activeSender.posisi} &bull; ID: {activeSender.idKaryawan}</div>
@@ -11614,7 +11614,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     <button type="submit" className={`px-5 py-3 text-white rounded-md font-black ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
                                 <button onClick={() => openScanner('itemsPengirim', 'Scan Barcode Barang')} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
-                                    <i className="fa-solid fa-camera text-2xl text-slate-300"></i>
+                                    <i className="fa-solid fa-camera text-lg md:text-2xl text-slate-300"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
                                         <div className="text-sm">SCAN BARCODE HP</div>
@@ -11626,7 +11626,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             </button>
                         </div>
 
-                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col">
                             <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-boxes-stacked mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Barang Ter-scan</h3>
                                 <span className={`text-white font-black px-4 py-1.5 rounded-md text-sm ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}>{Object.values(scannedItemsPengirim).reduce((a, b) => a + b, 0)} Pcs</span>
@@ -11658,12 +11658,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     <i className="fa-solid fa-minus"></i>
                                                 </button>
                                                 <div className="text-right">
-                                                    <span className="font-black text-2xl text-rose-800">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
+                                                    <span className="font-black text-lg md:text-2xl text-rose-800">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
                                                 </div>
                                             </div>
                                         </div>
                                     );
-                                }) : <div className="text-center text-slate-400 font-bold py-16"><i className="fa-solid fa-barcode text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
+                                }) : <div className="text-center text-slate-400 font-bold py-4 md:py-6 md:py-12"><i className="fa-solid fa-barcode text-lg md:text-2xl md:text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
                             </div>
                         </div>
                     </div>
@@ -11673,13 +11673,13 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* ============ TAB PENERIMA SYAREN ============ */}
             {activeTab === 'faradela' && (
                 !activeReceiver ? (
-                    <div className="bg-white p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
-                        <div className="w-24 h-24 mx-auto bg-blue-100 rounded-full flex items-center justify-center"><i className="fa-solid fa-id-card text-blue-600 text-5xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800">Scan ID Card Penerima</h3>
+                    <div className="bg-white p-4 md:p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
+                        <div className="w-12 md:w-14 md:w-20 h-12 md:h-14 md:h-20 mx-auto bg-blue-100 rounded-full flex items-center justify-center"><i className="fa-solid fa-id-card text-blue-600 text-xl md:text-3xl md:text-5xl"></i></div>
+                        <h3 className="text-lg md:text-2xl font-black text-rose-800">Scan ID Card Penerima</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai penerimaan barang.</p>
                         <form onSubmit={handleScanReceiverId} className="flex gap-2">
                             <input ref={receiverIdRef} type="text" placeholder="Scan ID Card..." value={receiverIdInput} onChange={e => setReceiverIdInput(e.target.value)} className="flex-1 p-4 border-2 border-blue-300 rounded-md font-bold bg-blue-50 outline-none focus:border-blue-500 text-center text-lg" autoFocus />
-                            <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-md font-black text-lg"><i className="fa-solid fa-arrow-right"></i></button>
+                            <button type="submit" className="px-4 md:px-6 py-3 bg-blue-600 text-white rounded-md font-black text-lg"><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
                         <button onClick={() => openScanner('receiverId', 'Scan ID Card Penerima')} className="w-full py-3 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-md font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
@@ -11687,7 +11687,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                     </div>
                 ) : activeDraft ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-barcode text-blue-600 mr-2"></i>Verifikasi: {activeDraft.id}</h3>
                                 <button onClick={() => { setActiveDraft(null); setScannedItemsPenerima({}); setDraftConfirmed(false); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
@@ -11706,7 +11706,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     <button type="submit" className="px-5 py-3 bg-blue-600 text-white rounded-md font-black"><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
                                 <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang')} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
-                                    <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
+                                    <i className="fa-solid fa-camera text-lg md:text-2xl text-rose-400"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
                                         <div className="text-sm">SCAN BARCODE HP</div>
@@ -11734,7 +11734,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 </button>
                             </div>
                         </div>
-                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col">
                             <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-list-check text-blue-600 mr-2"></i>Cek Barang</h3>
                                 <span className="bg-blue-600 text-white font-black px-4 py-1.5 rounded-md text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
@@ -11758,7 +11758,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     </button>
                                                 )}
                                                 <div className="text-right">
-                                                    <span className={`font-black text-2xl ${full ? 'text-teal-600' : 'text-rose-800'}`}>{scanned}</span><span className="text-slate-400 font-bold">/{expected}</span>
+                                                    <span className={`font-black text-lg md:text-2xl ${full ? 'text-teal-600' : 'text-rose-800'}`}>{scanned}</span><span className="text-slate-400 font-bold">/{expected}</span>
                                                     {full && <div><i className="fa-solid fa-check-circle text-teal-500 text-sm"></i></div>}
                                                 </div>
                                             </div>
@@ -11771,7 +11771,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 ) : isDirectScanMode ? (
                     // ===== MODE SCAN LANGSUNG (TANPA SURAT JALAN) =====
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-bolt text-teal-600 mr-2"></i>Penerimaan Langsung</h3>
                                 <button onClick={() => { setIsDirectScanMode(false); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
@@ -11790,7 +11790,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     <button type="submit" disabled={directScanDone} className="px-5 py-3 bg-teal-600 disabled:bg-slate-300 text-white rounded-md font-black"><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
                                 <button onClick={() => openScanner('itemsPenerima', 'Scan Barang Masuk Gudang')} disabled={directScanDone} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 disabled:bg-slate-300 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
-                                    <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
+                                    <i className="fa-solid fa-camera text-lg md:text-2xl text-rose-400"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
                                         <div className="text-sm">SCAN BARCODE HP</div>
@@ -11812,7 +11812,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 </button>
                             </div>
                         </div>
-                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                        <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col">
                             <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-boxes-stacked text-teal-600 mr-2"></i>Barang Ter-scan</h3>
                                 <span className="bg-teal-600 text-white font-black px-4 py-1.5 rounded-md text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
@@ -11847,12 +11847,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     </button>
                                                 )}
                                                 <div className="text-right">
-                                                    <span className="font-black text-2xl text-teal-600">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
+                                                    <span className="font-black text-lg md:text-2xl text-teal-600">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
                                                 </div>
                                             </div>
                                         </div>
                                     );
-                                }) : <div className="text-center text-slate-400 font-bold py-16"><i className="fa-solid fa-barcode text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
+                                }) : <div className="text-center text-slate-400 font-bold py-4 md:py-6 md:py-12"><i className="fa-solid fa-barcode text-lg md:text-2xl md:text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
                             </div>
                         </div>
                     </div>
@@ -11876,8 +11876,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                         </div>
                         <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                             {allDraftSJs.length === 0 && (
-                                <div className="text-center p-10 bg-white rounded-md border shadow-sm text-slate-400">
-                                    <i className="fa-regular fa-folder-open text-5xl mb-3 block"></i>
+                                <div className="text-center p-5 md:p-8 bg-white rounded-md border shadow-sm text-slate-400">
+                                    <i className="fa-regular fa-folder-open text-xl md:text-3xl md:text-5xl mb-3 block"></i>
                                     <h3 className="text-base font-bold">Belum Ada Surat Jalan Masuk</h3>
                                     <p className="text-xs mt-1">Minta tim Bengkel mengirim barang via tab Lery/Samin, atau gunakan tombol <b>Scan Langsung</b> di atas.</p>
                                 </div>
@@ -12080,24 +12080,24 @@ function KasOperasional({ showToast }) {
     return (
         <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in zoom-in duration-300">
             {/* Header & Papan Saldo */}
-            <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
+            <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
                 <div>
-                    <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-wallet text-rose-500"></i> Kas Operasional</h2>
+                    <h2 className="text-lg md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-wallet text-rose-500"></i> Kas Operasional</h2>
                 </div>
-                <button onClick={copyToWA} className="w-full md:w-auto bg-emerald-500 text-white px-6 py-3.5 rounded-md font-black text-sm hover:bg-emerald-600 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30">
+                <button onClick={copyToWA} className="w-full md:w-auto bg-emerald-500 text-white px-4 md:px-6 py-3.5 rounded-md font-black text-sm hover:bg-emerald-600 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30">
                     <i className="fa-brands fa-whatsapp text-xl mr-2"></i> COPY FORMAT WA
                 </button>
             </div>
 
-            <div className={`p-6 rounded-md shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-rose-900'}`}>
-                <i className="fa-solid fa-coins absolute -right-4 -bottom-4 text-8xl opacity-20"></i>
+            <div className={`p-4 md:p-6 rounded-md shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-rose-900'}`}>
+                <i className="fa-solid fa-coins absolute -right-4 -bottom-4 text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl opacity-20"></i>
                 <p className="text-sm opacity-90 uppercase tracking-widest mb-1 text-rose-400">Sisa Saldo Saat Ini</p>
-                <h3 className="text-5xl font-black">Rp {sisaSaldo.toLocaleString('id-ID')}</h3>
+                <h3 className="text-xl md:text-3xl md:text-5xl font-black">Rp {sisaSaldo.toLocaleString('id-ID')}</h3>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Form Input */}
-                <div className="bg-white p-6 rounded-md border shadow-sm h-fit">
+                <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm h-fit">
                     <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-pen-to-square mr-2 text-rose-500"></i> Catat Transaksi</h4>
                     <form onSubmit={handleSimpan} className="space-y-4">
                         <div>
@@ -12150,7 +12150,7 @@ function KasOperasional({ showToast }) {
                 </div>
 
                 {/* Riwayat */}
-                <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
+                <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
                     <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-list-check mr-2 text-rose-500"></i> Riwayat Tanggal: <span className="text-rose-500">{tanggal}</span></h4>
                     <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
                         {dataHariIni.map((item) => (
@@ -12204,9 +12204,9 @@ function KasOperasional({ showToast }) {
                         </div>
                     </div>
 
-                    <div className="p-6 pb-12 bg-black flex justify-center items-center">
-                        <button onClick={jepretFoto} className="w-20 h-20 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-rose-600">
-                            <i className="fa-solid fa-camera text-3xl text-white"></i>
+                    <div className="p-4 md:p-6 pb-12 bg-black flex justify-center items-center">
+                        <button onClick={jepretFoto} className="w-14 md:w-16 h-14 md:h-16 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-rose-600">
+                            <i className="fa-solid fa-camera text-xl md:text-3xl text-white"></i>
                         </button>
                     </div>
 
@@ -12239,11 +12239,11 @@ function LoginPage({ onLogin }) {
             } catch (authError) {
                 // Jika akun belum ada, otomatis buatkan (Khusus Admin)
                 if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-login-credentials' || authError.code === 'auth/invalid-credential') {
-                    if (username === 'minsyaren' && password === '913765@Why') {
+                    if (username === 'minsyaren' && password === 'Syaren@2026') {
                         await firebase.auth().createUserWithEmailAndPassword(emailFormat, password);
 
                         // PERBAIKAN FINAL: Gunakan variabel 'db' langsung bawaan aplikasi Anda!
-                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: '913765@Why', role: 'admin', access: [] });
+                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: 'Syaren@2026', role: 'admin', access: [] });
 
                         showAlert('✅ Akun Berhasil Terdaftar! Silakan klik MASUK SEKARANG sekali lagi.', 'Informasi');
                         setLoading(false);
@@ -12278,10 +12278,10 @@ function LoginPage({ onLogin }) {
     return (
         <div className="min-h-screen bg-[#d4c4b7] flex items-center justify-center p-4 font-sans relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 flex items-center justify-center pointer-events-none"><i className="fa-solid fa-cubes text-[30rem] text-rose-500"></i></div>
-            <div className={`w-full max-w-md rounded-md relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-10 shadow-2xl' : ''}`}>
+            <div className={`w-full max-w-md rounded-md relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-5 md:p-8 shadow-2xl' : ''}`}>
                 {!loading ? (
                     <>
-                        <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
+                        <div className="text-center mb-10"><div className="w-14 md:w-16 h-14 md:h-16 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-xl md:text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
                         <form onSubmit={handleLogin} action="javascript:void(0);" className="space-y-6">
                             <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
                             <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
