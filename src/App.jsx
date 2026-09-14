@@ -3,6 +3,80 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import html2canvas from 'html2canvas';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
 
+
+// ==========================================
+// GLOBAL CUSTOM CONFIRM & ALERT MODAL (SYAREN)
+// ==========================================
+let globalConfirmCallback = null;
+
+const showConfirm = (message, title = "Konfirmasi") => {
+    return new Promise((resolve) => {
+        if (globalConfirmCallback) {
+            globalConfirmCallback(message, title, false, resolve);
+        } else {
+            resolve(window.confirm(message));
+        }
+    });
+};
+
+const showAlert = (message, title = "Informasi") => {
+    return new Promise((resolve) => {
+        if (globalConfirmCallback) {
+            globalConfirmCallback(message, title, true, resolve);
+        } else {
+            window.alert(message);
+            resolve(true);
+        }
+    });
+};
+
+function GlobalConfirmModal() {
+    const [isOpen, setIsOpen] = React.useState(false);
+    const [config, setConfig] = React.useState({ message: '', title: '', isAlert: false });
+    const resolveRef = React.useRef(null);
+
+    React.useEffect(() => {
+        globalConfirmCallback = (message, title, isAlert, resolve) => {
+            setConfig({ message, title, isAlert });
+            resolveRef.current = resolve;
+            setIsOpen(true);
+        };
+        return () => { globalConfirmCallback = null; };
+    }, []);
+
+    const handleClose = (result) => {
+        setIsOpen(false);
+        if (resolveRef.current) {
+            resolveRef.current(result);
+            resolveRef.current = null;
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white w-full max-w-sm rounded-md shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className={`text-white p-4 flex items-center gap-3 ${config.isAlert ? (config.title.toLowerCase().includes('gagal') || config.title.toLowerCase().includes('error') ? 'bg-rose-600' : 'bg-slate-700') : 'bg-rose-900'}`}>
+                    <i className={`fa-solid ${config.isAlert ? 'fa-circle-exclamation' : 'fa-circle-question'} text-xl`}></i>
+                    <h3 className="font-bold text-lg">{config.title}</h3>
+                </div>
+                <div className="p-6 text-slate-700 text-sm whitespace-pre-wrap leading-relaxed font-semibold">
+                    {config.message}
+                </div>
+                <div className="p-4 bg-slate-50 flex gap-3 border-t border-slate-200">
+                    {!config.isAlert && (
+                        <button onClick={() => handleClose(false)} className="flex-1 py-3 bg-white border border-slate-300 text-slate-700 font-bold rounded-md hover:bg-slate-50 transition-colors shadow-sm">Batal</button>
+                    )}
+                    <button onClick={() => handleClose(true)} className={`flex-1 py-3 text-white font-bold rounded-md transition-colors shadow-md ${config.isAlert ? (config.title.toLowerCase().includes('gagal') || config.title.toLowerCase().includes('error') ? 'bg-rose-600 hover:bg-rose-700' : 'bg-slate-700 hover:bg-slate-800') : 'bg-rose-900 hover:bg-rose-950'}`}>
+                        {config.isAlert ? 'OK' : 'OK, Lanjutkan'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 // ==========================================
 // ZxingScanner Component
 // ==========================================
@@ -63,7 +137,7 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
             
             const capabilities = track.getCapabilities && track.getCapabilities();
             if (capabilities && !capabilities.torch) {
-                alert('Fitur Senter (Flash) tidak didukung di perangkat ini/browser ini.');
+                showAlert('Fitur Senter (Flash) tidak didukung di perangkat ini/browser ini.', 'Informasi');
                 return;
             }
             
@@ -82,13 +156,13 @@ const ZxingScanner = ({ onScan, videoId = 'video-reader' }) => {
                 await track.applyConstraints({ advanced: [{ torch: newState }] });
                 setFlashOn(newState);
             } catch (err2) {
-                alert('Gagal menyalakan flash: ' + err.message);
+                showAlert('Gagal menyalakan flash: ' + err.message, 'Informasi');
             }
         }
     };
 
     return (
-        <div className="w-full bg-rose-900 rounded-xl overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
+        <div className="w-full bg-rose-900 rounded-md overflow-hidden border-2 border-slate-300 relative min-h-[350px] md:min-h-[450px] flex items-center justify-center shadow-inner">
             <video id={videoId} className="w-full absolute inset-0 h-full object-cover"></video>
             <div className="absolute inset-0 pointer-events-none border-2 border-green-500/50 m-6 md:m-10 rounded-lg shadow-[0_0_0_4000px_rgba(0,0,0,0.5)] z-10 flex items-center justify-center">
                  <div className="w-full h-0.5 bg-green-500/50 animate-pulse shadow-[0_0_15px_#22c55e]"></div>
@@ -566,7 +640,7 @@ function App() {
                         }
                     }
                     if (hasUpdates) {
-                        console.log('âœ… ShortCodes berhasil digenerate dan disimpan (chunked)!');
+                        console.log('✅ ShortCodes berhasil digenerate dan disimpan (chunked)!');
                     }
                 } catch (err) {
                     console.error('âŒ Gagal memigrasi shortCodes:', err);
@@ -691,7 +765,7 @@ function App() {
     };
 
     if (isAuthChecking) return <div className="flex h-screen items-center justify-center bg-rose-900 text-rose-500 font-black text-2xl"><i className="fa-solid fa-circle-notch fa-spin mr-3"></i> Memeriksa Sesi...</div>;
-    if (dbError) return <div className="p-8 text-center text-red-600 font-bold">Koneksi Database Gagal. Cek Aturan Firebase.</div>;
+    if (dbError) return <div className="p-6 text-center text-red-600 font-bold">Koneksi Database Gagal. Cek Aturan Firebase.</div>;
     if (!currentUser) return <LoginPage onLogin={(userObj) => {
         localStorage.setItem('syaren_lastActivity', Date.now().toString());
         setCurrentUser(userObj);
@@ -748,8 +822,9 @@ function App() {
 
     return (
         <div className="flex h-screen bg-slate-50 font-sans">
+            <GlobalConfirmModal />
             {toast && (
-                <div className={`fixed top-4 right-4 z-[99999] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-rose-950 animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
+                <div className={`fixed top-4 right-4 z-[99999] px-5 py-3 rounded-md shadow-2xl flex items-center gap-3 text-rose-950 animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
                     <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-3xl flex-shrink-0`}></i>
                     <div>
                         <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'Peringatan!' : 'Berhasil'}</h4>
@@ -765,7 +840,7 @@ function App() {
                 </div>
                 <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 space-y-0.5 px-4 custom-scrollbar">
                     {allowedMenus.map(m => (
-                        <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
+                        <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-2.5 text-sm font-semibold rounded-md menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
                             <i className={`fa-solid ${m.icon} w-5 text-center`}></i> <span className="ml-2 truncate text-left">{m.label}</span>
                         </button>
                     ))}
@@ -791,7 +866,7 @@ function App() {
                         </div>
                         <div className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-4 space-y-0.5">
                             {allowedMenus.map(m => (
-                                <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-3 text-sm font-semibold rounded-xl menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
+                                <button key={m.id} onClick={() => handleMenuClick(m.id)} className={`w-full flex items-center px-3 py-3 text-sm font-semibold rounded-md menu-magnify ${activeMenu === m.id ? 'bg-rose-500 text-white shadow-md active-menu' : 'text-rose-800 hover:text-rose-950 font-bold'}`}>
                                     <i className={`fa-solid ${m.icon} w-5 text-center`}></i> <span className="ml-2 text-left">{m.label}</span>
                                 </button>
                             ))}
@@ -836,7 +911,7 @@ function App() {
 // ==========================================
 const handleCetakResiManual = (order, variants) => {
     const printWindow = window.open('', '_blank');
-    if (!printWindow) return alert("Gagal membuka tab baru. Izinkan Pop-up Blocker!");
+    if (!printWindow) return showAlert("Gagal membuka tab baru. Izinkan Pop-up Blocker!", 'Informasi');
 
     const dateStr = toLocalDateStr();
     const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
@@ -1102,7 +1177,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
     const handleDeleteTemplate = async (e, id) => {
         e.stopPropagation();
-        if (!window.confirm('Hapus template ini?')) return;
+        if (!(await showConfirm('Hapus template ini?'))) return;
         try {
             await db.collection('manual_order_senders').doc(id).delete();
             if (selectedTemplateId === id) {
@@ -1157,7 +1232,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
     };
 
     const handleBypassInstan = async (order) => {
-        if (!window.confirm(`Yakin memproses instan pesanan ${order.id_pesanan}? Ini akan Bypas GRPA, memotong stok Gudang Utama, dan langsung mencetak resi.`)) return;
+        if (!(await showConfirm(`Yakin memproses instan pesanan ${order.id_pesanan}? Ini akan Bypas GRPA, memotong stok Gudang Utama, dan langsung mencetak resi.`))) return;
 
         setIsLoading(true);
         try {
@@ -1196,7 +1271,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
     };
 
     const handleDeleteDraft = async (id) => {
-        if (!window.confirm('Yakin ingin menghapus draf ini?')) return;
+        if (!(await showConfirm('Yakin ingin menghapus draf ini?'))) return;
         try {
             await db.collection('manual_orders').doc(id).delete();
             showToast('success', 'Draft dihapus');
@@ -1205,23 +1280,23 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
     return (
         <div className="space-y-6">
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="bg-white p-5 rounded-md shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div>
                     <h2 className="text-xl font-black text-rose-800"><i className="fa-solid fa-envelope-open-text text-rose-500 mr-2"></i> Pesanan Manual</h2>
                     <p className="text-sm font-semibold text-slate-500">Kelola pesanan dari WA, Endorse, dan lainnya yang tidak memiliki resi marketplace otomatis.</p>
                 </div>
-                <button onClick={() => setShowModal(true)} className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-6 py-3 rounded-xl font-bold transition-all shadow-md shadow-rose-500/30 flex items-center justify-center">
+                <button onClick={() => setShowModal(true)} className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-6 py-3 rounded-md font-bold transition-all shadow-md shadow-rose-500/30 flex items-center justify-center">
                     <i className="fa-solid fa-plus mr-2"></i> Buat Pesanan
                 </button>
             </div>
 
-            <div className="flex bg-slate-200/50 p-1.5 rounded-xl w-fit">
+            <div className="flex bg-slate-200/50 p-1.5 rounded-md w-fit">
                 <button onClick={() => setActiveTab('DRAFT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'DRAFT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Draft ({draftList.length})</button>
                 <button onClick={() => setActiveTab('RIWAYAT')} className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all ${activeTab === 'RIWAYAT' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>Riwayat Proses ({riwayatList.length})</button>
             </div>
 
             {activeTab === 'DRAFT' && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
                     <div className="p-4 border-b border-slate-100 font-bold text-slate-700 flex items-center justify-between bg-slate-50/50">
                         <span>Menunggu Diproses di GRPA</span>
                         <span className="text-xs bg-rose-100 text-rose-700 px-3 py-1 rounded-full"><i className="fa-solid fa-info-circle mr-1"></i> Centang opsi 'Sertakan Pesanan Manual' di menu GRPA untuk memproses data ini.</span>
@@ -1232,7 +1307,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                         <div className="divide-y divide-slate-100">
                             {draftList.map(order => (
                                 <div key={order.id} className="p-5 hover:bg-slate-50 transition-colors">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
                                         <div>
                                             <div className="font-black text-lg text-rose-800 flex items-center gap-2">
                                                 {order.id_pesanan}
@@ -1270,11 +1345,11 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
             )}
 
             {activeTab === 'RIWAYAT' && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="bg-white rounded-md shadow-sm border border-slate-200 overflow-hidden">
                     {riwayatList.length === 0 ? (
                         <div className="p-10 text-center text-slate-400 font-semibold"><i className="fa-regular fa-folder-open text-5xl mb-3 opacity-30 block"></i> Tidak ada riwayat pesanan.</div>
                     ) : (
-                        <table className="w-full text-left text-sm whitespace-nowrap">
+                        <table className="w-full text-xs md:text-sm text-left text-sm whitespace-nowrap">
                             <thead className="bg-slate-50 text-slate-500 font-bold sticky top-0 border-b border-slate-200">
                                 <tr>
                                     <th className="p-4 py-3">ID Pesanan</th>
@@ -1313,30 +1388,30 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
             {/* Modal Buat Pesanan */}
             {showModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden">
+                    <div className="bg-white rounded-md shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden">
                         <div className="p-5 border-b border-slate-200 flex justify-between items-center bg-slate-50">
                             <h3 className="font-black text-lg text-rose-800"><i className="fa-solid fa-pen-to-square text-rose-500 mr-2"></i> Buat Pesanan Manual</h3>
                             <button type="button" onClick={() => setShowModal(false)} className="text-slate-400 hover:text-rose-500"><i className="fa-solid fa-xmark text-2xl"></i></button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-6 font-semibold custom-scrollbar">
                             <form id="formPesananManual" onSubmit={handleSimpanDraft}>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-5">
                                     {/* Kolom Kiri: Info Konsumen */}
                                     <div className="space-y-4">
                                         <h4 className="font-bold text-rose-800 border-b border-slate-200 pb-2 mb-3">Informasi Pelanggan</h4>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Sumber Masuk</label>
-                                            <select value={sumber} onChange={e => setSumber(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
+                                            <select value={sumber} onChange={e => setSumber(e.target.value)} className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
                                                 <option value="WhatsApp">WhatsApp</option>
                                                 <option value="Endorse/Affiliate">Endorse/Affiliate</option>
                                                 <option value="Resize">Tukar (Resize)</option>
                                                 <option value="Lainnya">Lainnya...</option>
                                             </select>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-2 gap-3">
                                             <div>
                                                 <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Layanan</label>
-                                                <select value={layanan} onChange={e => setLayanan(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
+                                                <select value={layanan} onChange={e => setLayanan(e.target.value)} className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 font-bold text-slate-700 bg-white">
                                                     <option value="Reguler">Reguler</option>
                                                     <option value="DFOD">DFOD</option>
                                                     <option value="Instan">Instan</option>
@@ -1344,7 +1419,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                             </div>
                                             <div>
                                                 <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Ekspedisi</label>
-                                                <select value={ekspedisi} onChange={e => setEkspedisi(e.target.value)} className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
+                                                <select value={ekspedisi} onChange={e => setEkspedisi(e.target.value)} className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
                                                     <option value="J&T">J&T</option>
                                                     <option value="JNE">JNE</option>
                                                     <option value="SICEPAT">SiCepat</option>
@@ -1356,35 +1431,35 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Nama Penerima</label>
-                                            <input required value={namaPenerima} onChange={e => setNamaPenerima(e.target.value)} type="text" placeholder="Contoh: Budi Santoso" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
+                                            <input required value={namaPenerima} onChange={e => setNamaPenerima(e.target.value)} type="text" placeholder="Contoh: Budi Santoso" className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Nomor Telepon</label>
-                                            <input required value={nomorTelepon} onChange={e => setNomorTelepon(e.target.value)} type="tel" placeholder="0812xxxx / 628xxxx" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
+                                            <input required value={nomorTelepon} onChange={e => setNomorTelepon(e.target.value)} type="tel" placeholder="0812xxxx / 628xxxx" className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white" />
                                         </div>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Alamat Lengkap</label>
-                                            <textarea required value={alamat} onChange={e => setAlamat(e.target.value)} placeholder="Jalan, RT/RW, Kel, Kec, Kota, kodepos" rows="3" className="w-full border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white resize-none"></textarea>
+                                            <textarea required value={alamat} onChange={e => setAlamat(e.target.value)} placeholder="Jalan, RT/RW, Kel, Kec, Kota, kodepos" rows="3" className="w-full border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 bg-slate-50 focus:bg-white resize-none"></textarea>
                                         </div>
 
                                         <h4 className="font-bold text-rose-800 border-b border-slate-200 pb-2 pt-4 mb-3">Informasi Pengirim</h4>
                                         <div>
                                             <label className="block text-xs text-slate-500 mb-1.5 uppercase font-bold tracking-wider">Template Pengirim</label>
                                             <div className="flex gap-2">
-                                                <select value={selectedTemplateId} onChange={e => handleSelectTemplate(e.target.value)} className="flex-1 border-2 border-slate-200 rounded-xl p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
+                                                <select value={selectedTemplateId} onChange={e => handleSelectTemplate(e.target.value)} className="flex-1 border-2 border-slate-200 rounded-md p-3 focus:outline-none focus:border-rose-500 font-bold text-slate-700 bg-white">
                                                     <option value="">-- Input Manual --</option>
                                                     {senderTemplates.map(t => (
                                                         <option key={t.id} value={t.id}>{t.name} ({t.phone})</option>
                                                     ))}
                                                 </select>
                                                 {selectedTemplateId && (
-                                                    <button type="button" onClick={(e) => handleDeleteTemplate(e, selectedTemplateId)} className="bg-red-50 text-red-500 border-2 border-red-100 p-3 rounded-xl hover:bg-red-500 hover:text-rose-950 transition-all">
+                                                    <button type="button" onClick={(e) => handleDeleteTemplate(e, selectedTemplateId)} className="bg-red-50 text-red-500 border-2 border-red-100 p-3 rounded-md hover:bg-red-500 hover:text-rose-950 transition-all">
                                                         <i className="fa-solid fa-trash-can"></i>
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-1 gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100">
+                                        <div className="grid grid-cols-1 gap-3 p-3 bg-blue-50/50 rounded-md border border-blue-100">
                                             <div>
                                                 <label className="block text-[10px] text-slate-500 mb-1 uppercase font-bold tracking-wider">Nama Pengirim</label>
                                                 <input required value={namaPengirim} onChange={e => setNamaPengirim(e.target.value)} type="text" placeholder="Nama Toko / Pengirim" className="w-full border-2 border-slate-200 rounded-lg p-2 focus:outline-none focus:border-blue-500 text-sm" />
@@ -1409,12 +1484,12 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
 
                                         {/* Pencarian Produk */}
                                         <div className="relative">
-                                            <div className="flex items-center border-2 border-slate-200 rounded-xl bg-white focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all overflow-hidden">
+                                            <div className="flex items-center border-2 border-slate-200 rounded-md bg-white focus-within:border-rose-500 focus-within:ring-4 focus-within:ring-rose-500/10 transition-all overflow-hidden">
                                                 <i className="fa-solid fa-search text-slate-400 pl-4"></i>
                                                 <input type="text" value={searchSku} onChange={e => setSearchSku(e.target.value)} placeholder="Ketik SKU atau Artikel untuk mencari..." className="w-full p-3 pl-3 outline-none font-semibold text-sm bg-transparent" />
                                             </div>
                                             {searchResults.length > 0 && (
-                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-60 overflow-y-auto z-[60] divide-y divide-slate-100">
+                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-md shadow-2xl max-h-60 overflow-y-auto z-[60] divide-y divide-slate-100">
                                                     {searchResults.map((v, idx) => (
                                                         <button key={idx} type="button" onClick={() => addItem(v)} className="w-full text-left p-3 hover:bg-rose-50 transition-colors flex items-center justify-between group">
                                                             <div>
@@ -1429,7 +1504,7 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                                         </div>
 
                                         {/* List Produk Terpilih */}
-                                        <div className="bg-slate-50 rounded-xl border border-slate-200 min-h-[150px] p-3 space-y-2">
+                                        <div className="bg-slate-50 rounded-md border border-slate-200 min-h-[150px] p-3 space-y-2">
                                             {listProduk.length === 0 ? (
                                                 <div className="text-center text-slate-400 text-sm py-10 font-semibold italic">Belum ada produk yang dipilih.</div>
                                             ) : (
@@ -1459,8 +1534,8 @@ function PesananManual({ variants, manualOrders, senderTemplates, transactions, 
                         <div className="p-5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
                             <div className="text-sm font-semibold text-slate-500">Total: <span className="font-black text-lg text-rose-800">{listProduk.reduce((a, c) => a + c.qty, 0)} Pcs</span></div>
                             <div className="flex gap-3">
-                                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                                <button form="formPesananManual" type="submit" className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-8 py-3 rounded-xl font-bold shadow-md shadow-rose-500/30 transition-all focus:ring-4 focus:ring-rose-500/20">Simpan Draf</button>
+                                <button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 rounded-md font-bold text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
+                                <button form="formPesananManual" type="submit" className="bg-rose-500 hover:bg-rose-600 text-rose-950 px-8 py-3 rounded-md font-bold shadow-md shadow-rose-500/30 transition-all focus:ring-4 focus:ring-rose-500/20">Simpan Draf</button>
                             </div>
                         </div>
                     </div>
@@ -1583,7 +1658,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     // Gabungkan semua draft, generate PDF, lalu hapus semua draft dari Firestore
     const handleKirimProduksi = async () => {
         if (poDrafts.length === 0) return showToast('error', 'Tidak ada antrian PO.');
-        const confirmed = window.confirm(`Kirim ${poDrafts.length} batch PO ke produksi? Semua antrian akan dihapus setelah PDF dibuat.`);
+        const confirmed = confirm(`Kirim ${poDrafts.length} batch PO ke produksi? Semua antrian akan dihapus setelah PDF dibuat.`);
         if (!confirmed) return;
         setPoDraftLoading(true);
         try {
@@ -2270,7 +2345,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     };
 
     const handleDeleteHistory = async (id) => {
-        if (!window.confirm('Hapus riwayat permanen dari daftar riwayat dan produksi?')) return;
+        if (!(await showConfirm('Hapus riwayat permanen dari daftar riwayat dan produksi?'))) return;
         setIsLoading(true);
         try {
             const docSnap = await window.db.collection('online_history').doc(id).get();
@@ -2319,7 +2394,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             return showToast('error', 'Maaf, Anda tidak memiliki akses untuk menghapus antrean PO.');
         }
 
-        const confirmed = window.confirm(`PERINGATAN!\n\nAnda akan menghapus SEMUA antrian PO (${poDrafts.length} batch) yang belum dikirim ke produksi.\nTindakan ini tidak bisa dibatalkan!\n\nYakin ingin mereset/menghapus antrian ini?`);
+        const confirmed = confirm(`PERINGATAN!\n\nAnda akan menghapus SEMUA antrian PO (${poDrafts.length} batch) yang belum dikirim ke produksi.\nTindakan ini tidak bisa dibatalkan!\n\nYakin ingin mereset/menghapus antrian ini?`);
         if (!confirmed) return;
 
         setPoDraftLoading(true);
@@ -3712,7 +3787,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
     };
 
     const handleHapusAntrianReady = async () => {
-        const confirmed = window.confirm("Hapus semua antrean Resi Ready? (Resi tidak akan terhapus, hanya dikeluarkan dari antrean)");
+        const confirmed = confirm("Hapus semua antrean Resi Ready? (Resi tidak akan terhapus, hanya dikeluarkan dari antrean)");
         if (!confirmed) return;
 
         setPoDraftLoading(true);
@@ -4502,11 +4577,11 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
 
     const FileBox = ({ title, accept, files, onUpload, onRemove, icon, colorClass, borderClass, bgClass, stats }) => (
-        <div className={`border-2 rounded-2xl p-5 ${borderClass} ${bgClass} relative overflow-hidden flex flex-col h-full`}>
+        <div className={`border-2 rounded-md p-5 ${borderClass} ${bgClass} relative overflow-hidden flex flex-col h-full`}>
             <i className={`fa-solid ${icon} absolute -bottom-4 -right-4 text-7xl opacity-5 ${colorClass}`}></i>
             <div className="relative z-10 flex-1 flex flex-col">
                 <h3 className={`font-black text-lg mb-3 flex items-center gap-2 ${colorClass}`}><i className={`fa-solid ${icon}`}></i> {title}</h3>
-                <input type="file" multiple accept={accept} onChange={onUpload} className="w-full text-xs font-bold text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-white file:shadow-sm cursor-pointer mb-3" />
+                <input type="file" multiple accept={accept} onChange={onUpload} className="w-full text-xs font-bold text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-xs file:font-black file:bg-white file:shadow-sm cursor-pointer mb-3" />
                 <div className="flex-1 max-h-24 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {files.map((f, i) => (
                         <div key={i} className="flex justify-between items-center text-[11px] bg-white/70 p-2 rounded-lg border border-white"><span className="truncate pr-2 font-mono font-bold text-slate-700">{f.name}</span><button onClick={() => onRemove(i)} className="text-rose-500 hover:bg-rose-100 w-5 h-5 rounded flex items-center justify-center transition-colors"><i className="fa-solid fa-xmark"></i></button></div>
@@ -4524,8 +4599,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
     return (
         <div className="max-w-6xl mx-auto space-y-6">
-            <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-slate-200 no-print">
-                <div className="mb-6 text-center"><h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-rose-500"></i> Generator Rekapan Pesanan </h2></div>
+            <div className="bg-white p-6 md:p-6 rounded-md shadow-xl border border-slate-200 no-print">
+                <div className="mb-4 text-center"><h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2"><i className="fa-solid fa-server text-rose-500"></i> Generator Rekapan Pesanan </h2></div>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-4">
                     {/* KOTAK SHOPEE SEKARANG MENERIMA PDF (Shopee Seller Centre) */}
                     <FileBox title="Shopee (PDF)" accept=".pdf" files={shopeeFiles} onUpload={handleUploadShopee} onRemove={(i) => setShopeeFiles(p => p.filter((_, idx) => idx !== i))} icon="fa-bag-shopping" colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-50" stats={platformStats?.shopee} />
@@ -4536,7 +4611,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 </div>
 
                 {/* CHECKBOX MANUAL ORDERS */}
-                <div className="mb-6 p-4 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between shadow-sm cursor-pointer hover:bg-rose-50 transition-colors" onClick={() => setIncludeManual(!includeManual)}>
+                <div className="mb-4 p-4 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-between shadow-sm cursor-pointer hover:bg-rose-50 transition-colors" onClick={() => setIncludeManual(!includeManual)}>
                     <div className="flex items-center gap-3">
                         <div className={`w-6 h-6 rounded flex items-center justify-center border-2 transition-colors ${includeManual ? 'bg-rose-500 border-rose-500 text-white' : 'border-slate-300 text-transparent'}`}>
                             <i className="fa-solid fa-check text-sm"></i>
@@ -4549,12 +4624,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     {platformStats?.manual && <div className="text-sm font-black text-emerald-600 hidden md:flex items-center gap-1.5 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200"><i className="fa-solid fa-check-circle"></i> {platformStats.manual.resi} Pesanan Terbaca</div>}
                 </div>
 
-                <button type="button" onClick={processAllPlatforms} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 font-black text-lg md:text-xl rounded-2xl shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1 mb-4"><i className="fa-solid fa-bolt mr-3 text-xl"></i> GABUNGKAN &amp; ANALISIS SEMUA PESANAN</button>
+                <button type="button" onClick={processAllPlatforms} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3 font-black text-lg md:text-xl rounded-md shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1 mb-4"><i className="fa-solid fa-bolt mr-3 text-xl"></i> GABUNGKAN &amp; ANALISIS SEMUA PESANAN</button>
 
                 {analysisResult && (
-                    <div className="flex flex-col gap-4 no-print mt-4">
+                    <div className="flex flex-col gap-3 no-print mt-4">
                         <div className="w-full">
-                            <button onClick={handleSiapkanQC} className="w-full bg-rose-800 hover:bg-rose-900 text-white py-3.5 font-black text-base rounded-xl shadow-lg transition-transform transform hover:-translate-y-1">
+                            <button onClick={handleSiapkanQC} className="w-full bg-rose-800 hover:bg-rose-900 text-white py-3.5 font-black text-base rounded-md shadow-lg transition-transform transform hover:-translate-y-1">
                                 <i className="fa-solid fa-paper-plane mr-2"></i> SIAPKAN UNTUK TIM QC
                             </button>
                         </div>
@@ -4562,18 +4637,18 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         {analysisResult && analysisResult.summary.totalResi > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
                                 <button onClick={() => handlePrintCurrentResi('ready')} disabled={analysisResult.readyList.length === 0 || isGeneratingPdf}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white py-3 font-black text-sm rounded-xl shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale">
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white py-3 font-black text-sm rounded-md shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2 disabled:opacity-50 disabled:grayscale">
                                     <i className="fa-solid fa-tags"></i> {isGeneratingPdf ? 'MENYIAPKAN...' : 'CETAK RESI SHIPPING (READY SAJA)'}
                                 </button>
                                 <button onClick={() => handlePrintCurrentResi('all')} disabled={isGeneratingPdf}
-                                    className="bg-rose-600 hover:bg-rose-700 text-white py-3 font-black text-sm rounded-xl shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
+                                    className="bg-rose-600 hover:bg-rose-700 text-white py-3 font-black text-sm rounded-md shadow-md transition-all transform hover:-translate-y-1 flex items-center justify-center gap-2">
                                     <i className="fa-solid fa-layer-group"></i> {isGeneratingPdf ? 'MENYIAPKAN...' : 'CETAK SEMUA RESI (READY + PO)'}
                                 </button>
                             </div>
                         )}
 
                         {/* PENGATURAN TANGGAL & SESI PO DIPINDAHKAN KE SINI */}
-                        <div className="flex items-center gap-3 bg-rose-50 border-2 border-rose-200 rounded-xl p-3 flex-wrap justify-center shadow-inner">
+                        <div className="flex items-center gap-3 bg-rose-50 border-2 border-rose-200 rounded-md p-3 flex-wrap justify-center shadow-inner">
                             <i className="fa-solid fa-calendar-days text-rose-500 text-lg"></i>
                             <span className="text-sm font-black text-rose-800 uppercase tracking-wider">Tgl Psn online & Sesi:</span>
                             <input type="date" value={poDraftDate} onChange={e => setPoDraftDate(e.target.value)}
@@ -4594,8 +4669,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             {/* MODAL PREVIEW RESI (FITUR BARU) - TABEL EDITABLE */}
             {showResiPreview && Object.keys(resiPreviews).length > 0 && (
-                <div className="bg-white p-6 md:p-8 rounded-3xl shadow-xl border border-blue-200 no-print">
-                    <div className="mb-6 text-center">
+                <div className="bg-white p-6 md:p-6 rounded-md shadow-xl border border-blue-200 no-print">
+                    <div className="mb-4 text-center">
                         <h2 className="text-3xl font-black text-rose-800 flex items-center justify-center gap-3 mb-2">
                             <i className="fa-solid fa-magnifying-glass text-blue-500"></i> Daftar Resi Pesanan
                         </h2>
@@ -4603,28 +4678,28 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     </div>
 
                     {/* TAB PLATFORM FILTER & MASS UPDATE */}
-                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 pb-2">
+                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-3 mb-4 pb-2">
                         <div className="flex overflow-x-auto gap-2 custom-scrollbar max-w-full pb-2 xl:pb-0">
-                            <button onClick={() => setActivePreviewTab('PREV-ALL')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-ALL' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 border-2 border-blue-200 hover:bg-blue-100'}`}>
+                            <button onClick={() => setActivePreviewTab('PREV-ALL')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-ALL' ? 'bg-blue-600 text-white shadow-md' : 'bg-blue-50 text-blue-600 border-2 border-blue-200 hover:bg-blue-100'}`}>
                                 <i className="fa-solid fa-list mr-2"></i> Semua ({Object.keys(resiPreviews).length})
                             </button>
                             {platformStats?.shopee && platformStats.shopee.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-SHOPEE')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-SHOPEE' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
                                     <i className="fa-solid fa-bag-shopping mr-2"></i> Shopee ({platformStats.shopee.resi})
                                 </button>
                             )}
                             {platformStats?.tiktok && platformStats.tiktok.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-rose-800 text-white shadow-md' : 'bg-rose-50 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-TIKTOK')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-TIKTOK' ? 'bg-rose-800 text-white shadow-md' : 'bg-rose-50 text-slate-700 border-2 border-slate-300 hover:bg-slate-200'}`}>
                                     <i className="fa-solid fa-music mr-2"></i> TikTok ({platformStats.tiktok.resi})
                                 </button>
                             )}
                             {platformStats?.lazada && platformStats.lazada.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-LAZADA')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-LAZADA' ? 'bg-rose-600 text-white shadow-md' : 'bg-rose-50 text-rose-600 border-2 border-rose-200 hover:bg-rose-100'}`}>
                                     <i className="fa-solid fa-heart mr-2"></i> Lazada ({platformStats.lazada.resi})
                                 </button>
                             )}
                             {platformStats?.manual && platformStats.manual.resi > 0 && (
-                                <button onClick={() => setActivePreviewTab('PREV-MANUAL')} className={`flex-shrink-0 px-6 py-3 rounded-xl font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-MANUAL' ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100'}`}>
+                                <button onClick={() => setActivePreviewTab('PREV-MANUAL')} className={`flex-shrink-0 px-6 py-3 rounded-md font-black transition-all whitespace-nowrap ${activePreviewTab === 'PREV-MANUAL' ? 'bg-emerald-600 text-white shadow-md' : 'bg-emerald-50 text-emerald-600 border-2 border-emerald-200 hover:bg-emerald-100'}`}>
                                     <i className="fa-solid fa-file-invoice mr-2"></i> Manual ({platformStats.manual.resi})
                                 </button>
                             )}
@@ -4632,8 +4707,8 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     </div>
 
                     {/* TABEL DAFTAR RESI EDITABLE */}
-                    <div className="overflow-x-auto border border-slate-300 rounded-2xl mb-6">
-                        <table className="w-full border-collapse bg-white">
+                    <div className="overflow-x-auto border border-slate-300 rounded-md mb-4">
+                        <table className="w-full text-xs md:text-sm border-collapse bg-white">
                             <thead>
                                 <tr className="bg-blue-50 border-b-2 border-blue-300">
                                     <th className="px-4 py-3 text-left font-black text-rose-800 border-r border-slate-300 w-40">Nomer Resi</th>
@@ -4736,10 +4811,10 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
                     {/* TOMBOL AKSI */}
                     <div className="flex gap-3 items-center justify-center flex-wrap">
-                        <button onClick={handleRekapSekarang} disabled={isLoadingLocal} className="flex-1 md:flex-none px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-black rounded-xl shadow-lg transition-transform transform hover:-translate-y-1">
+                        <button onClick={handleRekapSekarang} disabled={isLoadingLocal} className="flex-1 md:flex-none px-8 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-400 text-white font-black rounded-md shadow-lg transition-transform transform hover:-translate-y-1">
                             <i className="fa-solid fa-chart-pie mr-2"></i> {isLoadingLocal ? 'MEMPROSES...' : 'REKAP SEKARANG'}
                         </button>
-                        <button onClick={() => window.location.reload()} className="flex-1 md:flex-none px-6 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-xl shadow-md transition-colors">
+                        <button onClick={() => window.location.reload()} className="flex-1 md:flex-none px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md shadow-md transition-colors">
                             <i className="fa-solid fa-arrow-rotate-left mr-2"></i> MULAI ULANG
                         </button>
                     </div>
@@ -4748,30 +4823,30 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
 
             {analysisResult && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+                    <div className="bg-white rounded-md shadow-xl overflow-hidden border border-slate-200">
                         {/* KEMBALI KE DESAIN TAB YANG LAMA (Besar, Icon di Atas) */}
                         <div className="flex overflow-x-auto bg-rose-50 p-2 gap-2 border-b-4 border-slate-200 no-print custom-scrollbar">
-                            <button onClick={() => setActiveTab('PO')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'PO' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                            <button onClick={() => setActiveTab('PO')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'PO' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-triangle-exclamation text-2xl mb-1"></i> Pesan Bengkel (Online) <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.poList.reduce((a, c) => a + c.missingQty, 0)} Pcs</span>
                             </button>
-                            <button onClick={() => setActiveTab('READY')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'READY' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                            <button onClick={() => setActiveTab('READY')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'READY' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-check-double text-2xl mb-1"></i> Barang Ready <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.readyList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
-                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-4 px-6 rounded-2xl transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-rose-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
+                            <button onClick={() => setActiveTab('UNREC')} className={`flex-1 flex flex-col items-center py-3 px-6 rounded-md transition-colors font-black text-sm whitespace-nowrap ${activeTab === 'UNREC' ? 'bg-rose-800 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50'}`}>
                                 <i className="fa-solid fa-circle-question text-2xl mb-1"></i> Tidak Dikenali <span className="mt-1 bg-white/20 px-3 rounded-full">{analysisResult.unrecognizedList.reduce((a, c) => a + c.qty, 0)} Pcs</span>
                             </button>
                         </div>
 
-                        <div className={`p-8 bg-slate-50 ${activeTab !== 'READY' && 'hidden'}`}>
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 border-b pb-4 border-slate-300 gap-4 no-print">
+                        <div className={`p-6 bg-slate-50 ${activeTab !== 'READY' && 'hidden'}`}>
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-4 border-b pb-4 border-slate-300 gap-3 no-print">
                                 <div><h3 className="text-xl font-black text-emerald-700 flex items-center"><i className="fa-solid fa-clipboard-list mr-2"></i> Daftar Barang Siap Ambil (Untuk Picker)</h3></div>
-                                <button onClick={handlePrintPickingList} disabled={analysisResult.readyList.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1">
+                                <button onClick={handlePrintPickingList} disabled={analysisResult.readyList.length === 0} className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1">
                                     <i className="fa-solid fa-print mr-2"></i> DOWNLOAD PDF DAFTAR AMBIL
                                 </button>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto custom-scrollbar no-print">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 max-h-[500px] overflow-y-auto custom-scrollbar no-print">
                                 {analysisResult.readyList.map((item, idx) => (
-                                    <div key={idx} className={`bg-white p-4 rounded-xl flex items-center gap-4 ${item.isEdited ? 'border-2 border-yellow-400 bg-yellow-50 shadow-md shadow-yellow-300' : 'border border-emerald-200'}`}>
+                                    <div key={idx} className={`bg-white p-4 rounded-md flex items-center gap-3 ${item.isEdited ? 'border-2 border-yellow-400 bg-yellow-50 shadow-md shadow-yellow-300' : 'border border-emerald-200'}`}>
                                         <div className={`${item.isEdited ? 'bg-yellow-200 text-yellow-800' : 'bg-emerald-100 text-emerald-700'} w-12 h-12 rounded-lg flex items-center justify-center font-black text-xl`}>{item.qty}</div>
                                         <div className="flex-1">
                                             <div className="font-black text-rose-800 flex items-center gap-2 flex-wrap">{item.variant.article} {item.isEdited && <span className="inline-block bg-yellow-400 text-yellow-900 text-xs font-black px-2 py-0.5 rounded">ed</span>}</div>
@@ -4821,20 +4896,20 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         </div>
 
                         {/* KERTAS PO */}
-                        <div className={`p-8 bg-slate-50 ${activeTab !== 'PO' && 'hidden'}`}>
-                            <div className="flex flex-col md:flex-row justify-between items-center mb-6 no-print border-b pb-4 border-slate-300 gap-4">
+                        <div className={`p-6 bg-slate-50 ${activeTab !== 'PO' && 'hidden'}`}>
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-4 no-print border-b pb-4 border-slate-300 gap-3">
                                 <h3 className="text-xl font-black text-rose-700 flex items-center"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Daftar Kekurangan (Harus Produksi)</h3>
                                 <div className="flex flex-wrap gap-3 w-full md:w-auto items-center justify-end">
-                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-rose-900 hover:bg-rose-800 text-white px-8 py-3.5 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
+                                    <button onClick={handlePrint} disabled={analysisResult.poList.length === 0} className="flex-1 md:flex-none bg-rose-900 hover:bg-rose-800 text-white px-8 py-3.5 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50">
                                         <i className="fa-solid fa-print mr-2 text-lg"></i> CETAK PESANAN KERTAS
                                     </button>
                                 </div>
                             </div>
 
                             {/* BANNER ANTRIAN READY */}
-                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${readyDrafts.length > 0 ? 'bg-teal-50 border-teal-300' : 'bg-rose-50 border-slate-200'}`}>
+                            <div className={`mb-4 rounded-md border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${readyDrafts.length > 0 ? 'bg-teal-50 border-teal-300' : 'bg-rose-50 border-slate-200'}`}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${readyDrafts.length > 0 ? 'bg-teal-500 text-white' : 'bg-slate-300 text-slate-500'}`}>
+                                    <div className={`w-12 h-12 rounded-md flex items-center justify-center text-xl font-black ${readyDrafts.length > 0 ? 'bg-teal-500 text-white' : 'bg-slate-300 text-slate-500'}`}>
                                         {readyDrafts.length > 0 ? <i className="fa-solid fa-tags"></i> : <i className="fa-solid fa-inbox"></i>}
                                     </div>
                                     <div>
@@ -4854,22 +4929,22 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                 <div className="flex gap-2 flex-wrap justify-end">
                                     {(currentUser?.role === 'admin' || (currentUser?.access || []).includes('delete_antrean')) && (
                                         <button onClick={handleHapusAntrianReady} disabled={readyDrafts.length === 0 || poDraftLoading}
-                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-4 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
+                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-4 py-3 rounded-md font-black shadow-sm transition-colors flex items-center gap-2">
                                             <i className="fa-solid fa-trash-can"></i> Hapus Antrean
                                         </button>
                                     )}
 
                                     <button onClick={handleCetakResiReadyAntrian} disabled={readyDrafts.length === 0 || poDraftLoading}
-                                        className="bg-teal-600 hover:bg-teal-500 disabled:bg-slate-400 text-white px-5 py-3 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
+                                        className="bg-teal-600 hover:bg-teal-500 disabled:bg-slate-400 text-white px-5 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
                                         <i className="fa-solid fa-print"></i> Cetak Resi Ready
                                     </button>
                                 </div>
                             </div>
 
                             {/* BANNER ANTRIAN PO - ditampilkan selalu di tab PO */}
-                            <div className={`mb-4 rounded-2xl border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${poDrafts.length > 0 ? 'bg-rose-50 border-rose-300' : 'bg-rose-50 border-slate-200'}`}>
+                            <div className={`mb-4 rounded-md border-2 p-4 flex flex-col md:flex-row items-center justify-between gap-3 ${poDrafts.length > 0 ? 'bg-rose-50 border-rose-300' : 'bg-rose-50 border-slate-200'}`}>
                                 <div className="flex items-center gap-3">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-black ${poDrafts.length > 0 ? 'bg-rose-400 text-white' : 'bg-slate-300 text-slate-500'}`}>
+                                    <div className={`w-12 h-12 rounded-md flex items-center justify-center text-xl font-black ${poDrafts.length > 0 ? 'bg-rose-400 text-white' : 'bg-slate-300 text-slate-500'}`}>
                                         {poDrafts.length > 0 ? <i className="fa-solid fa-box-open"></i> : <i className="fa-solid fa-inbox"></i>}
                                     </div>
                                     <div>
@@ -4890,17 +4965,17 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                     {/* TOMBOL HAPUS BARU (Hanya Muncul untuk Admin / Akses Hapus) */}
                                     {(currentUser?.role === 'admin' || (currentUser?.access || []).includes('delete_antrean')) && (
                                         <button onClick={handleHapusAntrianPO} disabled={poDrafts.length === 0 || poDraftLoading}
-                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-5 py-3 rounded-xl font-black shadow-sm transition-colors flex items-center gap-2">
+                                            className="bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white disabled:bg-rose-50 disabled:text-slate-400 disabled:border-slate-200 border border-rose-200 px-5 py-3 rounded-md font-black shadow-sm transition-colors flex items-center gap-2">
                                             <i className="fa-solid fa-trash-can"></i> Hapus Antrean
                                         </button>
                                     )}
 
                                     <button onClick={handleCetakLabelAntrian} disabled={poDrafts.length === 0 || poDraftLoading}
-                                        className="bg-rose-500 hover:bg-rose-600 disabled:bg-slate-400 text-white px-5 py-3 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
+                                        className="bg-rose-500 hover:bg-rose-600 disabled:bg-slate-400 text-white px-5 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
                                         <i className="fa-solid fa-tags"></i> Cetak Label
                                     </button>
                                     <button onClick={handleKirimProduksi} disabled={poDrafts.length === 0 || poDraftLoading}
-                                        className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white px-8 py-3 rounded-xl font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
+                                        className="bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-400 text-white px-8 py-3 rounded-md font-black shadow-md transition-transform transform hover:-translate-y-1 disabled:opacity-50 flex items-center gap-2">
                                         {poDraftLoading ? <><i className="fa-solid fa-circle-notch fa-spin"></i> Proses...</> : <><i className="fa-solid fa-paper-plane"></i> Kirim ke Produksi</>}
                                     </button>
                                 </div>
@@ -4909,7 +4984,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                             {analysisResult.poList.length === 0 ? (
                                 <div className="text-center py-16 text-emerald-600"><i className="fa-solid fa-face-smile-beam text-6xl mb-4"></i><h2 className="text-2xl font-black">STOK GUDANG AMAN!</h2><p className="font-bold">Semua pesanan ada di rak.</p></div>
                             ) : (
-                                <div className="overflow-x-auto flex justify-center bg-white p-6 rounded-2xl border border-slate-200 shadow-inner">
+                                <div className="overflow-x-auto flex justify-center bg-white p-6 rounded-md border border-slate-200 shadow-inner">
                                     <div id="print-po-area" className="bg-white w-full max-w-[800px]">
                                         <h2 style={{ fontFamily: "'Times New Roman', serif", textAlign: 'center', color: '#dc2626', textTransform: 'uppercase', fontWeight: '900', fontSize: '22pt', margin: '0 0 10px 0' }}>PESANAN ONLINE SYAREN OFFICIAL</h2>
                                         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
@@ -4979,14 +5054,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                         </div>
 
                         {/* TAB TIDAK DIKENALI */}
-                        <div className={`p-8 bg-slate-50 ${activeTab !== 'UNREC' && 'hidden'}`}>
-                            <div className="mb-6 border-b pb-4 border-slate-300 no-print">
+                        <div className={`p-6 bg-slate-50 ${activeTab !== 'UNREC' && 'hidden'}`}>
+                            <div className="mb-4 border-b pb-4 border-slate-300 no-print">
                                 <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-circle-question mr-2"></i> SKU Tidak Dikenali</h3>
                                 <p className="text-sm text-slate-500 font-semibold mt-1">Teks SKU di bawah ini <b className="text-rose-500">TIDAK ADA</b> di Master Produk Anda (Mungkin salah ketik di marketplace).</p>
                             </div>
                             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
                                 {analysisResult.unrecognizedList.map((item, idx) => (
-                                    <div key={idx} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center gap-3">
+                                    <div key={idx} className="bg-white p-4 rounded-md border border-slate-200 shadow-sm flex justify-between items-center gap-3">
                                         <div className="font-mono text-sm font-bold text-slate-700">{item.sku}</div>
                                         <div className="flex items-center gap-2">
                                             {item.sku.split('-').length < 3 && (
@@ -5004,13 +5079,13 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             )}
 
             {/* RIWAYAT PESANAN ONLINE (SPO) - MIRIP MPO */}
-            <div className="mt-8 bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden no-print animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="mt-8 bg-white rounded-md border border-slate-200 shadow-xl overflow-hidden no-print animate-in fade-in slide-in-from-bottom-4 duration-700">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-xl text-rose-800 uppercase tracking-widest"><i className="fa-solid fa-clock-rotate-left text-emerald-600 mr-3"></i> Daftar Riwayat Pesanan</h3>
                     <span className={`font-bold px-4 py-1.5 rounded-full text-xs shadow-inner uppercase tracking-wider ${onlineHistory.length > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}`}>{onlineHistory.length} Batch Tersimpan</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-[10px] border-b-4 border-slate-200">
                             <tr>
                                 <th className="p-6 font-black uppercase tracking-tighter w-48">SESI & TANGGAL</th>
@@ -5054,32 +5129,32 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                                             </td>
                                             <td className="p-6 text-center border-l border-slate-100">
                                                 <div className="flex items-center justify-center gap-2 flex-col sm:flex-row">
-                                                    <button type="button" title="Cetak Semua Resi (Ready + PO)" onClick={() => handleRePrintResi(batch, 'all')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
+                                                    <button type="button" title="Cetak Semua Resi (Ready + PO)" onClick={() => handleRePrintResi(batch, 'all')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-print mr-1"></i> SEMUA
                                                     </button>
-                                                    <button type="button" title="Cetak Resi Barang Ready Saja" onClick={() => handleRePrintResi(batch, 'ready')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
+                                                    <button type="button" title="Cetak Resi Barang Ready Saja" onClick={() => handleRePrintResi(batch, 'ready')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-md border border-teal-200 bg-teal-50 text-teal-700 hover:bg-teal-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-box-open mr-1"></i> READY
                                                     </button>
-                                                    <button type="button" title="Cetak Resi Ready Terakhir (Sesi Ini)" onClick={() => handleRePrintResi(batch, 'ready_latest')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter">
+                                                    <button type="button" title="Cetak Resi Ready Terakhir (Sesi Ini)" onClick={() => handleRePrintResi(batch, 'ready_latest')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter">
                                                         <i className="fa-solid fa-bolt mr-1"></i> LATEST
                                                     </button>
-                                                    <button type="button" title="Cetak Resi Pesanan Online Saja" onClick={() => handleRePrintResi(batch, 'po')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-xl border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
+                                                    <button type="button" title="Cetak Resi Pesanan Online Saja" onClick={() => handleRePrintResi(batch, 'po')} className="flex-1 w-full sm:w-auto px-4 py-2.5 rounded-md border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase">
                                                         <i className="fa-solid fa-clock mr-1"></i> PO
                                                     </button>
                                                 </div>
                                             </td>
                                             <td className="p-6 text-center border-l border-slate-100">
                                                 <div className="flex items-center justify-center gap-2 flex-col sm:flex-row">
-                                                    <button type="button" onClick={() => handleRePrintSPO(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-xl border-2 border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
+                                                    <button type="button" onClick={() => handleRePrintSPO(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-md border-2 border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
                                                         <i className="fa-solid fa-file-invoice mr-1.5 group-hover:scale-125 transition-transform"></i> SPO
                                                     </button>
-                                                    <button type="button" title="Cetak Label Produk (Berurutan)" onClick={() => handleRePrintLabels(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-xl border-2 border-rose-100 bg-white text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
+                                                    <button type="button" title="Cetak Label Produk (Berurutan)" onClick={() => handleRePrintLabels(batch)} className="flex-1 w-full sm:w-auto px-4 py-3 rounded-md border-2 border-rose-100 bg-white text-rose-700 hover:bg-rose-600 hover:text-white shadow-sm transition-all text-[11px] font-black uppercase tracking-tighter group">
                                                         <i className="fa-solid fa-tags mr-1.5 group-hover:rotate-12 transition-transform"></i> LBL
                                                     </button>
                                                 </div>
                                             </td>
                                             <td className="p-6 text-right">
-                                                <button type="button" onClick={() => handleDeleteHistory(batch.id)} className="w-10 h-10 bg-white border border-rose-100 shadow-sm rounded-xl hover:bg-rose-500 hover:text-white text-rose-500 transition-all">
+                                                <button type="button" onClick={() => handleDeleteHistory(batch.id)} className="w-10 h-10 bg-white border border-rose-100 shadow-sm rounded-md hover:bg-rose-500 hover:text-white text-rose-500 transition-all">
                                                     <i className="fa-solid fa-trash-can"></i>
                                                 </button>
                                             </td>
@@ -5133,7 +5208,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                 const msg = MOTIVASI_QC[Math.floor(Math.random() * MOTIVASI_QC.length)];
                 setMotivasiMsg(msg);
                 playCekling();
-                showToast('success', `âœ… Selamat datang, ${emp.nama}! ${msg}`);
+                showToast('success', `✅ Selamat datang, ${emp.nama}! ${msg}`);
                 setActiveCart(idVal);
             } else {
                 // Bukan ID karyawan yang dikenal ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ tolak (termasuk jika scan resi)
@@ -5149,7 +5224,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
     const handleSelesaiQC = async () => {
         if (!activeCart) return;
-        if (confirm('Tutup keranjang/karung ini dan selesai QC hari ini? Paket bisa di-handover ke Kurir.')) {
+        if (await showConfirm('Tutup keranjang/karung ini dan selesai QC hari ini? Paket bisa di-handover ke Kurir.')) {
             setIsLoading(true);
             try {
                 const batch = db.batch();
@@ -5166,7 +5241,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                 setIsDone(false);
                 setActiveEmployee(null);
                 setMotivasiMsg('');
-                showToast('success', 'Selesai QC! Paket siap diserahkan ke Kurir. âœ…');
+                showToast('success', 'Selesai QC! Paket siap diserahkan ke Kurir. ✅');
             } catch (e) { showToast('error', e.message); }
             setIsLoading(false);
         }
@@ -5174,7 +5249,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
     const handleIstirahatQC = async () => {
         if (!activeCart) return;
-        if (confirm('Istirahat sejenak? Keranjang tetap terbuka, bisa dilanjutkan nanti.')) {
+        if (await showConfirm('Istirahat sejenak? Keranjang tetap terbuka, bisa dilanjutkan nanti.')) {
             setActiveCart('');
             setIsDefectMode(false);
             setActiveOrder(null);
@@ -5343,32 +5418,32 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
     return (
         <div className="max-w-4xl mx-auto space-y-6">
             {!activeCart ? (
-                <div className="bg-white p-16 rounded-3xl border border-slate-200 shadow-2xl text-center">
-                    <i className="fa-solid fa-id-card text-8xl text-rose-500 mb-8 mt-4 animate-bounce"></i>
+                <div className="bg-white p-16 rounded-md border border-slate-200 shadow-2xl text-center">
+                    <i className="fa-solid fa-id-card text-8xl text-rose-500 mb-5 mt-4 animate-bounce"></i>
                     <h2 className="text-4xl font-black text-rose-800 mb-4">SCAN ID CHART KAMU</h2>
-                    <p className="text-slate-500 font-bold mb-8 text-lg">Silakan scan Barcode ID Chart/Keranjang Anda sebelum memulai QC.</p>
+                    <p className="text-slate-500 font-bold mb-5 text-lg">Silakan scan Barcode ID Chart/Keranjang Anda sebelum memulai QC.</p>
                     <form onSubmit={handleCartSubmit}>
-                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-6 text-3xl font-mono text-center border-4 border-rose-200 focus:border-rose-600 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
+                        <input ref={cartInputRef} autoFocus value={cartInput} onChange={e => setCartInput(e.target.value)} className="w-full max-w-xl p-6 text-3xl font-mono text-center border-2 border-rose-200 focus:border-rose-600 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN ID CHART..." />
                     </form>
                 </div>
             ) : !activeOrder ? (
-                <div className="bg-white p-10 rounded-3xl border-2 border-slate-200 shadow-2xl text-center relative overflow-hidden min-h-[480px]">
+                <div className="bg-white p-10 rounded-md border-2 border-slate-200 shadow-2xl text-center relative overflow-hidden min-h-[480px]">
                     {/* TOMBOL SELESAI QC SAJA (tanpa istirahat) */}
                     <div className="absolute z-10 top-6 right-6 flex gap-2">
-                        <button onClick={handleSelesaiQC} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-black py-3 px-5 rounded-xl flex items-center gap-2 transition-colors border-2 border-emerald-300 shadow-sm">
+                        <button onClick={handleSelesaiQC} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-black py-3 px-5 rounded-md flex items-center gap-2 transition-colors border-2 border-emerald-300 shadow-sm">
                             <i className="fa-solid fa-circle-check"></i> SELESAI QC
                         </button>
                     </div>
 
-                    <div className="absolute top-6 left-6 flex items-center gap-2 bg-rose-100 text-blue-800 px-4 py-2 rounded-xl font-bold border border-rose-200 shadow-sm transition-colors">
+                    <div className="absolute top-6 left-6 flex items-center gap-2 bg-rose-100 text-blue-800 px-4 py-2 rounded-md font-bold border border-rose-200 shadow-sm transition-colors">
                         <i className="fa-solid fa-cart-shopping"></i> Chart: {activeCart}
                     </div>
 
                     <div className="mt-8 animate-in fade-in zoom-in duration-300">
                         {/* FOTO KARYAWAN + UCAPAN SEMANGAT */}
                         {activeEmployee ? (
-                            <div className="flex flex-col items-center mb-6">
-                                <div className="w-24 h-28 rounded-2xl border-4 border-rose-200 overflow-hidden bg-rose-50 shadow-lg mb-3">
+                            <div className="flex flex-col items-center mb-4">
+                                <div className="w-24 h-28 rounded-md border-2 border-rose-200 overflow-hidden bg-rose-50 shadow-lg mb-3">
                                     {activeEmployee.foto
                                         ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
                                         : <div className="w-full h-full flex items-center justify-center text-slate-300 text-4xl"><i className="fa-solid fa-user"></i></div>
@@ -5378,7 +5453,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                                 <span className="bg-rose-100 text-rose-600 text-xs font-black uppercase px-3 py-1 rounded-full mb-3">{activeEmployee.posisi}</span>
                             </div>
                         ) : (
-                            <div className="mb-6">
+                            <div className="mb-4">
                                 <i className="fa-solid fa-barcode text-6xl text-rose-500 mb-4 animate-pulse block"></i>
                                 <h2 className="text-4xl font-black text-rose-800 mb-2">TIM QC</h2>
                             </div>
@@ -5386,41 +5461,41 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                         <p className="text-slate-400 font-bold mb-4 uppercase tracking-widest text-xs">Siap Menerima Scan Resi</p>
 
                         {/* STATS ANTREAN */}
-                        <div className="flex justify-center gap-4 mb-6">
-                            <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl px-6 py-4 text-center shadow-sm min-w-[140px]">
+                        <div className="flex justify-center gap-3 mb-4">
+                            <div className="bg-rose-50 border-2 border-rose-200 rounded-md px-6 py-3 text-center shadow-sm min-w-[140px]">
                                 <div className="text-3xl font-black text-rose-600">{pendingOrders.length}</div>
                                 <div className="text-xs font-black text-rose-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-clock-rotate-left mr-1"></i>Antrean QC</div>
                             </div>
-                            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl px-6 py-4 text-center shadow-sm min-w-[140px]">
+                            <div className="bg-emerald-50 border-2 border-emerald-200 rounded-md px-6 py-3 text-center shadow-sm min-w-[140px]">
                                 <div className="text-3xl font-black text-emerald-600">{qcOrders.filter(o => o.status === 'PACKED' && o.cartId === activeCart).length}</div>
                                 <div className="text-xs font-black text-emerald-700 uppercase tracking-wide mt-1"><i className="fa-solid fa-box-open mr-1"></i>Selesai QC</div>
                             </div>
                         </div>
 
                         <form onSubmit={handleScan}>
-                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className="scan-input-big w-full max-w-xl p-5 text-2xl md:text-3xl font-mono text-center border-4 border-rose-200 focus:border-rose-200 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SIAP SCAN..." />
+                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className="scan-input-big w-full max-w-xl p-5 text-xl md:text-2xl font-mono text-center border-2 border-rose-200 focus:border-rose-200 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SIAP SCAN..." />
                         </form>
                     </div>
                 </div>
             ) : (
-                <div className={`p-4 md:p-6 rounded-2xl border-4 shadow-xl transition-all duration-300 ${isDefectMode ? 'bg-red-50 border-red-500 shadow-red-100' : 'bg-white border-indigo-500 shadow-indigo-100'}`}>
-                    <div className="flex justify-between items-start mb-6 border-b pb-6 border-slate-100">
+                <div className={`p-4 md:p-6 rounded-md border-2 shadow-xl transition-all duration-300 ${isDefectMode ? 'bg-red-50 border-red-500 shadow-red-100' : 'bg-white border-indigo-500 shadow-indigo-100'}`}>
+                    <div className="flex justify-between items-start mb-4 border-b pb-6 border-slate-100">
                         <div>
                             <h3 className="text-3xl font-black flex items-center gap-3">
                                 {isDefectMode ? <i className="fa-solid fa-triangle-exclamation text-rose-600 animate-bounce"></i> : <i className="fa-solid fa-box-open text-rose-500"></i>}
                                 {activeOrder.id}
                             </h3>
                             <div className="flex gap-3 mt-2">
-                                <span className={`px-4 py-1.5 rounded-xl font-black text-xs uppercase shadow-sm border ${activeOrder.platform === 'SHOPEE' ? 'bg-rose-100 text-rose-700 border-rose-200' : activeOrder.platform === 'TIKTOK' ? 'bg-rose-800 text-white border-slate-900' : 'bg-rose-100 text-rose-600 border-rose-200'}`}>{activeOrder.platform}</span>
-                                {isDefectMode && <span className="bg-rose-600 text-white px-4 py-1.5 rounded-xl font-black text-xs uppercase animate-pulse shadow-md">Mode Koreksi Rusak Aktif</span>}
+                                <span className={`px-4 py-1.5 rounded-md font-black text-xs uppercase shadow-sm border ${activeOrder.platform === 'SHOPEE' ? 'bg-rose-100 text-rose-700 border-rose-200' : activeOrder.platform === 'TIKTOK' ? 'bg-rose-800 text-white border-slate-900' : 'bg-rose-100 text-rose-600 border-rose-200'}`}>{activeOrder.platform}</span>
+                                {isDefectMode && <span className="bg-rose-600 text-white px-4 py-1.5 rounded-md font-black text-xs uppercase animate-pulse shadow-md">Mode Koreksi Rusak Aktif</span>}
                             </div>
                         </div>
-                        <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-3 rounded-xl font-black text-xs uppercase transition-colors border border-transparent hover:border-rose-200">Ganti Resi</button>
+                        <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 p-3 rounded-md font-black text-xs uppercase transition-colors border border-transparent hover:border-rose-200">Ganti Resi</button>
                     </div>
 
-                    <div className="mb-8">
+                    <div className="mb-5">
                         <form onSubmit={handleScan}>
-                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className={`scan-input-big w-full p-4 md:p-6 text-xl md:text-3xl font-mono text-center border-4 rounded-2xl outline-none shadow-inner transition-all ${isDefectMode ? 'border-red-500 bg-red-50 text-red-900 placeholder-red-400' : 'border-slate-300 focus:border-rose-200 bg-slate-50 text-rose-800'}`} placeholder={isDone ? 'PESANAN SELESAI' : isDefectMode ? 'SCAN BARANG RUSAK!' : 'SCAN BARANG...'} />
+                            <input ref={inputRef} autoFocus value={currentResi} onChange={e => setCurrentResi(e.target.value)} className={`scan-input-big w-full p-4 md:p-6 text-xl md:text-3xl font-mono text-center border-2 rounded-md outline-none shadow-inner transition-all ${isDefectMode ? 'border-red-500 bg-red-50 text-red-900 placeholder-red-400' : 'border-slate-300 focus:border-rose-200 bg-slate-50 text-rose-800'}`} placeholder={isDone ? 'PESANAN SELESAI' : isDefectMode ? 'SCAN BARANG RUSAK!' : 'SCAN BARANG...'} />
                         </form>
                     </div>
 
@@ -5429,12 +5504,12 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                             const variant = variants.find(v => v.sku === item.sysSku || v.sku === item.sku || (v.legacySkus || []).includes(item.sysSku) || (v.legacySkus || []).includes(item.sku));
                             const itemDone = item.scanned >= item.qty;
                             return (
-                                <div key={idx} className={`p-3 md:p-4 rounded-xl border-2 flex items-center justify-between transition-all duration-300 ${itemDone ? 'bg-teal-50 border-teal-400 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                                <div key={idx} className={`p-3 md:p-4 rounded-md border-2 flex items-center justify-between transition-all duration-300 ${itemDone ? 'bg-teal-50 border-teal-400 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center gap-3 min-w-0">
-                                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center text-xl md:text-2xl shadow-sm flex-shrink-0 ${itemDone ? 'bg-teal-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-300'}`}>
+                                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-md flex items-center justify-center text-xl md:text-2xl shadow-sm flex-shrink-0 ${itemDone ? 'bg-teal-600 text-white' : 'bg-white border-2 border-slate-200 text-slate-300'}`}>
                                             {itemDone ? <i className="fa-solid fa-check"></i> : idx + 1}
                                         </div>
-                                        {variant && <img src={variant.photo} className="w-14 h-14 md:w-16 md:h-16 rounded-xl object-cover shadow-md border-2 border-white flex-shrink-0" />}
+                                        {variant && <img src={variant.photo} className="w-12 h-12 md:w-14 md:h-14 rounded-md object-cover shadow-md border-2 border-white flex-shrink-0" />}
                                         <div className="min-w-0">
                                             <div className={`font-black text-base md:text-xl truncate ${itemDone ? 'text-teal-900' : 'text-rose-800'}`}>{variant ? variant.article : item.sku}</div>
                                             <div className="text-xs font-bold text-slate-500 uppercase">{variant ? `${variant.colorName} â€¢ Sz ${variant.sizeName}` : ''}</div>
@@ -5445,7 +5520,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                                             </div>
                                         </div>
                                     </div>
-                                    <div className={`text-3xl md:text-4xl font-black flex-shrink-0 ml-2 ${itemDone ? 'text-teal-600' : 'text-slate-300'}`}>{item.scanned}<span className="text-base text-slate-300 mx-0.5">/</span>{item.qty}</div>
+                                    <div className={`text-xl md:text-2xl font-black flex-shrink-0 ml-2 ${itemDone ? 'text-teal-600' : 'text-slate-300'}`}>{item.scanned}<span className="text-base text-slate-300 mx-0.5">/</span>{item.qty}</div>
                                 </div>
                             )
                         })}
@@ -5456,7 +5531,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
                             <div className="inline-block bg-teal-100 text-teal-700 px-5 py-2 rounded-full font-black text-sm uppercase tracking-widest border border-teal-200 shadow-sm animate-pulse mb-5">
                                 <i className="fa-solid fa-wand-magic-sparkles mr-2"></i> Pesanan Siap Dibungkus!
                             </div>
-                            <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="w-full bg-rose-800 hover:bg-rose-900 text-white font-black py-5 md:py-6 rounded-2xl shadow-xl shadow-slate-800/30 transition-all transform hover:-translate-y-1 text-xl md:text-2xl flex items-center justify-center gap-3 border-b-4 border-slate-950">
+                            <button onClick={() => { setIsDefectMode(false); setActiveOrder(null); setIsDone(false); }} className="w-full bg-rose-800 hover:bg-rose-900 text-white font-black py-3.5 md:py-6 rounded-md shadow-xl shadow-slate-800/30 transition-all transform hover:-translate-y-1 text-xl md:text-2xl flex items-center justify-center gap-3 border-b-4 border-slate-950">
                                 <i className="fa-solid fa-box"></i> LANJUT PESANAN BARU
                             </button>
                             <p className="text-center text-slate-400 font-bold mt-4 text-sm italic">Tips: Langsung scan Resi baru untuk lanjut otomatis tanpa klik.</p>
@@ -5503,7 +5578,7 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
         if (!wVar) return showToast('error', 'Barcode Barang yang Dikembalikan TIDAK VALID.');
         if (!rVar) return showToast('error', 'Barcode Barang Baru TIDAK VALID.');
 
-        if (!confirm(`Tukar Barang?\nKembali: ${wVar.article} (${wVar.colorName})\nAmbil Baru: ${rVar.article} (${rVar.colorName})`)) return;
+        if (!(await showConfirm(`Tukar Barang?\nKembali: ${wVar.article} (${wVar.colorName})\nAmbil Baru: ${rVar.article} (${rVar.colorName})`))) return;
 
         setIsLoading(true);
         try {
@@ -5530,8 +5605,8 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
         <div className="max-w-4xl mx-auto space-y-6 relative">
             {showCamera && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera ({cameraTarget === 'wrong' ? 'Barang Salah' : 'Barang Benar'})</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
@@ -5550,32 +5625,32 @@ function RevisiStok({ variants, transactions, setIsLoading, showToast, currentUs
                 </div>
             )}
 
-            <div className="bg-rose-900 p-8 rounded-3xl shadow-xl flex items-center justify-between text-white">
+            <div className="bg-rose-900 p-6 rounded-md shadow-xl flex items-center justify-between text-white">
                 <div>
                     <h2 className="text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-right-left text-rose-500"></i> Menu Koreksi & Tukar Barang</h2>
                     <p className="text-slate-400 font-bold mt-2">Untuk Tim Picker: Kembalikan barang yang salah, ambil barang yang benar.</p>
                 </div>
             </div>
             <form onSubmit={handleSwap} className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-                <div className="bg-rose-50 p-8 rounded-3xl border-4 border-rose-200 text-center shadow-sm">
+                <div className="bg-rose-50 p-6 rounded-md border-2 border-rose-200 text-center shadow-sm">
                     <i className="fa-solid fa-arrow-turn-down text-5xl text-rose-400 mb-4"></i>
                     <h3 className="font-black text-rose-800 text-xl mb-4">1. Scan Barang Salah</h3>
                     <div className="flex gap-2">
-                        <input ref={inputWrong} required value={wrongBarcode} onChange={e => setWrongBarcode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRight.current.focus(); } }} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 rounded-xl outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
-                        <button type="button" onClick={() => { setCameraTarget('wrong'); setShowCamera(true); }} className="bg-rose-200 hover:bg-rose-300 text-rose-800 px-4 rounded-xl shadow-sm"><i className="fa-solid fa-camera text-xl"></i></button>
+                        <input ref={inputWrong} required value={wrongBarcode} onChange={e => setWrongBarcode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); inputRight.current.focus(); } }} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 rounded-md outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
+                        <button type="button" onClick={() => { setCameraTarget('wrong'); setShowCamera(true); }} className="bg-rose-200 hover:bg-rose-300 text-rose-800 px-4 rounded-md shadow-sm"><i className="fa-solid fa-camera text-xl"></i></button>
                     </div>
                     {wrongBarcode && getVariantByFullBarcode(wrongBarcode) && <div className="mt-4 font-bold text-rose-700 bg-rose-200 p-2 rounded-lg">{getVariantByFullBarcode(wrongBarcode).article} - {getVariantByFullBarcode(wrongBarcode).sizeName}</div>}
                 </div>
-                <div className="bg-emerald-50 p-8 rounded-3xl border-4 border-emerald-200 text-center shadow-sm">
+                <div className="bg-emerald-50 p-6 rounded-md border-2 border-emerald-200 text-center shadow-sm">
                     <i className="fa-solid fa-arrow-turn-up text-5xl text-emerald-400 mb-4"></i>
                     <h3 className="font-black text-emerald-800 text-xl mb-4">2. Scan Barang Benar</h3>
                     <div className="flex gap-2">
-                        <input ref={inputRight} required value={rightBarcode} onChange={e => setRightBarcode(e.target.value)} className="w-full p-4 border-2 border-emerald-300 focus:border-emerald-600 rounded-xl outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
-                        <button type="button" onClick={() => { setCameraTarget('right'); setShowCamera(true); }} className="bg-emerald-200 hover:bg-emerald-300 text-emerald-800 px-4 rounded-xl shadow-sm"><i className="fa-solid fa-camera text-xl"></i></button>
+                        <input ref={inputRight} required value={rightBarcode} onChange={e => setRightBarcode(e.target.value)} className="w-full p-4 border-2 border-emerald-300 focus:border-emerald-600 rounded-md outline-none font-mono text-center font-bold text-lg bg-white" placeholder="SCAN BARCODE..." />
+                        <button type="button" onClick={() => { setCameraTarget('right'); setShowCamera(true); }} className="bg-emerald-200 hover:bg-emerald-300 text-emerald-800 px-4 rounded-md shadow-sm"><i className="fa-solid fa-camera text-xl"></i></button>
                     </div>
                     {rightBarcode && getVariantByFullBarcode(rightBarcode) && <div className="mt-4 font-bold text-emerald-700 bg-emerald-200 p-2 rounded-lg">{getVariantByFullBarcode(rightBarcode).article} - {getVariantByFullBarcode(rightBarcode).sizeName}</div>}
                 </div>
-                <button type="submit" disabled={!wrongBarcode || !rightBarcode} className="md:col-span-2 bg-rose-900 hover:bg-black text-white font-black text-xl py-5 rounded-2xl shadow-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-bolt mr-2"></i> KONFIRMASI TUKAR BARANG</button>
+                <button type="submit" disabled={!wrongBarcode || !rightBarcode} className="md:col-span-2 bg-rose-900 hover:bg-black text-white font-black text-xl py-3.5 rounded-md shadow-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-bolt mr-2"></i> KONFIRMASI TUKAR BARANG</button>
             </form>
         </div>
     );
@@ -5616,7 +5691,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                 const msg = MOTIVASI_HANDOVER[Math.floor(Math.random() * MOTIVASI_HANDOVER.length)];
                 setMotivasiMsg(msg);
                 playCekling();
-                showToast('success', `âœ… Selamat datang, ${emp.nama}! ${msg}`);
+                showToast('success', `✅ Selamat datang, ${emp.nama}! ${msg}`);
                 setIsWorking(true);
             } else {
                 playError();
@@ -5674,7 +5749,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
     const handleSelesai = async () => {
         if (stagedList.length === 0) return showToast('error', 'Belum ada paket yang di-scan.');
         const totalPaket = stagedList.reduce((a, s) => a + s.count, 0);
-        if (!confirm(`Serahkan ${totalPaket} paket ke kurir sekarang?`)) return;
+        if (!(await showConfirm(`Serahkan ${totalPaket} paket ke kurir sekarang?`))) return;
         setIsLoading(true);
         try {
             const batch = db.batch();
@@ -5759,7 +5834,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             }
             // ------------------------------------
             playCekling();
-            showToast('success', `${totalPaket} paket resmi diserahkan ke kurir! âœ…`);
+            showToast('success', `${totalPaket} paket resmi diserahkan ke kurir! ✅`);
             playTTS(`${totalPaket} paket selesai`);
             setStagedList([]);
             setIsWorking(false);
@@ -5769,9 +5844,9 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
         setIsLoading(false);
     };
 
-    const handleIstirahat = () => {
+    const handleIstirahat = async () => {
         if (stagedList.length > 0) {
-            if (!confirm(`Ada ${stagedList.reduce((a, s) => a + s.count, 0)} paket belum diserahkan. Istirahat dan batalkan daftar?`)) return;
+            if (!(await showConfirm(`Ada ${stagedList.reduce((a, s) => a + s.count, 0)} paket belum diserahkan. Istirahat dan batalkan daftar?`))) return;
         }
         setStagedList([]);
         setIsWorking(false);
@@ -5790,22 +5865,22 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
         <div className="max-w-4xl mx-auto space-y-6">
             {!isWorking ? (
                 // LAYAR SCAN ID KARYAWAN
-                <div className="bg-white p-16 rounded-3xl border border-slate-200 shadow-2xl text-center">
-                    <i className="fa-solid fa-id-card text-8xl text-emerald-500 mb-8 mt-4 animate-bounce"></i>
+                <div className="bg-white p-16 rounded-md border border-slate-200 shadow-2xl text-center">
+                    <i className="fa-solid fa-id-card text-8xl text-emerald-500 mb-5 mt-4 animate-bounce"></i>
                     <h2 className="text-4xl font-black text-rose-800 mb-4">HANDOVER KURIR</h2>
-                    <p className="text-slate-500 font-bold mb-8 text-lg">Scan ID Card karyawan untuk mulai menyerahkan paket ke kurir.</p>
+                    <p className="text-slate-500 font-bold mb-5 text-lg">Scan ID Card karyawan untuk mulai menyerahkan paket ke kurir.</p>
                     <form onSubmit={handleIdSubmit}>
-                        <input ref={idInputRef} autoFocus value={idInput} onChange={e => setIdInput(e.target.value)} className="scan-input-big w-full max-w-xl p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-4 border-teal-200 focus:border-teal-600 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN ID KARYAWAN..." />
+                        <input ref={idInputRef} autoFocus value={idInput} onChange={e => setIdInput(e.target.value)} className="scan-input-big w-full max-w-xl p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-2 border-teal-200 focus:border-teal-600 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN ID KARYAWAN..." />
                     </form>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {/* HEADER: foto karyawan + tombol aksi */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl flex items-center justify-between gap-4">
+                    <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl flex items-center justify-between gap-3">
                         <div className="flex items-center gap-5">
                             {activeEmployee && (
                                 <>
-                                    <div className="w-16 h-20 rounded-xl border-2 border-emerald-200 overflow-hidden bg-rose-50 shadow-md flex-shrink-0">
+                                    <div className="w-16 h-20 rounded-md border-2 border-emerald-200 overflow-hidden bg-rose-50 shadow-md flex-shrink-0">
                                         {activeEmployee.foto
                                             ? <img src={activeEmployee.foto} className="w-full h-full object-cover" />
                                             : <div className="w-full h-full flex items-center justify-center text-slate-300 text-2xl"><i className="fa-solid fa-user"></i></div>
@@ -5824,8 +5899,8 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                     {/* OVERLAY KAMERA */}
                     {showCamera && (
                         <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                            <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                                <div className="flex justify-between items-center mb-6">
+                            <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                                <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-emerald-600"></i> Scan Resi (Continuous)</h3>
                                     <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                                 </div>
@@ -5837,13 +5912,13 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                     )}
 
                     {/* INPUT SCAN */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xl">
+                    <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl">
                         <p className="text-slate-500 font-bold text-sm mb-3 text-center uppercase tracking-wide">Scan Resi atau ID Karung/Chart</p>
-                        <div className="flex gap-4">
+                        <div className="flex gap-3">
                             <form onSubmit={handleScan} className="flex-1">
-                                <input ref={inputRef} autoFocus value={resi} onChange={e => setResi(e.target.value)} className="scan-input-big w-full p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-4 border-slate-300 focus:border-teal-500 rounded-2xl outline-none shadow-inner bg-slate-50" placeholder="SCAN RESI / ID CHART..." />
+                                <input ref={inputRef} autoFocus value={resi} onChange={e => setResi(e.target.value)} className="scan-input-big w-full p-4 md:p-5 text-xl md:text-2xl font-mono text-center border-2 border-slate-300 focus:border-teal-500 rounded-md outline-none shadow-inner bg-slate-50" placeholder="SCAN RESI / ID CHART..." />
                             </form>
-                            <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                            <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
                                 <i className="fa-solid fa-camera text-3xl mb-1 text-emerald-400"></i> Kamera
                             </button>
                         </div>
@@ -5851,16 +5926,16 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
 
                     {/* DAFTAR STAGED */}
                     {stagedList.length > 0 ? (
-                        <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-                            <div className="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                        <div className="bg-white rounded-md border border-slate-200 shadow-xl overflow-hidden">
+                            <div className="bg-emerald-600 px-6 py-3 flex justify-between items-center">
                                 <span className="text-white font-black text-lg"><i className="fa-solid fa-list-check mr-2"></i> Daftar Paket Siap Serah</span>
                                 <span className="bg-white text-emerald-700 font-black px-4 py-1 rounded-full text-sm">{totalStagedPaket} Paket</span>
                             </div>
                             <div className="divide-y divide-slate-100">
                                 {stagedList.map((s, idx) => (
-                                    <div key={idx} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                                    <div key={idx} className="flex items-center justify-between px-6 py-3 hover:bg-slate-50 transition-colors">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 bg-emerald-100 rounded-md flex items-center justify-center">
                                                 <i className={`fa-solid ${s.type === 'CART' ? 'fa-boxes-stacked' : 'fa-box'} text-emerald-600`}></i>
                                             </div>
                                             <div>
@@ -5868,21 +5943,21 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
                                                 <div className="text-xs text-slate-500 font-bold">{s.type === 'CART' ? `Karung â€¢ ${s.count} paket` : 'Resi individual'}</div>
                                             </div>
                                         </div>
-                                        <button onClick={() => handleRemoveStaged(s.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 w-9 h-9 rounded-xl flex items-center justify-center transition-colors">
+                                        <button onClick={() => handleRemoveStaged(s.id)} className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 w-9 h-9 rounded-md flex items-center justify-center transition-colors">
                                             <i className="fa-solid fa-xmark"></i>
                                         </button>
                                     </div>
                                 ))}
                             </div>
-                            <div className="bg-slate-50 px-6 py-4 flex justify-between items-center border-t border-slate-200">
+                            <div className="bg-slate-50 px-6 py-3 flex justify-between items-center border-t border-slate-200">
                                 <span className="text-slate-500 font-bold text-sm">Total Terkirim Hari Ini: <b className="text-emerald-700">{shippedCount} paket</b></span>
-                                <button onClick={handleSelesai} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-3 rounded-xl shadow-md flex items-center gap-2 transition-all hover:-translate-y-0.5">
+                                <button onClick={handleSelesai} className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-3 rounded-md shadow-md flex items-center gap-2 transition-all hover:-translate-y-0.5">
                                     <i className="fa-solid fa-truck-fast"></i> SERAHKAN KE KURIR
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200 py-12 text-center text-slate-400">
+                        <div className="bg-slate-50 rounded-md border-2 border-dashed border-slate-200 py-12 text-center text-slate-400">
                             <i className="fa-solid fa-inbox text-5xl mb-3 block opacity-50"></i>
                             <p className="font-bold">Scan resi atau karung untuk mulai membuat daftar serah.</p>
                             <p className="text-xs mt-1">Daftar akan muncul di sini. Klik SELESAI untuk menyerahkan semua sekaligus.</p>
@@ -5953,7 +6028,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
     };
 
     const handleDelete = async (id) => {
-        if (confirm('Hapus data karyawan ini secara permanen?')) {
+        if (await showConfirm('Hapus data karyawan ini secara permanen?')) {
             setIsLoading(true);
             await db.collection('employees').doc(id).delete();
             setIsLoading(false);
@@ -6156,31 +6231,31 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div>
                     <h2 className="text-xl md:text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-id-card text-rose-500"></i> Manajemen Karyawan</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Data staf dan pembuatan ID Card Barcode.</p>
                 </div>
-                <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(initialForm); }} className={`px-5 py-2.5 rounded-xl font-black transition-colors ${showForm ? 'bg-slate-200 text-slate-700' : 'bg-rose-500 text-white hover:bg-rose-600 shadow-md'}`}>
+                <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(initialForm); }} className={`px-4 py-2 rounded-md font-black transition-colors ${showForm ? 'bg-slate-200 text-slate-700' : 'bg-rose-500 text-white hover:bg-rose-600 shadow-md'}`}>
                     <i className={`fa-solid ${showForm ? 'fa-xmark' : 'fa-plus'} mr-2`}></i> {showForm ? 'Batal' : 'Tambah Karyawan'}
                 </button>
             </div>
 
             {showForm && (
-                <div className="bg-slate-50 p-6 md:p-8 rounded-3xl border-2 border-slate-200 shadow-inner animate-in fade-in zoom-in duration-300">
-                    <h3 className="text-xl font-black text-rose-800 mb-6 border-b pb-4"><i className="fa-solid fa-user-pen mr-2 text-rose-500"></i> {editId ? 'Edit Data Karyawan' : 'Input Karyawan Baru'}</h3>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-slate-50 p-6 md:p-6 rounded-md border-2 border-slate-200 shadow-inner animate-in fade-in zoom-in duration-300">
+                    <h3 className="text-xl font-black text-rose-800 mb-4 border-b pb-4"><i className="fa-solid fa-user-pen mr-2 text-rose-500"></i> {editId ? 'Edit Data Karyawan' : 'Input Karyawan Baru'}</h3>
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Lengkap</label><input required value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-bold bg-white" placeholder="NAMA LENGKAP" /></div>
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">ID Karyawan (Boleh Kosong)</label><input value={form.idKaryawan} onChange={e => setForm({ ...form, idKaryawan: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-mono bg-white" placeholder="ID KARYAWAN (OTOMATIS JIKA KOSONG)" /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Lengkap</label><input required value={form.nama} onChange={e => setForm({ ...form, nama: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 font-bold bg-white" placeholder="NAMA LENGKAP" /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">ID Karyawan (Boleh Kosong)</label><input value={form.idKaryawan} onChange={e => setForm({ ...form, idKaryawan: e.target.value.toUpperCase() })} className="w-full p-4 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 font-mono bg-white" placeholder="ID KARYAWAN (OTOMATIS JIKA KOSONG)" /></div>
                             <div>
                                 <label className="block text-sm font-bold text-slate-700 mb-1">Posisi / Jabatan</label>
-                                <input required value={form.posisi || ''} onChange={e => setForm({ ...form, posisi: e.target.value })} className="w-full p-4 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 font-bold bg-white" placeholder="POSISI / JABATAN" />
+                                <input required value={form.posisi || ''} onChange={e => setForm({ ...form, posisi: e.target.value })} className="w-full p-4 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 font-bold bg-white" placeholder="POSISI / JABATAN" />
                             </div>
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-1">Foto Pas Karyawan (Max 800Kb)</label>
-                            <label className="flex flex-col items-center justify-center w-full h-64 border-4 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-white hover:bg-rose-50 transition-colors shadow-sm overflow-hidden relative">
+                            <label className="flex flex-col items-center justify-center w-full h-64 border-2 border-slate-300 border-dashed rounded-md cursor-pointer bg-white hover:bg-rose-50 transition-colors shadow-sm overflow-hidden relative">
                                 {form.foto ? (
                                     <img src={form.foto} alt="Preview" className="w-full h-full object-cover" />
                                 ) : (
@@ -6190,7 +6265,7 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
                             </label>
                         </div>
                         <div className="md:col-span-2 pt-6 border-t border-slate-200">
-                            <button type="submit" className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-8 py-3.5 rounded-xl font-black shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
+                            <button type="submit" className="w-full md:w-auto bg-rose-500 hover:bg-rose-600 text-white px-8 py-3.5 rounded-md font-black shadow-lg shadow-rose-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-save mr-2"></i> SIMPAN DATA KARYAWAN</button>
                         </div>
                     </form>
                 </div>
@@ -6198,10 +6273,10 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {employees.map(emp => (
-                    <div key={emp.id} className="bg-white p-6 rounded-3xl border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-rose-300 transition-colors relative overflow-hidden group">
+                    <div key={emp.id} className="bg-white p-6 rounded-md border-2 border-slate-100 shadow-sm flex flex-col justify-between hover:border-rose-300 transition-colors relative overflow-hidden group">
                         <div className="absolute top-0 right-0 w-24 h-24 bg-rose-50 rounded-bl-full -z-10 transition-transform group-hover:scale-110"></div>
-                        <div className="flex items-start gap-4 mb-6">
-                            <div className="w-20 h-24 rounded-xl border-2 border-slate-200 overflow-hidden bg-rose-50 flex-shrink-0 shadow-sm">
+                        <div className="flex items-start gap-3 mb-4">
+                            <div className="w-20 h-24 rounded-md border-2 border-slate-200 overflow-hidden bg-rose-50 flex-shrink-0 shadow-sm">
                                 {emp.foto ? <img src={emp.foto} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-300 text-3xl"><i className="fa-solid fa-user"></i></div>}
                             </div>
                             <div>
@@ -6211,15 +6286,15 @@ function ManajemenKaryawan({ setIsLoading, showToast }) {
                             </div>
                         </div>
                         <div className="flex gap-2 border-t border-slate-100 pt-4">
-                            <button onClick={() => cetakIDCard(emp)} className="flex-1 bg-rose-900 hover:bg-black text-white py-2.5 rounded-xl font-bold text-xs shadow-sm transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak ID</button>
-                            <button onClick={() => handleEdit(emp)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-xl font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-pen"></i></button>
-                            <button onClick={() => handleDelete(emp.id)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-xl font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-trash-can"></i></button>
+                            <button onClick={() => cetakIDCard(emp)} className="flex-1 bg-rose-900 hover:bg-black text-white py-2.5 rounded-md font-bold text-xs shadow-sm transition-colors"><i className="fa-solid fa-print mr-1"></i> Cetak ID</button>
+                            <button onClick={() => handleEdit(emp)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-md font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-pen"></i></button>
+                            <button onClick={() => handleDelete(emp.id)} className="w-10 h-10 bg-rose-50 hover:bg-rose-500 hover:text-white text-rose-500 rounded-md font-bold flex items-center justify-center transition-colors"><i className="fa-solid fa-trash-can"></i></button>
                         </div>
                     </div>
                 ))}
 
                 {employees.length === 0 && (
-                    <div className="md:col-span-2 lg:col-span-3 text-center py-16 text-slate-400 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                    <div className="md:col-span-2 lg:col-span-3 text-center py-16 text-slate-400 bg-white rounded-md border-2 border-dashed border-slate-200">
                         <i className="fa-solid fa-users-slash text-6xl mb-4 opacity-50"></i>
                         <h3 className="text-xl font-black text-slate-600 mb-1">Belum Ada Data Karyawan</h3>
                         <p className="font-bold text-sm">Klik tombol "Tambah Karyawan" di atas untuk memasukkan data.</p>
@@ -6249,11 +6324,11 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             });
             localStorage.setItem('syaren_waTarget', waTarget);
             localStorage.setItem('syaren_waTime', waTime);
-            alert('Pengaturan Laporan WA berhasil disimpan!');
+            showAlert('Pengaturan Laporan WA berhasil disimpan!', 'Informasi');
             setShowSettings(false);
         } catch (error) {
             console.error(error);
-            alert('Gagal menyimpan pengaturan.');
+            showAlert('Gagal menyimpan pengaturan.', 'Informasi');
         }
     };
 
@@ -6556,7 +6631,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     };
 
     const copyLaporan = () => {
-        navigator.clipboard.writeText(laporanTeks).then(() => alert('Laporan berhasil disalin!'));
+        navigator.clipboard.writeText(laporanTeks).then(() => showAlert('Laporan berhasil disalin!', 'Informasi'));
     };
 
     // COPY PASTE: Perhitungan Sisa PO Pabrik persis dari Surat Jalan
@@ -6564,7 +6639,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
         .reduce((acc, po) => acc + (po.items || []).reduce((s, i) => s + Math.max(0, (i.qty || 0) - (i.received || 0)), 0), 0);
 
     const handleResetAntrean = async () => {
-        if (!confirm(`PERINGATAN KERAS! âš ï¸\n\nAnda akan menghapus SELURUH data Sistem Pesanan Online (SPO) secara PERMANEN, meliputi:\n1. Semua Antrean QC\n2. Semua Riwayat Pesanan (History)\n3. Semua Draft Antrean Produksi\n\nTindakan ini tidak bisa dibatalkan. Yakin ingin RESET TOTAL?`)) return;
+        if (!(await showConfirm(`PERINGATAN KERAS! âš ï¸\n\nAnda akan menghapus SELURUH data Sistem Pesanan Online (SPO) secara PERMANEN, meliputi:\n1. Semua Antrean QC\n2. Semua Riwayat Pesanan (History)\n3. Semua Draft Antrean Produksi\n\nTindakan ini tidak bisa dibatalkan. Yakin ingin RESET TOTAL?`))) return;
 
         setIsResetting(true);
         // Karena Dashboard tidak punya prop showToast, kita gunakan alert/loading state lokal
@@ -6589,9 +6664,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             await deleteCollection('po_drafts');
             await deleteCollection('online_history');
 
-            alert('RESET TOTAL BERHASIL! Seluruh data pesanan online telah dibersihkan.');
+            showAlert('RESET TOTAL BERHASIL! Seluruh data pesanan online telah dibersihkan.', 'Informasi');
         } catch (e) {
-            alert('Terjadi kesalahan saat reset: ' + e.message);
+            showAlert('Terjadi kesalahan saat reset: ' + e.message, 'Informasi');
         } finally {
             setIsResetting(false);
         }
@@ -6599,51 +6674,51 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
     return (
         <div className="space-y-6 relative">
-            <div className="flex justify-end -mb-4 relative z-10">
-                <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-white text-rose-500 border-2 border-rose-100 px-4 py-2 rounded-xl hover:bg-rose-50 transition-colors shadow-sm font-bold text-sm" title="Pengaturan Laporan WA">
+            <div className="flex justify-end mb-2 md:-mb-4 relative z-10">
+                <button onClick={() => setShowSettings(true)} className="flex items-center gap-2 bg-white text-rose-500 border-2 border-rose-100 px-4 py-2 rounded-md hover:bg-rose-50 transition-colors shadow-sm font-bold text-sm" title="Pengaturan Laporan WA">
                     <i className="fa-solid fa-gear"></i> Pengaturan WA
                 </button>
             </div>
             {showSettings && (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-2xl relative border-4 border-rose-100">
+                    <div className="bg-white rounded-md p-6 w-full max-w-md shadow-2xl relative border-2 border-rose-100">
                         <div className="w-16 h-16 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4"><i className="fa-brands fa-whatsapp text-3xl"></i></div>
-                        <h3 className="text-2xl font-black text-rose-800 text-center mb-6">Pengaturan Laporan WA</h3>
+                        <h3 className="text-2xl font-black text-rose-800 text-center mb-4">Pengaturan Laporan WA</h3>
                         <form onSubmit={saveWaSettings} className="space-y-5">
                             <div>
                                 <label className="block text-sm font-bold text-rose-700 mb-2">Nomor WhatsApp Tujuan</label>
-                                <input required type="text" value={waTarget} onChange={e => setWaTarget(e.target.value)} className="w-full p-4 rounded-xl border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" placeholder="081234567890" />
+                                <input required type="text" value={waTarget} onChange={e => setWaTarget(e.target.value)} className="w-full p-4 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" placeholder="081234567890" />
                             </div>
                             <div>
                                 <label className="block text-sm font-bold text-rose-700 mb-2">Jam Pengiriman Otomatis</label>
-                                <input required type="time" value={waTime} onChange={e => setWaTime(e.target.value)} className="w-full p-4 rounded-xl border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" />
+                                <input required type="time" value={waTime} onChange={e => setWaTime(e.target.value)} className="w-full p-4 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" />
                                 
                             </div>
-                            <div className="flex gap-4 pt-4">
-                                <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-4 font-bold text-rose-500 bg-rose-50 rounded-xl hover:bg-rose-100 transition-colors">BATAL</button>
-                                <button type="submit" className="flex-1 py-4 font-black text-white bg-rose-500 rounded-xl hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">SIMPAN</button>
+                            <div className="flex gap-3 pt-4">
+                                <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-3 font-bold text-rose-500 bg-rose-50 rounded-md hover:bg-rose-100 transition-colors">BATAL</button>
+                                <button type="submit" className="flex-1 py-3 font-black text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">SIMPAN</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between">
+            <div className="bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
                 <div className="flex flex-wrap gap-2 justify-center md:justify-start">
                     {['hari', 'kemarin', 'minggu', 'bulan', 'tahun', 'custom'].map(r => (
-                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-5 py-2.5 rounded-xl text-sm md:text-base font-bold capitalize transition-colors ${range === r ? 'bg-rose-900 text-white shadow-md' : 'bg-rose-50 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
+                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-4 py-2 rounded-md text-sm md:text-base font-bold capitalize transition-colors ${range === r ? 'bg-rose-900 text-white shadow-md' : 'bg-rose-50 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
                     ))}
                 </div>
                 {range === 'custom' && (
-                    <div className="flex flex-col sm:flex-row gap-2 items-center bg-slate-50 p-3 rounded-2xl border w-full md:w-auto">
-                        <input type="date" className="w-full sm:w-auto bg-white border rounded-xl p-2.5 text-sm md:text-base outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700" onChange={e => setCustomRange({ ...customRange, start: e.target.value })} />
+                    <div className="flex flex-col sm:flex-row gap-2 items-center bg-slate-50 p-3 rounded-md border w-full md:w-auto">
+                        <input type="date" className="w-full sm:w-auto bg-white border rounded-md p-2.5 text-sm md:text-base outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700" onChange={e => setCustomRange({ ...customRange, start: e.target.value })} />
                         <span className="text-slate-400 font-black hidden sm:inline">-</span>
-                        <input type="date" className="w-full sm:w-auto bg-white border rounded-xl p-2.5 text-sm md:text-base outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700" onChange={e => setCustomRange({ ...customRange, end: e.target.value })} />
+                        <input type="date" className="w-full sm:w-auto bg-white border rounded-md p-2.5 text-sm md:text-base outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-700" onChange={e => setCustomRange({ ...customRange, end: e.target.value })} />
                     </div>
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
                 <StatCard
                     title="Barang Masuk (Produksi)"
                     value={stats.in}
@@ -6663,14 +6738,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 {/* KARTU SALDO KAS */}
                 <div
                     onClick={() => setKasModal(true)}
-                    className="cursor-pointer bg-gradient-to-br from-rose-500 to-rose-600 p-5 md:p-6 rounded-3xl shadow-md hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-4 group"
+                    className="cursor-pointer bg-gradient-to-br from-rose-500 to-rose-600 p-4 md:p-5 rounded-md shadow-md hover:shadow-lg hover:scale-[1.02] transition-all flex items-center gap-3 group"
                 >
-                    <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-md bg-white/20 flex items-center justify-center flex-shrink-0 group-hover:bg-white/30 transition-colors">
                         <i className="fa-solid fa-wallet text-white text-2xl"></i>
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="text-white/80 text-xs font-black uppercase tracking-widest">Saldo Kas Operasional</div>
-                        <div className="text-white text-2xl md:text-3xl font-black leading-tight mt-0.5 truncate">
+                        <div className="text-white text-xl md:text-2xl font-black leading-tight mt-0.5 truncate">
                             {kasLoaded ? `Rp ${totalSaldoKas.toLocaleString('id-ID')}` : '...'}
                         </div>
                         <div className={`text-xs font-bold mt-1 ${totalSaldoKas >= 0 ? 'text-green-200' : 'text-red-200'}`}>
@@ -6682,33 +6757,33 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             </div>
 
             <div className="mt-8 pt-6 border-t border-slate-200">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
                     <h3 className="text-xl font-black text-rose-800 flex items-center gap-2"><i className="fa-solid fa-radar text-rose-500"></i> Pantauan Live QC & Packing</h3>
                     <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button onClick={() => { generateLaporan(); setLaporanModal(true); }} className="bg-emerald-100 hover:bg-emerald-600 text-emerald-700 hover:text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors flex items-center gap-2 border border-emerald-200 shadow-sm flex-1 md:flex-none justify-center">
+                        <button onClick={() => { generateLaporan(); setLaporanModal(true); }} className="bg-emerald-100 hover:bg-emerald-600 text-emerald-700 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center gap-2 border border-emerald-200 shadow-sm flex-1 md:flex-none justify-center">
                             <i className="fa-solid fa-clipboard-list"></i> BUAT LAPORAN
                         </button>
-                        <button onClick={handleResetAntrean} disabled={isResetting || qcStats.pending === 0} className="bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors flex items-center gap-2 border border-rose-200 disabled:opacity-50 shadow-sm flex-1 md:flex-none justify-center">
+                        <button onClick={handleResetAntrean} disabled={isResetting || qcStats.pending === 0} className="bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center gap-2 border border-rose-200 disabled:opacity-50 shadow-sm flex-1 md:flex-none justify-center">
                             {isResetting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-trash-can"></i>}
                             TARIK / KOSONGKAN
                         </button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white border p-4 rounded-2xl shadow-sm text-center">
-                        <div className="text-3xl font-black text-slate-400">{qcStats.pending}</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-white border p-4 rounded-md shadow-sm text-center">
+                        <div className="text-2xl md:text-3xl font-black text-slate-400">{qcStats.pending}</div>
                         <div className="text-xs font-bold text-slate-500 uppercase mt-1">Antrean Masuk</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm text-center">
+                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
                         <div className="text-3xl font-black text-rose-600">{tungguOnline}</div>
                         <div className="text-xs font-bold text-rose-700 uppercase mt-1">Tunggu Pesanan Online</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl shadow-sm text-center">
-                        <div className="text-3xl font-black text-rose-500">{qcStats.packed}</div>
+                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
+                        <div className="text-2xl md:text-3xl font-black text-rose-500">{qcStats.packed}</div>
                         <div className="text-xs font-bold text-rose-600 uppercase mt-1">Selesai QC (Siap Kirim)</div>
                     </div>
-                    <div className="bg-teal-50 border border-teal-200 p-4 rounded-2xl shadow-sm text-center">
+                    <div className="bg-teal-50 border border-teal-200 p-4 rounded-md shadow-sm text-center">
                         <div className="text-3xl font-black text-teal-700">{qcStats.shipped}</div>
                         <div className="text-xs font-bold text-teal-700 uppercase mt-1">Sudah di Kurir</div>
                     </div>
@@ -6719,12 +6794,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-black text-rose-800 flex items-center gap-2"><i className="fa-solid fa-list-check text-rose-500"></i> Status PO Pabrik Terbaru</h3>
                             {/* KOTAK SISA PO BENGKEL GABUNGAN */}
-                            <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl font-black text-sm border border-rose-200 shadow-sm">
+                            <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-md font-black text-sm border border-rose-200 shadow-sm">
                                 <i className="fa-solid fa-box mr-2"></i>SISA PO SEMUA BENGKEL: {pendingPO} Pcs
                             </div>
                         </div>
-                        <div className="bg-slate-50 border rounded-2xl overflow-hidden shadow-inner">
-                            <table className="w-full text-left bg-white">
+                        <div className="bg-slate-50 border rounded-md overflow-hidden shadow-inner">
+                            <table className="w-full text-xs md:text-sm text-left bg-white">
                                 <thead className="bg-rose-50 text-slate-700 border-b-2">
                                     <tr>
                                         <th className="p-4 font-black">No. PO</th>
@@ -6801,12 +6876,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
                 return (
                     <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
-                        <div className="bg-white rounded-3xl w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                        <div className="bg-white rounded-md w-full max-w-5xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                             {/* HEADER */}
                             <div className={`p-4 md:p-6 border-b flex justify-between items-center ${historyModal.type === 'IN' ? 'bg-teal-50 border-teal-100' : 'bg-rose-50 border-rose-100'}`}>
                                 <div className="flex items-center gap-3">
                                     {selectedSession && (
-                                        <button onClick={() => setSelectedSession(null)} className="w-10 h-10 rounded-xl bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm transition-transform active:scale-95">
+                                        <button onClick={() => setSelectedSession(null)} className="w-10 h-10 rounded-md bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm transition-transform active:scale-95">
                                             <i className="fa-solid fa-arrow-left"></i>
                                         </button>
                                     )}
@@ -6835,8 +6910,8 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                 <p className="font-bold uppercase tracking-widest text-sm">Belum ada aktivitas scan</p>
                                             </div>
                                         ) : (
-                                            <div className="bg-white border rounded-2xl overflow-x-auto custom-scrollbar shadow-sm">
-                                                <table className="w-full text-left border-collapse min-w-[380px] md:min-w-0">
+                                            <div className="bg-white border rounded-md overflow-x-auto custom-scrollbar shadow-sm">
+                                                <table className="w-full text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
                                                     <thead className="bg-rose-50/50 border-b">
                                                         <tr className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-widest">
                                                             <th className="px-2 py-3 md:p-4 font-black">Tanggal</th>
@@ -6875,20 +6950,20 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                 ) : (
                                     /* LEVEL 2: DETAILED ITEM LIST */
                                     <div className="flex-1 overflow-y-auto p-2 md:p-6 custom-scrollbar">
-                                        <div className="mb-4 bg-slate-50 p-4 rounded-2xl border flex items-center justify-between">
-                                            <div className="flex gap-4">
-                                                <div className="text-center bg-white px-4 py-2 rounded-xl shadow-sm border">
+                                        <div className="mb-4 bg-slate-50 p-4 rounded-md border flex items-center justify-between">
+                                            <div className="flex gap-3">
+                                                <div className="text-center bg-white px-4 py-2 rounded-md shadow-sm border">
                                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Variasi Produk</div>
                                                     <div className="text-xl font-black text-rose-800 leading-none">{selectedSession.skus.size}</div>
                                                 </div>
-                                                <div className="text-center bg-white px-4 py-2 rounded-xl shadow-sm border">
+                                                <div className="text-center bg-white px-4 py-2 rounded-md shadow-sm border">
                                                     <div className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Total Pieces</div>
                                                     <div className="text-xl font-black text-emerald-600 leading-none">{selectedSession.totalQty} <span className="text-xs">PCS</span></div>
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="bg-white border rounded-2xl overflow-x-auto custom-scrollbar shadow-sm">
-                                            <table className="w-full text-left border-collapse min-w-[380px] md:min-w-0">
+                                        <div className="bg-white border rounded-md overflow-x-auto custom-scrollbar shadow-sm">
+                                            <table className="w-full text-xs md:text-sm text-left border-collapse min-w-[380px] md:min-w-0">
                                                 <thead className="sticky top-0 bg-white z-10 shadow-sm border-b">
                                                     <tr className="text-slate-400 text-[10px] sm:text-xs font-black uppercase tracking-widest">
                                                         <th className="pb-3 md:pb-4 font-black px-2">Waktu</th>
@@ -6902,17 +6977,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                                         const variant = variants.find(v => v.sku === t.sku || (v.legacySkus || []).includes(t.sku));
                                                         return (
                                                             <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="py-3 md:py-4 px-2">
+                                                                <td className="py-3 md:py-3 px-2">
                                                                     <div className="font-black text-rose-800 text-xs md:text-sm">{new Date(t.date).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</div>
                                                                 </td>
-                                                                <td className="py-3 md:py-4 px-2">
+                                                                <td className="py-3 md:py-3 px-2">
                                                                     <div className="font-black text-rose-800 text-xs md:text-sm">{variant ? variant.article : t.sku}</div>
                                                                     <div className="text-[10px] text-slate-400 font-mono translate-y-[-2px]">{t.sku}</div>
                                                                 </td>
-                                                                <td className="py-3 md:py-4 px-2">
+                                                                <td className="py-3 md:py-3 px-2">
                                                                     <div className="font-bold text-slate-600 text-[10px] md:text-xs uppercase">{variant ? `${variant.colorName} - ${variant.sizeName}` : '-'}</div>
                                                                 </td>
-                                                                <td className="py-3 md:py-4 px-2 text-center">
+                                                                <td className="py-3 md:py-3 px-2 text-center">
                                                                     <span className={`inline-block px-2 md:px-3 py-1 rounded-lg font-black text-xs md:text-sm ${historyModal.type === 'IN' ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'bg-rose-50 text-rose-700 border border-rose-100'}`}>
                                                                         {t.qty}
                                                                     </span>
@@ -6930,7 +7005,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             {/* FOOTER */}
                             <div className="p-4 bg-slate-50 border-t flex justify-between items-center no-print">
                                 <p className="text-[10px] font-bold text-slate-400 italic">Klik baris atau tombol detail untuk melihat pemecahan per item.</p>
-                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                                <button onClick={() => { setHistoryModal(null); setSelectedSession(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                             </div>
                         </div>
                     </div>
@@ -6940,7 +7015,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             {/* MODAL LAPORAN */}
             {laporanModal && (
                 <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
-                    <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                    <div className="bg-white rounded-md w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                         <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
                             <h3 className="font-black text-xl text-rose-800 flex items-center gap-3"><i className="fa-solid fa-clipboard-list text-emerald-500"></i> Buat Laporan Harian</h3>
                             <button onClick={() => setLaporanModal(false)} className="text-slate-400 hover:text-rose-500 bg-white hover:bg-rose-50 w-8 h-8 rounded-full flex items-center justify-center transition-colors shadow-sm border"><i className="fa-solid fa-xmark"></i></button>
@@ -6949,7 +7024,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             <div className="flex items-center gap-3 mb-4">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Waktu Mulai</label>
-                                    <div className="flex items-center w-full rounded-xl border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
+                                    <div className="flex items-center w-full rounded-md border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
                                         <input type="date" value={laporanMulai.split('T')[0]} onChange={e => setLaporanMulai(e.target.value + 'T' + (laporanMulai.split('T')[1] || '09:00'))} onBlur={generateLaporan} className="flex-1 p-2 bg-transparent font-bold text-sm outline-none cursor-pointer" />
                                         <div className="flex items-center bg-slate-200/50 px-2 py-2 border-l border-slate-300">
                                             <select value={laporanMulai.split('T')[1]?.split(':')[0] || '09'} onChange={e => setLaporanMulai(laporanMulai.split('T')[0] + 'T' + e.target.value + ':' + (laporanMulai.split('T')[1]?.split(':')[1] || '00'))} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
@@ -6965,7 +7040,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                 <div className="text-slate-300 font-black mt-4">-</div>
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Waktu Selesai</label>
-                                    <div className="flex items-center w-full rounded-xl border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
+                                    <div className="flex items-center w-full rounded-md border border-slate-300 bg-slate-50 overflow-hidden focus-within:border-emerald-500 transition-colors shadow-sm">
                                         <input type="date" value={laporanSelesai.split('T')[0]} onChange={e => setLaporanSelesai(e.target.value + 'T' + (laporanSelesai.split('T')[1] || '08:30'))} onBlur={generateLaporan} className="flex-1 p-2 bg-transparent font-bold text-sm outline-none cursor-pointer" />
                                         <div className="flex items-center bg-slate-200/50 px-2 py-2 border-l border-slate-300">
                                             <select value={laporanSelesai.split('T')[1]?.split(':')[0] || '08'} onChange={e => setLaporanSelesai(laporanSelesai.split('T')[0] + 'T' + e.target.value + ':' + (laporanSelesai.split('T')[1]?.split(':')[1] || '30'))} onBlur={generateLaporan} className="bg-transparent font-black text-sm outline-none cursor-pointer text-slate-700 appearance-none text-center">
@@ -6981,9 +7056,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             </div>
                             <button onClick={generateLaporan} className="w-full bg-rose-800 hover:bg-rose-900 text-white font-black text-xs py-2 rounded-lg mb-4 shadow-sm transition-colors">GENERATE ULANG</button>
 
-                            <textarea value={laporanTeks} readOnly className="w-full h-64 p-4 rounded-xl border border-slate-200 bg-slate-50 font-mono text-sm resize-none focus:outline-none whitespace-pre-wrap" />
+                            <textarea value={laporanTeks} readOnly className="w-full h-64 p-4 rounded-md border border-slate-200 bg-slate-50 font-mono text-sm resize-none focus:outline-none whitespace-pre-wrap" />
                             
-                            <button onClick={copyLaporan} className="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base py-3.5 rounded-xl shadow-lg shadow-emerald-500/30 transition-transform transform hover:-translate-y-0.5"><i className="fa-solid fa-copy mr-2"></i> COPY TEXT LAPORAN</button>
+                            <button onClick={copyLaporan} className="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base py-3.5 rounded-md shadow-lg shadow-emerald-500/30 transition-transform transform hover:-translate-y-0.5"><i className="fa-solid fa-copy mr-2"></i> COPY TEXT LAPORAN</button>
                         </div>
                     </div>
                 </div>
@@ -6992,12 +7067,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             {/* MODAL RIWAYAT KAS OPERASIONAL */}
             {kasModal && (
                 <div className="fixed inset-0 bg-rose-900/80 z-[100] flex items-center justify-center p-2 md:p-4 backdrop-blur-sm animate-in fade-in duration-200 no-print">
-                    <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
+                    <div className="bg-white rounded-md w-full max-w-2xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in duration-300">
                         {/* HEADER */}
                         <div className="p-4 md:p-6 border-b flex justify-between items-center bg-gradient-to-r from-rose-50 to-rose-50 border-rose-100">
                             <div className="flex items-center gap-3">
                                 {kasDetailItem && (
-                                    <button onClick={() => setKasDetailItem(null)} className="w-10 h-10 rounded-xl bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm transition-transform active:scale-95">
+                                    <button onClick={() => setKasDetailItem(null)} className="w-10 h-10 rounded-md bg-white/80 hover:bg-white text-slate-600 flex items-center justify-center shadow-sm transition-transform active:scale-95">
                                         <i className="fa-solid fa-arrow-left"></i>
                                     </button>
                                 )}
@@ -7021,19 +7096,19 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                 <div className="flex-1 overflow-y-auto p-3 md:p-6 custom-scrollbar bg-slate-50 space-y-3">
                                     {/* Ringkasan periode */}
                                     <div className="grid grid-cols-3 gap-3 mb-2">
-                                        <div className="bg-white border rounded-2xl p-3 text-center shadow-sm">
+                                        <div className="bg-white border rounded-md p-3 text-center shadow-sm">
                                             <div className="text-[10px] font-black text-teal-600 uppercase">Masuk</div>
                                             <div className="text-sm font-black text-teal-700 mt-0.5">
                                                 Rp {kasFiltered.filter(d => d.jenis === 'masuk').reduce((s, d) => s + d.nominal, 0).toLocaleString('id-ID')}
                                             </div>
                                         </div>
-                                        <div className="bg-white border rounded-2xl p-3 text-center shadow-sm">
+                                        <div className="bg-white border rounded-md p-3 text-center shadow-sm">
                                             <div className="text-[10px] font-black text-red-600 uppercase">Keluar</div>
                                             <div className="text-sm font-black text-red-700 mt-0.5">
                                                 Rp {kasFiltered.filter(d => d.jenis === 'keluar').reduce((s, d) => s + d.nominal, 0).toLocaleString('id-ID')}
                                             </div>
                                         </div>
-                                        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-center shadow-sm">
+                                        <div className="bg-rose-50 border border-rose-200 rounded-md p-3 text-center shadow-sm">
                                             <div className="text-[10px] font-black text-rose-700 uppercase">Saldo Total</div>
                                             <div className={`text-sm font-black mt-0.5 ${totalSaldoKas >= 0 ? 'text-rose-700' : 'text-red-700'}`}>
                                                 Rp {totalSaldoKas.toLocaleString('id-ID')}
@@ -7047,8 +7122,8 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                             <p className="font-bold uppercase tracking-widest text-sm">Tidak ada transaksi di periode ini</p>
                                         </div>
                                     ) : (
-                                        <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
-                                            <table className="w-full text-left border-collapse">
+                                        <div className="bg-white border rounded-md overflow-hidden shadow-sm">
+                                            <table className="w-full text-xs md:text-sm text-left border-collapse">
                                                 <thead className="bg-slate-50 border-b">
                                                     <tr className="text-slate-400 text-[10px] font-black uppercase tracking-widest">
                                                         <th className="px-3 py-3">Tanggal</th>
@@ -7093,14 +7168,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                             ) : (
                                 /* DETAIL TRANSAKSI */
                                 <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar space-y-4">
-                                    <div className="bg-slate-50 border rounded-2xl p-4 space-y-3">
+                                    <div className="bg-slate-50 border rounded-md p-4 space-y-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500 font-bold text-sm">Tanggal</span>
                                             <span className="font-black text-rose-800">{kasDetailItem.tanggal}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-slate-500 font-bold text-sm">Jenis</span>
-                                            <span className={`px-3 py-1 rounded-xl font-black text-sm ${kasDetailItem.jenis === 'masuk' ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700'}`}>
+                                            <span className={`px-3 py-1 rounded-md font-black text-sm ${kasDetailItem.jenis === 'masuk' ? 'bg-teal-100 text-teal-700' : 'bg-red-100 text-red-700'}`}>
                                                 {kasDetailItem.jenis === 'masuk' ? 'â–² Uang Masuk' : 'â–¼ Uang Keluar'}
                                             </span>
                                         </div>
@@ -7118,7 +7193,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     {kasDetailItem.buktiUrl && (
                                         <div>
                                             <div className="text-slate-500 font-black text-xs uppercase mb-2"><i className="fa-solid fa-camera mr-1"></i>Foto Bukti</div>
-                                            <img src={kasDetailItem.buktiUrl} alt="Bukti" className="w-full rounded-2xl border shadow-sm object-cover max-h-64" />
+                                            <img src={kasDetailItem.buktiUrl} alt="Bukti" className="w-full rounded-md border shadow-sm object-cover max-h-64" />
                                         </div>
                                     )}
                                 </div>
@@ -7127,7 +7202,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
                         {/* FOOTER */}
                         <div className="p-4 bg-slate-50 border-t flex justify-end">
-                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-xl font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
+                            <button onClick={() => { setKasModal(false); setKasDetailItem(null); }} className="px-6 py-2.5 bg-rose-800 text-white rounded-md font-black text-xs md:text-sm shadow-lg active:scale-95 transition-transform">TUTUP</button>
                         </div>
                     </div>
                 </div>
@@ -7140,13 +7215,13 @@ function StatCard({ title, value, icon, color, bg, onClick }) {
     return (
         <div
             onClick={onClick}
-            className={`bg-white p-5 md:p-7 rounded-2xl border-2 border-slate-100 shadow-sm flex items-center gap-4 md:gap-6 transition-all active:scale-95 group ${onClick ? 'cursor-pointer hover:border-rose-300 hover:shadow-md' : ''}`}
+            className={`bg-white p-4 md:p-5 rounded-md border-2 border-slate-100 shadow-sm flex items-center gap-3 md:gap-6 transition-all active:scale-95 group ${onClick ? 'cursor-pointer hover:border-rose-300 hover:shadow-md' : ''}`}
         >
-            <div className={`w-14 h-14 md:w-16 md:h-16 rounded-xl ${bg} ${color} flex items-center justify-center shadow-inner flex-shrink-0 transition-transform group-hover:scale-110`}><i className={`fa-solid ${icon} text-2xl md:text-3xl`}></i></div>
+            <div className={`w-12 h-12 md:w-14 md:h-14 rounded-md ${bg} ${color} flex items-center justify-center shadow-inner flex-shrink-0 transition-transform group-hover:scale-110`}><i className={`fa-solid ${icon} text-xl md:text-2xl`}></i></div>
             <div className="flex-1">
                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">{title}</p>
                 <div className="flex items-end justify-between">
-                    <p className="text-3xl md:text-4xl font-black text-rose-800">{value}</p>
+                    <p className="text-xl md:text-2xl font-black text-rose-800">{value}</p>
                     {onClick && <i className="fa-solid fa-chevron-right text-slate-300 text-sm md:text-base group-hover:text-rose-500 transition-colors"></i>}
                 </div>
             </div>
@@ -7196,7 +7271,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
     // Gen3: Fitur Robot Cuci Gudang (Migrasi SKU Lama ke Berurutan)
     const runMigration = async () => {
-        if (!confirm("PERINGATAN: Fitur ini (Robot Cuci Gudang) akan mengubah baseCode semua produk lama menjadi format berurutan. Ini hanya boleh dilakukan SEKALI saat migrasi Gen3. Lanjutkan?")) return;
+        if (!(await showConfirm("PERINGATAN: Fitur ini (Robot Cuci Gudang) akan mengubah baseCode semua produk lama menjadi format berurutan. Ini hanya boleh dilakukan SEKALI saat migrasi Gen3. Lanjutkan?"))) return;
         setIsLoading(true);
         try {
             let counter = 1;
@@ -7254,7 +7329,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
     const cancelEdit = () => { setForm(initialForm); setColors([{ name: '', code: '' }]); setSizes([{ name: '', code: '', buyPrice: '', sellPrice: '' }]); setEditId(null); };
 
     const deleteProduct = async (id) => {
-        if (confirm("Hapus produk ini secara permanen dari server?")) {
+        if (await showConfirm("Hapus produk ini secara permanen dari server?")) {
             setIsLoading(true); await db.collection('products').doc(id).delete(); setIsLoading(false); showToast('success', 'Produk dihapus permanen');
         }
     };
@@ -7277,13 +7352,13 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
     return (
         <div className="space-y-8">
-            <div className={`p-8 rounded-3xl border-4 shadow-xl transition-colors ${editId ? 'bg-rose-50 border-rose-300' : 'bg-white border-white'}`}>
-                <div className="flex justify-between items-center border-b border-slate-200 pb-5 mb-8">
+            <div className={`p-6 rounded-md border-2 shadow-xl transition-colors ${editId ? 'bg-rose-50 border-rose-300' : 'bg-white border-white'}`}>
+                <div className="flex justify-between items-center border-b border-slate-200 pb-5 mb-5">
                     <h3 className="text-2xl font-black text-rose-800 flex items-center">
-                        <div className={`w-14 h-14 flex items-center justify-center rounded-2xl mr-4 text-white shadow-md ${editId ? 'bg-rose-500' : 'bg-rose-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-2xl`}></i></div>
+                        <div className={`w-14 h-14 flex items-center justify-center rounded-md mr-4 text-white shadow-md ${editId ? 'bg-rose-500' : 'bg-rose-500'}`}><i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-upload'} text-2xl`}></i></div>
                         {editId ? 'Edit Master Produk' : 'Input Master Produk Baru'}
                     </h3>
-                    {editId && <button type="button" onClick={cancelEdit} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3 rounded-xl font-bold shadow-sm transition-colors"><i className="fa-solid fa-xmark mr-2"></i> Batal Edit</button>}
+                    {editId && <button type="button" onClick={cancelEdit} className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-5 py-3 rounded-md font-bold shadow-sm transition-colors"><i className="fa-solid fa-xmark mr-2"></i> Batal Edit</button>}
                 </div>
 
                 <form onSubmit={handleSubmit} action="javascript:void(0);">
@@ -7291,17 +7366,17 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                         <div className="space-y-6">
                             <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> Informasi Utama</h4>
                             <div className="space-y-4">
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Article</label><input required type="text" value={form.article} onChange={e => setForm({ ...form, article: e.target.value.toUpperCase() })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 uppercase bg-white shadow-inner font-bold text-rose-800" placeholder="CONTOH: F01-04.1" /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article) {!editId && <span className="text-emerald-600 text-xs font-bold ml-1">âœ… Otomatis #{nextBaseCode}</span>}</label><input required type="text" value={editId ? form.baseCode : (form.baseCode || nextBaseCode)} onChange={e => editId ? setForm({ ...form, baseCode: e.target.value }) : null} readOnly={!editId} className={`w-full px-5 py-3.5 border-2 rounded-xl outline-none font-mono shadow-inner text-rose-800 ${editId ? 'border-slate-300 focus:border-rose-500 bg-white' : 'border-emerald-300 bg-emerald-50 cursor-not-allowed font-black text-emerald-700'}`} placeholder="Otomatis" /></div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Beli</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
-                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Jual</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.sellPrice} onChange={e => setForm({ ...form, sellPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Nama Article</label><input required type="text" value={form.article} onChange={e => setForm({ ...form, article: e.target.value.toUpperCase() })} className="w-full px-5 py-3.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 uppercase bg-white shadow-inner font-bold text-rose-800" placeholder="CONTOH: F01-04.1" /></div>
+                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Kode Barcode Utama (Article) {!editId && <span className="text-emerald-600 text-xs font-bold ml-1">✅ Otomatis #{nextBaseCode}</span>}</label><input required type="text" value={editId ? form.baseCode : (form.baseCode || nextBaseCode)} onChange={e => editId ? setForm({ ...form, baseCode: e.target.value }) : null} readOnly={!editId} className={`w-full px-5 py-3.5 border-2 rounded-md outline-none font-mono shadow-inner text-rose-800 ${editId ? 'border-slate-300 focus:border-rose-500 bg-white' : 'border-emerald-300 bg-emerald-50 cursor-not-allowed font-black text-emerald-700'}`} placeholder="Otomatis" /></div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Beli</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.buyPrice} onChange={e => setForm({ ...form, buyPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
+                                    <div><label className="block text-sm font-bold text-slate-700 mb-1">Harga Jual</label><div className="relative"><span className="absolute left-4 top-4 text-slate-400 font-black">Rp</span><input required type="number" value={form.sellPrice} onChange={e => setForm({ ...form, sellPrice: e.target.value })} className="w-full pl-11 pr-4 py-3.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 bg-white shadow-inner font-bold text-rose-800" placeholder="0" /></div></div>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Foto SKU (Max 800Kb)</label>
-                                    <label className="flex flex-col items-center justify-center w-full h-48 border-4 border-slate-300 border-dashed rounded-2xl cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm">
+                                    <label className="flex flex-col items-center justify-center w-full h-48 border-2 border-slate-300 border-dashed rounded-md cursor-pointer bg-white hover:bg-slate-50 transition-colors shadow-sm">
                                         <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-xl" /> : <><i className="fa-solid fa-cloud-arrow-up text-5xl mb-4 text-rose-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
+                                            {form.photo ? <img src={form.photo} alt="Preview" className="h-40 object-contain rounded-md" /> : <><i className="fa-solid fa-cloud-arrow-up text-5xl mb-4 text-rose-400"></i><p className="text-sm text-slate-600 font-bold">Klik untuk upload foto</p></>}
                                         </div>
                                         <input type="file" className="hidden" accept="image/*" onChange={e => {
                                             const file = e.target.files[0];
@@ -7315,23 +7390,23 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                                     <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">2</span> Variasi Warna & Kode</h4>
-                                    <button type="button" onClick={() => setColors([...colors, { name: '', code: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
+                                    <button type="button" onClick={() => setColors([...colors, { name: '', code: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-md text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
                                 </div>
                                 {colors.map((c, i) => (
                                     <div key={i} className="flex gap-3 items-start animate-in slide-in-from-top-2">
-                                        <input required type="text" value={c.name} onChange={e => { const n = [...colors]; n[i].name = e.target.value; setColors(n); }} className="flex-1 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Nama (ex: Hitam)" />
-                                        <input required type="text" value={c.code} onChange={e => { const n = [...colors]; n[i].code = e.target.value; setColors(n); }} className="w-1/3 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm font-mono bg-white shadow-inner font-bold" placeholder="Kode (ex: 1)" />
-                                        {colors.length > 1 && <button type="button" onClick={() => { const n = [...colors]; n.splice(i, 1); setColors(n); }} className="w-12 h-[52px] flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
+                                        <input required type="text" value={c.name} onChange={e => { const n = [...colors]; n[i].name = e.target.value; setColors(n); }} className="flex-1 px-5 py-3.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Nama (ex: Hitam)" />
+                                        <input required type="text" value={c.code} onChange={e => { const n = [...colors]; n[i].code = e.target.value; setColors(n); }} className="w-1/3 px-5 py-3.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 text-sm font-mono bg-white shadow-inner font-bold" placeholder="Kode (ex: 1)" />
+                                        {colors.length > 1 && <button type="button" onClick={() => { const n = [...colors]; n.splice(i, 1); setColors(n); }} className="w-12 h-[52px] flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-500 hover:text-white rounded-md transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
                                     </div>
                                 ))}
                             </div>
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between border-b border-slate-200 pb-3">
                                     <h4 className="font-bold text-lg text-rose-800 flex items-center"><span className="bg-rose-800 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">3</span> Variasi Size & Kode</h4>
-                                    <button type="button" onClick={() => setSizes([...sizes, { name: '', code: '', buyPrice: '', sellPrice: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-xl text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
+                                    <button type="button" onClick={() => setSizes([...sizes, { name: '', code: '', buyPrice: '', sellPrice: '' }])} className="bg-rose-100 hover:bg-rose-500 hover:text-white transition-colors text-rose-600 px-4 py-2 rounded-md text-xs font-black shadow-sm"><i className="fa-solid fa-plus mr-1"></i> Tambah</button>
                                 </div>
                                 {sizes.map((s, i) => (
-                                    <div key={i} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl animate-in slide-in-from-top-2">
+                                    <div key={i} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-md animate-in slide-in-from-top-2">
                                         <div className="flex gap-3 items-start">
                                             {/* Input Size yang sudah dimodifikasi agar otomatis mengisi Kode */}
                                             <input required type="text" value={s.name} onChange={e => {
@@ -7339,20 +7414,20 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                                 n[i].name = e.target.value;
                                                 n[i].code = e.target.value; // Otomatis menduplikasi input nama size menjadi kode barcode
                                                 setSizes(n);
-                                            }} className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Size (ex: 37)" />
+                                            }} className="flex-1 px-4 py-3 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 text-sm bg-white shadow-inner font-bold" placeholder="Size (ex: 37)" />
 
                                             {/* Input Kode dihapus dari sini */}
 
-                                            {sizes.length > 1 && <button type="button" onClick={() => { const n = [...sizes]; n.splice(i, 1); setSizes(n); }} className="w-12 h-[48px] flex items-center justify-center text-red-500 bg-red-100 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
+                                            {sizes.length > 1 && <button type="button" onClick={() => { const n = [...sizes]; n.splice(i, 1); setSizes(n); }} className="w-12 h-[48px] flex items-center justify-center text-red-500 bg-red-100 hover:bg-red-500 hover:text-white rounded-md transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
                                         </div>
                                         <div className="flex flex-col sm:flex-row gap-3 mt-2">
                                             <div className="relative w-full">
                                                 <span className="absolute left-3 top-3 text-slate-400 font-bold text-[10px] uppercase tracking-wider">Beli Rp</span>
-                                                <input type="number" value={s.buyPrice || ''} onChange={e => { const n = [...sizes]; n[i].buyPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.buyPrice || "Sesuai Pusat"} />
+                                                <input type="number" value={s.buyPrice || ''} onChange={e => { const n = [...sizes]; n[i].buyPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.buyPrice || "Sesuai Pusat"} />
                                             </div>
                                             <div className="relative w-full">
                                                 <span className="absolute left-3 top-3 text-slate-400 font-bold text-[10px] uppercase tracking-wider">Jual Rp</span>
-                                                <input type="number" value={s.sellPrice || ''} onChange={e => { const n = [...sizes]; n[i].sellPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-xl outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.sellPrice || "Sesuai Pusat"} />
+                                                <input type="number" value={s.sellPrice || ''} onChange={e => { const n = [...sizes]; n[i].sellPrice = e.target.value; setSizes(n); }} className="w-full pl-16 pr-3 py-2.5 border-2 border-slate-300 rounded-md outline-none focus:border-rose-500 text-sm md:text-base bg-white shadow-inner font-bold text-rose-800" placeholder={form.sellPrice || "Sesuai Pusat"} />
                                             </div>
                                         </div>
                                     </div>
@@ -7361,14 +7436,14 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                         </div>
                     </div>
                     <div className="mt-10 pt-8 border-t border-slate-200 flex justify-end">
-                        <button type="submit" className={`w-full md:w-auto px-12 py-5 rounded-2xl font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30'}`}>
+                        <button type="submit" className={`w-full md:w-auto px-12 py-3.5 rounded-md font-black text-lg text-white shadow-xl transition-transform transform hover:-translate-y-1 ${editId ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30'}`}>
                             <i className={`fa-solid ${editId ? 'fa-pen-to-square' : 'fa-save'} mr-3`}></i> {editId ? 'UPDATE MASTER PRODUK' : 'SIMPAN MASTER PRODUK'}
                         </button>
                     </div>
                 </form>
             </div>
 
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
+            <div className="bg-white rounded-md border border-slate-200 shadow-lg overflow-hidden">
                 <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-xl text-rose-800 flex items-center">
                         <i className="fa-solid fa-list-ul text-rose-500 mr-3"></i> Daftar Produk 
@@ -7376,32 +7451,32 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                     <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{products.length} Produk</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-sm border-b-4 border-slate-200">
-                            <tr><th className="p-5 font-black uppercase">Detail Produk</th><th className="p-5 font-black uppercase">Harga Beli / Jual</th><th className="p-5 font-black uppercase">Status</th><th className="p-5 font-black text-right uppercase">Aksi</th></tr>
+                            <tr><th className="p-3 md:p-4 font-black uppercase">Detail Produk</th><th className="p-3 md:p-4 font-black uppercase">Harga Beli / Jual</th><th className="p-3 md:p-4 font-black uppercase">Status</th><th className="p-3 md:p-4 font-black text-right uppercase">Aksi</th></tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {products.map(p => (
                                 <tr key={p.id} className={`hover:bg-slate-50 transition-colors ${!p.isActive ? 'bg-slate-50 opacity-60' : ''}`}>
-                                    <td className="p-5 flex items-center gap-5">
-                                        <img src={p.photo} className="w-16 h-16 rounded-xl object-cover shadow-md border-2 border-white" />
+                                    <td className="p-3 md:p-4 flex items-center gap-5">
+                                        <img src={p.photo} className="w-16 h-16 rounded-md object-cover shadow-md border-2 border-white" />
                                         <div><div className="font-black text-rose-900 text-lg">{p.article}</div><div className="text-xs font-mono text-rose-600 font-bold bg-rose-100 px-2 py-1 rounded-md inline-block mt-1">Kode: {p.baseCode}</div></div>
                                     </td>
-                                    <td className="p-5">
+                                    <td className="p-3 md:p-4">
                                         <div className="font-bold text-slate-700 text-base">{formatRp(p.buyPrice)}</div>
                                         <div className="text-sm text-emerald-600 font-black mt-1">{formatRp(p.sellPrice)}</div>
                                     </td>
-                                    <td className="p-5">
-                                        <span className={`px-4 py-2 rounded-xl text-xs font-black shadow-sm ${p.isActive ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-slate-200 text-slate-600 border border-slate-300'}`}>{p.isActive ? 'AKTIF' : 'NONAKTIF'}</span>
+                                    <td className="p-3 md:p-4">
+                                        <span className={`px-4 py-2 rounded-md text-xs font-black shadow-sm ${p.isActive ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-slate-200 text-slate-600 border border-slate-300'}`}>{p.isActive ? 'AKTIF' : 'NONAKTIF'}</span>
                                     </td>
-                                    <td className="p-5 text-right space-x-3 whitespace-nowrap">
-                                        <button type="button" onClick={() => toggleStatus(p.id, p.isActive)} className={`w-12 h-12 rounded-xl border shadow-sm transition-colors ${p.isActive ? 'bg-white text-slate-600 hover:bg-slate-200' : 'bg-rose-800 text-white'}`} title="Ubah Status">
+                                    <td className="p-3 md:p-4 text-right space-x-3 whitespace-nowrap">
+                                        <button type="button" onClick={() => toggleStatus(p.id, p.isActive)} className={`w-12 h-12 rounded-md border shadow-sm transition-colors ${p.isActive ? 'bg-white text-slate-600 hover:bg-slate-200' : 'bg-rose-800 text-white'}`} title="Ubah Status">
                                             {p.isActive ? <i className="fa-solid fa-eye-slash"></i> : <i className="fa-solid fa-eye"></i>}
                                         </button>
-                                        <button type="button" onClick={() => handleEdit(p)} className="w-12 h-12 rounded-xl border shadow-sm transition-colors bg-white text-rose-500 hover:bg-rose-500 hover:text-white border-rose-200" title="Edit Produk">
+                                        <button type="button" onClick={() => handleEdit(p)} className="w-12 h-12 rounded-md border shadow-sm transition-colors bg-white text-rose-500 hover:bg-rose-500 hover:text-white border-rose-200" title="Edit Produk">
                                             <i className="fa-solid fa-pen"></i>
                                         </button>
-                                        <button type="button" onClick={() => deleteProduct(p.id)} className="w-12 h-12 bg-white border shadow-sm rounded-xl hover:bg-red-500 hover:text-white border-red-200 text-red-500 transition-colors" title="Hapus Permanen">
+                                        <button type="button" onClick={() => deleteProduct(p.id)} className="w-12 h-12 bg-white border shadow-sm rounded-md hover:bg-red-500 hover:text-white border-red-200 text-red-500 transition-colors" title="Hapus Permanen">
                                             <i className="fa-solid fa-trash-can"></i>
                                         </button>
                                     </td>
@@ -7617,7 +7692,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
     const handleConfirm = async () => {
         const dataTerbaru = scannedItemsRef.current;
         if (dataTerbaru.length === 0) return;
-        if (!confirm(`Terdapat ${dataTerbaru.length} item untuk disimpan. Lanjutkan Konfirmasi?`)) return;
+        if (!(await showConfirm(`Terdapat ${dataTerbaru.length} item untuk disimpan. Lanjutkan Konfirmasi?`))) return;
 
         setIsLoading(true);
         try {
@@ -7686,17 +7761,17 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
     };
 
     return (
-        <div className="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-3xl border border-slate-200 shadow-xl relative">
+        <div className="max-w-3xl mx-auto bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-xl relative">
             {unmappedBarcode && (
                 <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-4">
-                    <div className="bg-white p-8 rounded-3xl w-full max-w-lg shadow-2xl relative">
+                    <div className="bg-white p-6 rounded-md w-full max-w-lg shadow-2xl relative">
                         <div className="flex justify-center mb-4"><i className="fa-solid fa-link-slash text-5xl text-rose-500"></i></div>
                         <h3 className="text-2xl font-black text-rose-800 text-center mb-2">Barcode Terputus!</h3>
-                        <p className="text-slate-600 text-center text-sm mb-6">Sistem mendeteksi label <b>{unmappedBarcode.fullBarcode}</b> menggunakan kode usang (<b>{unmappedBarcode.shortCode}</b>). Pilih barang yang sesuai agar kode ini dapat tersambung kembali selamanya.</p>
+                        <p className="text-slate-600 text-center text-sm mb-4">Sistem mendeteksi label <b>{unmappedBarcode.fullBarcode}</b> menggunakan kode usang (<b>{unmappedBarcode.shortCode}</b>). Pilih barang yang sesuai agar kode ini dapat tersambung kembali selamanya.</p>
                         
-                        <div className="mb-6">
+                        <div className="mb-4">
                             <label className="block text-sm font-black text-slate-700 mb-2">Pilih Barang yang Sesuai:</label>
-                            <select value={unmappedSku} onChange={e => setUnmappedSku(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-xl font-bold bg-slate-50 focus:border-rose-500 outline-none text-sm">
+                            <select value={unmappedSku} onChange={e => setUnmappedSku(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-md font-bold bg-slate-50 focus:border-rose-500 outline-none text-sm">
                                 <option value="">-- Ketuk untuk memilih --</option>
                                 {unmappedBarcode.poSkus && unmappedBarcode.poSkus.length > 0 ? (
                                     variants.filter(v => unmappedBarcode.poSkus.includes(v.sku)).map(v => (
@@ -7710,7 +7785,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                             </select>
                         </div>
                         <div className="flex gap-3">
-                            <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-4 bg-rose-50 text-slate-600 rounded-xl font-bold hover:bg-slate-200 transition-colors">Batal</button>
+                            <button onClick={() => { setUnmappedBarcode(null); setUnmappedSku(''); }} className="flex-1 py-3 bg-rose-50 text-slate-600 rounded-md font-bold hover:bg-slate-200 transition-colors">Batal</button>
                             <button onClick={async () => {
                                 if (!unmappedSku) return showToast('error', 'Pilih barang terlebih dahulu!');
                                 
@@ -7739,7 +7814,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     showToast('error', 'Gagal menyambungkan: ' + e.message);
                                 }
                                 setIsLoading(false);
-                            }} className="flex-1 py-4 bg-rose-500 text-white rounded-xl font-black hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">Sambungkan & Scan</button>
+                            }} className="flex-1 py-3 bg-rose-500 text-white rounded-md font-black hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">Sambungkan & Scan</button>
                         </div>
                     </div>
                 </div>
@@ -7747,8 +7822,8 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
             {showCamera && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-rose-500"></i> Scan Kamera</h3>
                             <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
@@ -7757,26 +7832,26 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 </div>
             )}
 
-            <div className={`flex justify-between items-center text-white p-4 md:p-6 rounded-2xl shadow-inner mb-6 ${isMasuk ? 'bg-rose-800' : 'bg-rose-800'}`}>
+            <div className={`flex justify-between items-center text-white p-4 md:p-6 rounded-md shadow-inner mb-4 ${isMasuk ? 'bg-rose-800' : 'bg-rose-800'}`}>
                 <div>
-                    <h2 className="text-2xl md:text-3xl font-black flex items-center gap-3">
+                    <h2 className="text-xl md:text-2xl font-black flex items-center gap-3">
                         <i className={`fa-solid ${isMasuk ? 'fa-right-to-bracket text-teal-400' : 'fa-right-from-bracket text-red-400'}`}></i>
                         Scan {isMasuk ? 'Masuk' : 'Keluar'}
                     </h2>
                     <p className="text-slate-400 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Item Belum Disimpan</p>
                 </div>
-                <div className={`text-4xl md:text-6xl font-black ${isMasuk ? 'text-teal-400' : 'text-red-400'}`}>{scannedItems.length}</div>
+                <div className={`text-3xl md:text-5xl font-black ${isMasuk ? 'text-teal-400' : 'text-red-400'}`}>{scannedItems.length}</div>
             </div>
 
             <div className="flex flex-col gap-3 mb-5 border-b-4 border-slate-100 pb-5">
-                <button type="button" onClick={handleConfirm} disabled={scannedItems.length === 0} className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-black text-base md:text-lg flex justify-center items-center gap-3 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-md transition-transform transform hover:-translate-y-0.5">
+                <button type="button" onClick={handleConfirm} disabled={scannedItems.length === 0} className="w-full py-3.5 bg-rose-500 hover:bg-rose-600 text-white rounded-md font-black text-base md:text-lg flex justify-center items-center gap-3 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed shadow-md transition-transform transform hover:-translate-y-0.5">
                     <i className="fa-solid fa-cloud-arrow-up text-xl"></i> KONFIRMASI &amp; SIMPAN
                 </button>
                 <div className="flex gap-3">
-                    <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-xl font-bold flex justify-center items-center gap-2 disabled:bg-slate-300 disabled:text-slate-500 transition-colors shadow-sm">
+                    <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-2.5 bg-rose-700 hover:bg-rose-800 text-white rounded-md font-bold flex justify-center items-center gap-2 disabled:bg-slate-300 disabled:text-slate-500 transition-colors shadow-sm">
                         <i className="fa-solid fa-mug-hot"></i> Jeda &amp; Draft
                     </button>
-                    <button type="button" onClick={() => { if (confirm('Hapus semua antrean scan yang belum tersimpan?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem(draftKey); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border-2 border-rose-200 rounded-xl font-bold flex justify-center items-center gap-2 disabled:border-slate-200 disabled:text-slate-400 transition-colors">
+                    <button type="button" onClick={async () => { if (await showConfirm('Hapus semua antrean scan yang belum tersimpan?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem(draftKey); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 text-rose-600 border-2 border-rose-200 rounded-md font-bold flex justify-center items-center gap-2 disabled:border-slate-200 disabled:text-slate-400 transition-colors">
                         <i className="fa-solid fa-rotate-left"></i> Ulang Awal
                     </button>
                 </div>
@@ -7784,7 +7859,7 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
             <div className="mb-4">
                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-1">Pilih Kategori Scan {isMasuk ? 'Masuk' : 'Keluar'}</label>
-                <select value={kategoriScan} onChange={e => setKategoriScan(e.target.value)} className="w-full p-3 border-2 border-slate-200 rounded-xl font-bold bg-white outline-none focus:border-slate-400">
+                <select value={kategoriScan} onChange={e => setKategoriScan(e.target.value)} className="w-full p-3 border-2 border-slate-200 rounded-md font-bold bg-white outline-none focus:border-slate-400">
                     {isMasuk ? (
                         <>
                             <option value="PO Nota">PO Nota</option>
@@ -7801,12 +7876,12 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 </select>
             </div>
 
-            <div className="mb-6">
+            <div className="mb-4">
                 <div className="text-center font-bold text-rose-500 mb-3 text-sm bg-rose-50 p-2 rounded-lg border border-rose-200 inline-block w-full">
                     <i className="fa-solid fa-triangle-exclamation mr-1"></i> Jika ingin istirahat atau pindah menu, <b>WAJIB</b> klik tombol kuning <b>"Jeda & Draft"</b> agar data tidak hilang.
                 </div>
 
-                <div className="flex gap-4 mt-2">
+                <div className="flex gap-3 mt-2">
                     <div className="relative flex-1">
                         <i className="fa-solid fa-barcode absolute left-6 top-5 text-slate-400 text-2xl"></i>
                         <input
@@ -7820,11 +7895,11 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     }
                                 }
                             }}
-                            className="w-full pl-16 pr-6 py-5 text-2xl md:text-3xl border-4 border-slate-300 focus:border-rose-500 rounded-2xl font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner"
+                            className="w-full pl-16 pr-6 py-3.5 text-xl md:text-2xl border-2 border-slate-300 focus:border-rose-500 rounded-md font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner"
                             placeholder="KODE..."
                         />
                     </div>
-                    <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
+                    <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950">
                         <i className="fa-solid fa-camera text-3xl mb-1 text-rose-400"></i> Kamera
                     </button>
                 </div>
@@ -7833,10 +7908,10 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
 
             <div>
                 <h3 className="font-black text-lg text-rose-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-rose-500"></i> 10 Barang Terakhir di-Scan</h3>
-                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
+                <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-md border-2 border-slate-200 shadow-inner">
                     {scannedItems.slice(0, 10).map((item, idx) => (
-                        <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-2xl bg-white shadow-sm animate-in slide-in-from-left-4">
-                            <div className="flex items-center gap-4 md:gap-5">
+                        <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-md bg-white shadow-sm animate-in slide-in-from-left-4">
+                            <div className="flex items-center gap-3 md:gap-5">
                                 <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                 <div>
                                     <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
@@ -7844,11 +7919,11 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                                     <div className="text-[10px] md:text-[11px] text-slate-500 font-mono mt-2 bg-rose-50 px-2 py-1 rounded-md inline-block border border-slate-200">ID: {item.fullBarcode}</div>
                                 </div>
                             </div>
-                            <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-xl transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
+                            <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-md transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
                         </div>
                     ))}
                     {scannedItems.length > 10 && (
-                        <div className="text-center py-4 text-slate-500 font-bold bg-white rounded-2xl border border-dashed border-slate-300">
+                        <div className="text-center py-3 text-slate-500 font-bold bg-white rounded-md border border-dashed border-slate-300">
                             + {scannedItems.length - 10} item disembunyikan
                         </div>
                     )}
@@ -7991,7 +8066,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
         if (differences.length === 0) {
             showToast('success', 'Stok akurat 100%!'); setStep(1); setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); setComparisonResult(null); return;
         }
-        if (!confirm(`Sesuaikan ${differences.length} batch barang?`)) return;
+        if (!(await showConfirm(`Sesuaikan ${differences.length} batch barang?`))) return;
         setIsLoading(true);
         try {
             const batchId = 'SO' + Date.now();
@@ -8023,11 +8098,11 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
     if (step === 1) {
         return (
-            <div className="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-3xl border-2 border-purple-200 shadow-xl relative">
+            <div className="max-w-3xl mx-auto bg-white p-4 md:p-6 rounded-md border-2 border-purple-200 shadow-xl relative">
                 {showCamera && (
                     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                            <div className="flex justify-between items-center mb-6">
+                        <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                            <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-purple-600"></i> Kamera Opname</h3>
                                 <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                             </div>
@@ -8036,43 +8111,43 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                     </div>
                 )}
 
-                <div className="flex justify-between items-center bg-purple-900 text-white p-6 md:p-8 rounded-2xl shadow-inner mb-6 relative overflow-hidden">
+                <div className="flex justify-between items-center bg-purple-900 text-white p-6 md:p-6 rounded-md shadow-inner mb-4 relative overflow-hidden">
                     <i className="fa-solid fa-cloud-arrow-down absolute -right-4 -bottom-4 text-purple-800 text-8xl opacity-40"></i>
-                    <div className="relative z-10"><h2 className="text-2xl md:text-3xl font-black flex items-center gap-3"><i className="fa-solid fa-clipboard-check text-purple-400"></i> Stok Opname</h2><p className="text-purple-200 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Scan Fisik Sementara</p></div>
-                    <div className="text-6xl md:text-7xl font-black text-purple-300 relative z-10">{scannedItems.length}</div>
+                    <div className="relative z-10"><h2 className="text-xl md:text-2xl font-black flex items-center gap-3"><i className="fa-solid fa-clipboard-check text-purple-400"></i> Stok Opname</h2><p className="text-purple-200 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Scan Fisik Sementara</p></div>
+                    <div className="text-5xl md:text-6xl font-black text-purple-300 relative z-10">{scannedItems.length}</div>
                 </div>
 
-                <div className="flex flex-col gap-3 mb-6 border-b-4 border-slate-100 pb-6">
-                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-2xl font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-2xl"></i> SELESAI SCAN & EVALUASI</button>
+                <div className="flex flex-col gap-3 mb-4 border-b-4 border-slate-100 pb-6">
+                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-md font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-2xl"></i> SELESAI SCAN & EVALUASI</button>
                     <div className="flex gap-3">
-                        <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-xl font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
-                        <button type="button" onClick={() => { if (confirm('Hapus semua draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border-2 border-rose-200 rounded-xl font-bold flex justify-center items-center gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
+                        <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-md font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
+                        <button type="button" onClick={async () => { if (await showConfirm('Hapus semua draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border-2 border-rose-200 rounded-md font-bold flex justify-center items-center gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
                     </div>
                 </div>
 
-                <div className="mb-6">
-                    <div className="flex gap-4 mt-2">
+                <div className="mb-4">
+                    <div className="flex gap-3 mt-2">
                         <div className="relative flex-1">
                             <i className="fa-solid fa-barcode absolute left-6 top-5 text-purple-400 text-2xl"></i>
-                            <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-16 pr-6 py-5 text-2xl md:text-3xl border-4 border-purple-200 focus:border-purple-500 rounded-2xl font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner" placeholder="KODE..." />
+                            <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-16 pr-6 py-3.5 text-xl md:text-2xl border-2 border-purple-200 focus:border-purple-500 rounded-md font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner" placeholder="KODE..." />
                         </div>
-                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-2xl flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-3xl mb-1 text-purple-400"></i> Kamera</button>
+                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-3xl mb-1 text-purple-400"></i> Kamera</button>
                     </div>
                 </div>
 
                 <div>
                     <h3 className="font-black text-lg text-rose-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-purple-500"></i> 10 Barang Terakhir di-Scan</h3>
-                    <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-3xl border-2 border-slate-200 shadow-inner">
+                    <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-md border-2 border-slate-200 shadow-inner">
                         {scannedItems.slice(0, 10).map((item, idx) => (
-                            <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-2xl bg-white shadow-sm animate-in slide-in-from-left-4">
-                                <div className="flex items-center gap-4 md:gap-5">
+                            <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-md bg-white shadow-sm animate-in slide-in-from-left-4">
+                                <div className="flex items-center gap-3 md:gap-5">
                                     <span className="text-slate-300 font-black text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
                                     <div>
                                         <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
                                         <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 font-black">{item.variantInfo.sizeName}</span></div>
                                     </div>
                                 </div>
-                                <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-xl transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
+                                <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-md transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
                             </div>
                         ))}
                         {scannedItems.length === 0 && <div className="py-16 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Mulai scan barang fisik di gudang.</span></div>}
@@ -8084,37 +8159,37 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-2xl border shadow-sm">
-                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
+            <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-md border shadow-sm">
+                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-6 py-3 rounded-md font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
                 <div className="flex gap-3 w-full md:w-auto">
-                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-6 py-3 rounded-xl font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
-                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-xl font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
+                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-6 py-3 rounded-md font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
+                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 rounded-md font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-rose-900 text-white p-6 rounded-3xl border-4 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-5xl font-black">{totalSystem}</div></div>
-                <div className="bg-rose-500 text-white p-6 rounded-3xl border-4 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-5xl font-black">{totalScanned}</div></div>
-                <div className={`p-6 rounded-3xl border-4 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-5xl font-black">{totalDiffAbsolute}</div></div>
+                <div className="bg-rose-900 text-white p-6 rounded-md border-2 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-5xl font-black">{totalSystem}</div></div>
+                <div className="bg-rose-500 text-white p-6 rounded-md border-2 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-5xl font-black">{totalScanned}</div></div>
+                <div className={`p-6 rounded-md border-2 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-5xl font-black">{totalDiffAbsolute}</div></div>
             </div>
 
-            <div className="bg-white rounded-3xl border shadow-lg overflow-hidden">
+            <div className="bg-white rounded-md border shadow-lg overflow-hidden">
                 <div className="p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
                 <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
-                    <table className="w-full text-left text-sm border-collapse">
+                    <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
-                            <tr><th className="p-5 font-black uppercase">Detail Produk</th><th className="p-5 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-5 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-5 font-black uppercase text-center bg-rose-50">Stok Scan Fisik</th><th className="p-5 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
+                            <tr><th className="p-3 md:p-4 font-black uppercase">Detail Produk</th><th className="p-3 md:p-4 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-3 md:p-4 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-3 md:p-4 font-black uppercase text-center bg-rose-50">Stok Scan Fisik</th><th className="p-3 md:p-4 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
                         </thead>
                         <tbody>
                             {comparisonResult && comparisonResult.map((c, i) => {
                                 const isDiff = c.diff !== 0;
                                 return (
                                     <tr key={i} className={`border-b border-slate-100 transition-colors whitespace-nowrap ${isDiff ? (c.diff > 0 ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'bg-rose-50/40 hover:bg-rose-50') : 'hover:bg-slate-50'}`}>
-                                        <td className="p-5"><div className="font-black text-rose-800 text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-xs font-bold text-slate-500 mt-1">{c.variant?.colorName || '-'} - Sz: <span className="text-rose-500 font-black">{c.variant?.sizeName || '-'}</span></div></td>
-                                        <td className="p-5 text-center font-mono text-xs text-slate-500 border-x border-slate-100">{c.fullBarcode}</td>
-                                        <td className="p-5 text-center font-bold text-slate-600 bg-slate-50/50 text-lg">{c.sysQty}</td>
-                                        <td className="p-5 text-center font-black text-rose-600 bg-rose-50/30 text-lg">{c.scanQty}</td>
-                                        <td className="p-5 text-center border-l border-slate-100">{c.diff === 0 ? <span className="text-slate-300 font-black"><i className="fa-solid fa-check"></i> Pas</span> : c.diff > 0 ? <span className="text-emerald-600 font-black bg-emerald-100 px-3 py-1.5 rounded-lg">+ {c.diff} (Lebih)</span> : <span className="text-rose-600 font-black bg-rose-100 px-3 py-1.5 rounded-lg">{c.diff} (Hilang)</span>}</td>
+                                        <td className="p-3 md:p-4"><div className="font-black text-rose-800 text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-xs font-bold text-slate-500 mt-1">{c.variant?.colorName || '-'} - Sz: <span className="text-rose-500 font-black">{c.variant?.sizeName || '-'}</span></div></td>
+                                        <td className="p-3 md:p-4 text-center font-mono text-xs text-slate-500 border-x border-slate-100">{c.fullBarcode}</td>
+                                        <td className="p-3 md:p-4 text-center font-bold text-slate-600 bg-slate-50/50 text-lg">{c.sysQty}</td>
+                                        <td className="p-3 md:p-4 text-center font-black text-rose-600 bg-rose-50/30 text-lg">{c.scanQty}</td>
+                                        <td className="p-3 md:p-4 text-center border-l border-slate-100">{c.diff === 0 ? <span className="text-slate-300 font-black"><i className="fa-solid fa-check"></i> Pas</span> : c.diff > 0 ? <span className="text-emerald-600 font-black bg-emerald-100 px-3 py-1.5 rounded-lg">+ {c.diff} (Lebih)</span> : <span className="text-rose-600 font-black bg-rose-100 px-3 py-1.5 rounded-lg">{c.diff} (Hilang)</span>}</td>
                                     </tr>
                                 );
                             })}
@@ -8258,28 +8333,28 @@ function CetakLabel({ products, variants, showToast }) {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
-                <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col h-[650px]">
-                    <h3 className="text-2xl font-black mb-6 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-xl"></i> Cari Produk</h3>
+                <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
+                    <h3 className="text-2xl font-black mb-4 flex items-center gap-3 text-rose-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-3 rounded-md"></i> Cari Produk</h3>
                     <div className="space-y-4 mb-4">
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal Cetak Barcode</label>
-                            <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={printDate} onChange={e => setPrintDate(e.target.value)} />
+                            <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-md mt-1.5 font-bold text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={printDate} onChange={e => setPrintDate(e.target.value)} />
                         </div>
                         <div className="relative">
                             <i className="fa-solid fa-search absolute left-5 top-4 text-slate-400 text-lg"></i>
-                            <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-3 border-2 border-slate-300 rounded-md text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
+                    <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-md bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
                         {filteredVariants.map(v => (
-                            <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-4">
-                                <div className="flex items-center gap-4">
-                                    <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
+                            <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-md shadow-sm hover:border-rose-400 transition-colors gap-3">
+                                <div className="flex items-center gap-3">
+                                    <img src={v.photo} className="w-14 h-14 object-cover rounded-md border shadow-sm" />
                                     <div><div className="text-base font-black text-rose-800">{v.article} <span className="text-xs text-rose-500 bg-rose-100 px-2 py-0.5 rounded-md font-bold ml-2 tracking-wider">SKU: {v.sku}</span> {v.baseCode ? <span className="text-[10px] text-slate-400 ml-1">(Base: {v.baseCode})</span> : ''}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-rose-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
                                 </div>
                                 <div className="flex items-center gap-2 w-full md:w-auto">
                                     <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-rose-500 bg-slate-50" />
-                                    <button type="button" onClick={() => addToPrint(v)} className="flex-1 md:flex-none bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> CETAK</button>
+                                    <button type="button" onClick={() => addToPrint(v)} className="flex-1 md:flex-none bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-4 py-3 rounded-md font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> CETAK</button>
                                 </div>
                             </div>
                         ))}
@@ -8292,34 +8367,34 @@ function CetakLabel({ products, variants, showToast }) {
                     </div>
                 </div>
 
-                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-400"><i className="fa-solid fa-print text-8xl"></i></div>
-                    <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 relative z-10">
+                <div className="bg-white p-6 rounded-md border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6 opacity-5 text-slate-400"><i className="fa-solid fa-print text-8xl"></i></div>
+                    <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-4 relative z-10">
                         <h3 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean Label</h3>
                         <div className="flex items-center gap-3">
-                            <button type="button" onClick={() => setPrintList([])} disabled={printList.length === 0} className="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-xs font-bold transition-colors disabled:opacity-50 border border-red-200"><i className="fa-solid fa-trash-can mr-1"></i> Hapus Semua</button>
-                            <span className="text-white font-black bg-rose-500 px-4 py-2 rounded-xl text-sm shadow-md">{printList.length} Item</span>
+                            <button type="button" onClick={() => setPrintList([])} disabled={printList.length === 0} className="bg-red-50 text-red-600 hover:bg-red-500 hover:text-white px-4 py-2 rounded-md text-xs font-bold transition-colors disabled:opacity-50 border border-red-200"><i className="fa-solid fa-trash-can mr-1"></i> Hapus Semua</button>
+                            <span className="text-white font-black bg-rose-500 px-4 py-2 rounded-md text-sm shadow-md">{printList.length} Item</span>
                         </div>
                     </div>
-                    <div className="flex-1 overflow-y-auto space-y-2 mb-6 bg-slate-50 rounded-2xl p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
+                    <div className="flex-1 overflow-y-auto space-y-2 mb-4 bg-slate-50 rounded-md p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                         {printList.map((item, idx) => (
-                            <div key={item._id} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 hover:border-rose-300 transition-colors shadow-sm">
+                            <div key={item._id} className="flex justify-between items-center bg-white p-4 rounded-md border border-slate-200 hover:border-rose-300 transition-colors shadow-sm">
                                 <div className="text-sm text-slate-600 flex items-center gap-3">
                                     <span className="text-slate-400 font-bold w-4">{idx + 1}.</span>
                                     <span><span className="font-black text-rose-800 text-base">{item.article}</span> <span className="opacity-80 font-bold ml-1 text-slate-500">({item.colorName} - <b className="text-rose-500 text-base">{item.sizeName}</b>)</span></span>
                                 </div>
-                                <button type="button" onClick={() => removePrint(idx)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-xmark text-lg font-black"></i></button>
+                                <button type="button" onClick={() => removePrint(idx)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-md transition-colors"><i className="fa-solid fa-xmark text-lg font-black"></i></button>
                             </div>
                         ))}
                         {printList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                     </div>
-                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-rose-500/30 relative z-10"><i className="fa-solid fa-print text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
+                    <button type="button" onClick={executePrint} disabled={printList.length === 0} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3.5 rounded-md font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-rose-500/30 relative z-10"><i className="fa-solid fa-print text-2xl mr-3"></i> CETAK LABEL SEKARANG</button>
                 </div>
             </div>
 
             {/* Pratinjau Visual */}
-            <div className="bg-white p-8 rounded-2xl border shadow-sm no-print">
-                <h3 className="text-lg font-bold text-rose-800 mb-6 border-b pb-4 flex items-center gap-2">
+            <div className="bg-white p-6 rounded-md border shadow-sm no-print">
+                <h3 className="text-lg font-bold text-rose-800 mb-4 border-b pb-4 flex items-center gap-2">
                     <i className="fa-solid fa-magnifying-glass text-rose-500 bg-rose-50 p-2 rounded-lg"></i> Pratinjau Desain Stiker (471x215 px)
                 </h3>
                 {printList.length > 0 ? (
@@ -8355,12 +8430,12 @@ function CetakLabel({ products, variants, showToast }) {
                                 </div>
                             )
                         })}
-                        {printList.length > 3 && <div className="flex items-center justify-center px-8 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl text-slate-500 font-bold text-sm">
+                        {printList.length > 3 && <div className="flex items-center justify-center px-8 bg-slate-50 border-2 border-dashed border-slate-300 rounded-md text-slate-500 font-bold text-sm">
                             + {printList.length - 3} Label Lainnya...
                         </div>}
                     </div>
                 ) : (
-                    <p className="text-sm font-medium text-slate-500 py-6 text-center bg-slate-50 rounded-xl border border-dashed">Tambahkan produk ke antrean cetak untuk melihat pratinjau stiker.</p>
+                    <p className="text-sm font-medium text-slate-500 py-6 text-center bg-slate-50 rounded-md border border-dashed">Tambahkan produk ke antrean cetak untuk melihat pratinjau stiker.</p>
                 )}
             </div>
         </div>
@@ -8469,7 +8544,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const handleResetStok = async (e) => {
         e.preventDefault();
         if (resetPass !== currentUser.password) { return showToast('error', "GAGAL: Password Salah!"); }
-        if (confirm('TINDAKAN INI TIDAK BISA DIBATALKAN. Seluruh riwayat barang masuk & keluar akan dihapus, sehingga stok menjadi 0. Lanjutkan?')) {
+        if (await showConfirm('TINDAKAN INI TIDAK BISA DIBATALKAN. Seluruh riwayat barang masuk & keluar akan dihapus, sehingga stok menjadi 0. Lanjutkan?')) {
             setIsLoading(true);
             try {
                 const txDocs = await db.collection('transactions').get();
@@ -8507,19 +8582,19 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
         <div className="space-y-6 relative">
             {showResetModal && (
                 <div className="fixed inset-0 z-[100] bg-black/80 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl relative">
+                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl relative">
                         <button type="button" onClick={() => setShowResetModal(false)} className="absolute top-5 right-5 text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
                         <h3 className="text-2xl font-black text-rose-600 mb-2"><i className="fa-solid fa-triangle-exclamation mr-2"></i> Reset Data Stok</h3>
-                        <p className="text-slate-600 text-sm mb-6 font-semibold leading-relaxed">Tindakan ini akan <b>menghapus seluruh riwayat transaksi scan</b> (Barang Masuk/Keluar) dan mengembalikan semua stok menjadi 0. <span className="text-emerald-600">Master Produk Anda tidak akan dihapus.</span><br /><br />Masukkan Password Anda untuk memverifikasi.</p>
+                        <p className="text-slate-600 text-sm mb-4 font-semibold leading-relaxed">Tindakan ini akan <b>menghapus seluruh riwayat transaksi scan</b> (Barang Masuk/Keluar) dan mengembalikan semua stok menjadi 0. <span className="text-emerald-600">Master Produk Anda tidak akan dihapus.</span><br /><br />Masukkan Password Anda untuk memverifikasi.</p>
                         <form onSubmit={handleResetStok} action="javascript:void(0);" className="space-y-4">
-                            <input required type="password" placeholder="Masukkan Password Anda..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-200 focus:border-rose-500 outline-none rounded-xl font-bold bg-rose-50 focus:bg-white transition-colors" />
-                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-4 rounded-xl shadow-xl shadow-rose-600/30 transition-transform transform hover:-translate-y-1">RESET STOK SEKARANG</button>
+                            <input required type="password" placeholder="Masukkan Password Anda..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-200 focus:border-rose-500 outline-none rounded-md font-bold bg-rose-50 focus:bg-white transition-colors" />
+                            <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-md shadow-xl shadow-rose-600/30 transition-transform transform hover:-translate-y-1">RESET STOK SEKARANG</button>
                         </form>
                     </div>
                 </div>
             )}
 
-            <div className="bg-rose-900 rounded-3xl p-8 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-8 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
+            <div className="bg-rose-900 rounded-md p-6 shadow-xl text-white grid grid-cols-1 md:grid-cols-3 gap-6 divide-y md:divide-y-0 md:divide-x divide-slate-700 relative overflow-hidden">
                 <div className="absolute top-0 right-0 p-10 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
                 <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-rose-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
                 <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
@@ -8536,17 +8611,17 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 </div>
             </div>
 
-            <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-2xl overflow-hidden mt-8'}`}>
-                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center shrink-0">
+            <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-md overflow-hidden mt-8'}`}>
+                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-center shrink-0">
                     <h3 className="text-xl font-black text-rose-800 flex items-center"><i className="fa-solid fa-table-list text-rose-500 mr-3"></i> Detail Stok Per Article</h3>
                     <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
-                        <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
-                        <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
-                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
+                        <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-md font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
+                        <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-md font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
+                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-md font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
                     </div>
                 </div>
                 <div className={`overflow-auto custom-scrollbar ${isFullScreenLaporan ? 'flex-1 h-full' : 'pb-4'}`}>
-                    <table className="w-full text-left text-sm border-collapse min-w-max">
+                    <table className="w-full text-xs md:text-sm text-left text-sm border-collapse min-w-max">
                         <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
                                 <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-rose-50 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th>
@@ -8568,7 +8643,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                             <td className="p-1.5 sm:p-4 border-r border-slate-200 align-top bg-white min-w-[70px] max-w-[85px] sm:min-w-[140px] sm:max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
                                                 <div className="flex flex-col items-center text-center gap-1 sm:gap-3">
                                                     {row.photo && (
-                                                        <div className="w-10 h-10 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSelectedImage(row.photo)}>
+                                                        <div className="w-10 h-10 sm:w-20 sm:h-20 shrink-0 rounded-md overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSelectedImage(row.photo)}>
                                                             <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
                                                         </div>
                                                     )}
@@ -8607,7 +8682,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
             {selectedImage && (
                 <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
                     <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
-                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
         </div>
@@ -8714,21 +8789,21 @@ function PantauStok({ variants, transactions, showToast }) {
         const isExp = expanded[dataKey];
         const totalItems = data.reduce((acc, curr) => acc + curr.qty, 0);
         return (
-            <div className={`bg-white rounded-3xl border-4 ${borderClass} overflow-hidden shadow-lg transition-all`}>
+            <div className={`bg-white rounded-md border-2 ${borderClass} overflow-hidden shadow-lg transition-all`}>
                 <div onClick={() => toggleExp(dataKey)} className={`p-6 ${bgClass} flex justify-between items-center cursor-pointer select-none hover:brightness-95 transition-all`}>
-                    <div className="flex items-center gap-5"><div className={`w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center ${colorClass}`}><i className={`fa-solid ${icon} text-2xl`}></i></div><div><h3 className={`font-black text-2xl ${colorClass}`}>{title}</h3><p className="text-sm font-bold text-slate-600 mt-1">{subtitle} &bull; Sisa: <span className="underline">{totalItems} Pcs</span></p></div></div>
+                    <div className="flex items-center gap-5"><div className={`w-14 h-14 rounded-md bg-white shadow-md flex items-center justify-center ${colorClass}`}><i className={`fa-solid ${icon} text-2xl`}></i></div><div><h3 className={`font-black text-2xl ${colorClass}`}>{title}</h3><p className="text-sm font-bold text-slate-600 mt-1">{subtitle} &bull; Sisa: <span className="underline">{totalItems} Pcs</span></p></div></div>
                     {isExp ? <i className={`fa-solid fa-chevron-up text-2xl ${colorClass}`}></i> : <i className={`fa-solid fa-chevron-down text-2xl ${colorClass}`}></i>}
                 </div>
                 {isExp && (
                     <div className="p-5 bg-white max-h-96 overflow-y-auto space-y-3 custom-scrollbar">
                         {data.map((item, i) => (
-                            <div key={i} className="flex justify-between items-center p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 hover:border-slate-300 transition-colors">
+                            <div key={i} className="flex justify-between items-center p-4 border-2 border-slate-100 rounded-md bg-slate-50 hover:border-slate-300 transition-colors">
                                 <div>
                                     <div className="font-black text-rose-800 text-lg">{item.article}</div>
                                     <div className="font-bold text-slate-500 text-sm mt-0.5">{item.colorName} - Sz: <span className="text-rose-500 font-black">{item.sizeName}</span></div>
                                     <div className="text-xs font-bold text-slate-400 mt-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"><i className="fa-regular fa-calendar-check mr-1 text-rose-500"></i> Cetak: {new Date(item.originalDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                                 </div>
-                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-2xl border-2 shadow-sm text-rose-600">{item.qty} Pcs</span></div>
+                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-md border-2 shadow-sm text-rose-600">{item.qty} Pcs</span></div>
                             </div>
                         ))}
                         {data.length === 0 && <div className="text-center py-10 text-slate-400"><i className="fa-solid fa-box-open text-5xl mb-4 opacity-30"></i><p className="font-bold">Stok kategori ini kosong / habis terjual.</p></div>}
@@ -8740,12 +8815,12 @@ function PantauStok({ variants, transactions, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-rose-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
+            <div className="bg-rose-900 p-6 rounded-md text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+                <div className="absolute top-0 right-0 p-6 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
                 <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-rose-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
-                <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
+                <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-3 rounded-md shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <CategorySection title="Stok Baru" subtitle="0 s/d 3 Bulan" dataKey="baru" data={inventoryData.baru} colorClass="text-emerald-600" borderClass="border-emerald-200" bgClass="bg-emerald-100" icon="fa-leaf" />
                 <CategorySection title="Stok Lama" subtitle="3 s/d 6 Bulan" dataKey="lama" data={inventoryData.lama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-hourglass-half" />
                 <CategorySection title="Stok Sudah Lama" subtitle="6 s/d 12 Bulan" dataKey="sudahLama" data={inventoryData.sudahLama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-calendar-minus" />
@@ -8785,13 +8860,13 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
     };
 
     const handleDeleteUser = async (id) => {
-        if (confirm('Hapus akun karyawan ini secara permanen?')) { setIsLoading(true); await db.collection('users').doc(id).delete(); setUsers(users.filter(u => u.id !== id)); setIsLoading(false); }
+        if (await showConfirm('Hapus akun karyawan ini secara permanen?')) { setIsLoading(true); await db.collection('users').doc(id).delete(); setUsers(users.filter(u => u.id !== id)); setIsLoading(false); }
     };
 
     const handleReset = async (e) => {
         e.preventDefault();
         if (resetPass !== currentUser.password) return showToast('error', "GAGAL: Password Salah!");
-        if (confirm('TINDAKAN INI TIDAK BISA DIBATALKAN. Hapus seluruh data produk dan transaksi sekarang?')) {
+        if (await showConfirm('TINDAKAN INI TIDAK BISA DIBATALKAN. Hapus seluruh data produk dan transaksi sekarang?')) {
             setIsLoading(true);
             try { 
                 const prodDocs = await db.collection('products').get(); 
@@ -8831,21 +8906,21 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
         }
     };
 
-    if (currentUser.role !== 'admin') return <div className="p-10 font-bold text-red-500 text-center text-xl bg-red-50 rounded-2xl border-2 border-red-200">Akses Ditolak. Halaman ini hanya untuk Admin Utama.</div>;
+    if (currentUser.role !== 'admin') return <div className="p-10 font-bold text-red-500 text-center text-xl bg-red-50 rounded-md border-2 border-red-200">Akses Ditolak. Halaman ini hanya untuk Admin Utama.</div>;
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-3xl border shadow-sm">
-                <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-md border shadow-sm">
+                <div className="flex justify-between items-center mb-4 border-b border-slate-200 pb-4">
                     <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-users-gear text-rose-500 mr-2"></i> Manajemen Sub-Akun</h3>
-                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
+                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-4 py-2 rounded-md font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
                 </div>
 
                 {showAdd && (
-                    <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-8 p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-5 shadow-inner">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
+                    <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-5 p-6 bg-slate-50 border-2 border-slate-200 rounded-md space-y-5 shadow-inner">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-md focus:border-rose-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-md focus:border-rose-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Beri Akses Menu:</label>
@@ -8857,17 +8932,17 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                     { id: 'sj_syaren', label: 'Penerima - Syaren Official' },
                                     { id: 'delete_antrean', label: 'Akses Hapus Pesanan Online' }
                                 ].map(m => (
-                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-xl cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-rose-50 border-rose-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-rose-50'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-rose-500 focus:ring-blue-500" />{m.label}</label>
+                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-md cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-rose-50 border-rose-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-rose-50'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-rose-500 focus:ring-blue-500" />{m.label}</label>
                                 ))}
                             </div>
                         </div>
-                        <button className="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-4 rounded-xl mt-4 shadow-lg shadow-rose-500/30">SIMPAN SUB-AKUN</button>
+                        <button className="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-3 rounded-md mt-4 shadow-lg shadow-rose-500/30">SIMPAN SUB-AKUN</button>
                     </form>
                 )}
 
                 <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                     {users.map(u => (
-                        <div key={u.id} className="flex justify-between items-center p-5 border-2 border-slate-100 rounded-2xl bg-white shadow-sm hover:border-slate-300 transition-colors">
+                        <div key={u.id} className="flex justify-between items-center p-5 border-2 border-slate-100 rounded-md bg-white shadow-sm hover:border-slate-300 transition-colors">
                             <div>
                                 <div className="font-black text-rose-800 text-lg">{u.username} <span className={`text-[10px] px-2 py-0.5 rounded-md ml-2 uppercase align-middle ${u.role === 'admin' ? 'bg-rose-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{u.role}</span></div>
                                 <div className="text-xs text-slate-500 font-semibold mt-1.5 leading-relaxed">
@@ -8884,19 +8959,19 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                     )}
                                 </div>
                             </div>
-                            {u.username !== 'admin' && <button type="button" onClick={() => handleDeleteUser(u.id)} className="text-rose-500 w-12 h-12 flex items-center justify-center bg-rose-50 hover:bg-rose-500 hover:text-white rounded-xl transition-colors border border-rose-100"><i className="fa-solid fa-trash-can text-lg"></i></button>}
+                            {u.username !== 'admin' && <button type="button" onClick={() => handleDeleteUser(u.id)} className="text-rose-500 w-12 h-12 flex items-center justify-center bg-rose-50 hover:bg-rose-500 hover:text-white rounded-md transition-colors border border-rose-100"><i className="fa-solid fa-trash-can text-lg"></i></button>}
                         </div>
                     ))}
                 </div>
             </div>
 
-            <div className="bg-rose-50 p-8 rounded-3xl border-4 border-rose-200 h-fit shadow-sm relative overflow-hidden">
+            <div className="bg-rose-50 p-6 rounded-md border-2 border-rose-200 h-fit shadow-sm relative overflow-hidden">
                 <i className="fa-solid fa-triangle-exclamation absolute top-5 right-5 text-rose-500 text-8xl opacity-10"></i>
                 <h3 className="text-2xl font-black text-rose-800 mb-3 relative z-10"><i className="fa-solid fa-skull text-rose-600 mr-2"></i> Danger Zone: Reset Data</h3>
-                <p className="text-sm text-rose-700 font-semibold mb-6 relative z-10">Tindakan ini akan <b className="uppercase">menghapus seluruh</b> Master Produk dan Riwayat Transaksi secara permanen. Database akan dikosongkan. Masukkan Password Admin Utama untuk memverifikasi.</p>
+                <p className="text-sm text-rose-700 font-semibold mb-4 relative z-10">Tindakan ini akan <b className="uppercase">menghapus seluruh</b> Master Produk dan Riwayat Transaksi secara permanen. Database akan dikosongkan. Masukkan Password Admin Utama untuk memverifikasi.</p>
                 <form onSubmit={handleReset} action="javascript:void(0);" className="space-y-4 relative z-10">
-                    <input required type="password" placeholder="Masukkan Password Admin..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 outline-none rounded-xl font-bold bg-white" />
-                    <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-4 rounded-xl shadow-xl shadow-rose-600/30 transition-transform transform hover:-translate-y-1">HAPUS SELURUH DATA SEKARANG</button>
+                    <input required type="password" placeholder="Masukkan Password Admin..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 outline-none rounded-md font-bold bg-white" />
+                    <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-3 rounded-md shadow-xl shadow-rose-600/30 transition-transform transform hover:-translate-y-1">HAPUS SELURUH DATA SEKARANG</button>
                 </form>
             </div>
         </div>
@@ -9044,8 +9119,8 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         updateDraftList(mpoDraftList.filter(x => x.sku !== sku));
     };
 
-    const handleDuplicatePO = (po) => {
-        if (!window.confirm(`Duplikat PO ${po.id}? Seluruh pesanan barangnya akan disalin ke keranjang MPO saat ini.`)) return;
+    const handleDuplicatePO = async (po) => {
+        if (!(await showConfirm(`Duplikat PO ${po.id}? Seluruh pesanan barangnya akan disalin ke keranjang MPO saat ini.`))) return;
         
         const existingList = [...mpoDraftList];
         po.items.forEach(newItem => {
@@ -9465,7 +9540,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     };
 
     const deletePO = async (id) => {
-        if (confirm('Hapus PO ini secara permanen?')) {
+        if (await showConfirm('Hapus PO ini secara permanen?')) {
             setIsLoading(true);
             await db.collection('purchase_orders').doc(id).delete();
             setIsLoading(false);
@@ -9486,15 +9561,15 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
     return (
         <>
         <div className="space-y-6">
-            <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex justify-between items-center">
+            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm flex justify-between items-center">
                 <div>
                     <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Manajemen PO Bengkel</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Buat Matrix Order, cetak SP dan label barcode</p>
                 </div>
                 {showForm ? (
-                    <button onClick={() => setShowForm(false)} className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-black transition-colors">Batal</button>
+                    <button onClick={() => setShowForm(false)} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-md font-black transition-colors">Batal</button>
                 ) : (
-                    <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white shadow-md rounded-xl font-black transition-colors">+ BIKIN PO MPO</button>
+                    <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-rose-500 hover:bg-rose-600 text-white shadow-md rounded-md font-black transition-colors">+ BIKIN PO MPO</button>
                 )}
             </div>
 
@@ -9529,11 +9604,11 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
                 return (
                     <div className="fixed inset-0 bg-rose-900/80 z-50 flex items-center justify-center p-4">
-                        <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
+                        <div className="bg-white rounded-md p-6 md:p-6 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
                             <h3 className="text-2xl font-black text-rose-800 mb-2">Preview PO <span className="text-rose-500">{newPoId}</span></h3>
-                            <p className="text-slate-500 font-bold text-sm mb-6 border-b pb-4">Tanggal PO: {poDate} &nbsp;|&nbsp; Target Selesai: {targetDate}</p>
-                            <div className="flex-1 overflow-auto bg-slate-50 border rounded-2xl mb-6 shadow-inner p-2 custom-scrollbar">
-                                <table className="w-full text-left text-sm border-collapse">
+                            <p className="text-slate-500 font-bold text-sm mb-4 border-b pb-4">Tanggal PO: {poDate} &nbsp;|&nbsp; Target Selesai: {targetDate}</p>
+                            <div className="flex-1 overflow-auto bg-slate-50 border rounded-md mb-4 shadow-inner p-2 custom-scrollbar">
+                                <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
                                     <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                                         <tr>
                                             <th className="p-3 font-black uppercase text-center border-r">Article</th>
@@ -9593,9 +9668,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     </tfoot>
                                 </table>
                             </div>
-                            <div className="flex gap-4">
-                                <button onClick={() => setPreviewModal(false)} className="flex-1 px-6 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-xl transition-colors">KEMBALI KE DRAFT</button>
-                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-4 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
+                            <div className="flex gap-3">
+                                <button onClick={() => setPreviewModal(false)} className="flex-1 px-6 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-md transition-colors">KEMBALI KE DRAFT</button>
+                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-md transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
                             </div>
                         </div>
                     </div>
@@ -9603,34 +9678,34 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             })()}
 
             {showForm && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print mb-8">
-                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border shadow-sm flex flex-col h-[550px] sm:h-[650px]">
-                        <h3 className="text-sm sm:text-xl font-black mb-2 sm:mb-6 flex items-center gap-2 sm:gap-3 text-rose-800 border-b-2 border-slate-100 pb-2 sm:pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-2 sm:p-3 rounded-lg sm:rounded-xl"></i> Cari Produk</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print mb-5">
+                    <div className="bg-white p-4 sm:p-6 rounded-md sm:rounded-md border shadow-sm flex flex-col h-[550px] sm:h-[650px]">
+                        <h3 className="text-sm sm:text-xl font-black mb-2 sm:mb-4 flex items-center gap-2 sm:gap-3 text-rose-800 border-b-2 border-slate-100 pb-2 sm:pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-2 sm:p-3 rounded-lg sm:rounded-md"></i> Cari Produk</h3>
                         <div className="space-y-2 sm:space-y-4 mb-2 sm:mb-4">
-                            <div className="flex gap-2 sm:gap-4">
+                            <div className="flex gap-2 sm:gap-3">
                                 <div className="flex-1">
                                     <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
-                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-md mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
                                 </div>
                                 <div className="flex-1">
                                     <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
-                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-md mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
                                 </div>
                             </div>
                             <div>
                                 <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Nama Bengkel</label>
-                                <input type="text" placeholder="Masukkan Nama Bengkel..." className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={bengkelName} onChange={e => setBengkelName(e.target.value)} />
+                                <input type="text" placeholder="Masukkan Nama Bengkel..." className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-md mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={bengkelName} onChange={e => setBengkelName(e.target.value)} />
                             </div>
                             <div className="relative">
                                 <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
-                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-md text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                             </div>
                             <div className="flex gap-2 items-center">
-                                <input type="number" placeholder="Target stok tiap SKU..." className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 font-bold bg-white" value={targetStock} onChange={e => setTargetStock(e.target.value)} />
-                                <button type="button" onClick={handleApplyTargetStock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-sm whitespace-nowrap shadow-md transition-colors"><i className="fa-solid fa-bolt mr-1 sm:mr-2"></i>Apply</button>
+                                <input type="number" placeholder="Target stok tiap SKU..." className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-md text-xs sm:text-base outline-none focus:border-rose-500 font-bold bg-white" value={targetStock} onChange={e => setTargetStock(e.target.value)} />
+                                <button type="button" onClick={handleApplyTargetStock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-md font-black text-[10px] sm:text-sm whitespace-nowrap shadow-md transition-colors"><i className="fa-solid fa-bolt mr-1 sm:mr-2"></i>Apply</button>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
+                        <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-md bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
                             {filteredVariants.map(v => {
                                 const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
                                     if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
@@ -9638,9 +9713,9 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                     return sum;
                                 }, 0);
                                 return (
-                                <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-4">
-                                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
-                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
+                                <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-md shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-3">
+                                    <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-md border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
                                         <div className="min-w-0">
                                             <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
                                             <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight">
@@ -9657,7 +9732,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                                     {mpoDraftList.find(x => x.sku === v.sku).qty} <i className="fa-solid fa-check"></i>
                                                 </div>
                                             )}
-                                            <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
+                                            <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-md font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
                                         </div>
                                     </div>
                                 </div>
@@ -9671,43 +9746,43 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                         </div>
                     </div>
 
-                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
-                        <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
+                    <div className="bg-white p-4 sm:p-6 rounded-md sm:rounded-md border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 sm:p-6 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
+                        <div className="flex justify-between items-center mb-3 sm:mb-4 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
                             <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
                             <div className="flex gap-1 sm:gap-2 items-center">
-                                <button type="button" onClick={handleUndo} disabled={history.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Undo (Ctrl+Z)"><i className="fa-solid fa-rotate-left"></i></button>
-                                <button type="button" onClick={handleRedo} disabled={future.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Redo (Ctrl+Y)"><i className="fa-solid fa-rotate-right"></i></button>
-                                <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md ml-1">{mpoDraftList.length} Item</span>
+                                <button type="button" onClick={handleUndo} disabled={history.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-md hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Undo (Ctrl+Z)"><i className="fa-solid fa-rotate-left"></i></button>
+                                <button type="button" onClick={handleRedo} disabled={future.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-md hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Redo (Ctrl+Y)"><i className="fa-solid fa-rotate-right"></i></button>
+                                <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-md text-[10px] sm:text-sm shadow-md ml-1">{mpoDraftList.length} Item</span>
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-6 bg-slate-50 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-4 bg-slate-50 rounded-md sm:rounded-md p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                             {mpoDraftList.map((item) => (
-                                <div key={item.sku} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                <div key={item.sku} className="flex justify-between items-center bg-white p-4 rounded-md border border-slate-200 shadow-sm">
                                     <div className="text-sm text-slate-600 flex items-center gap-3">
                                         <span className="font-black text-rose-800 text-base">{item.article}</span>
                                         <span className="font-bold text-slate-500">({item.colorName} - <b className="text-rose-500">{item.sizeName}</b>)</span>
                                     </div>
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex items-center gap-3">
                                         <span className="font-black text-lg text-rose-800">{item.qty} Pcs</span>
-                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-md transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
                                     </div>
                                 </div>
                             ))}
                             {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                         </div>
-                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-5 rounded-xl sm:rounded-2xl font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
+                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-3.5 rounded-md sm:rounded-md font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="bg-white rounded-md sm:rounded-md border border-slate-200 shadow-xl overflow-hidden">
                 <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
                     <h3 className="font-black text-base sm:text-xl text-rose-800"><i className="fa-solid fa-list-ul text-rose-500 mr-2"></i> Riwayat Daftar PO</h3>
                     <span className="bg-blue-200 text-blue-900 font-black px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm shadow-inner">{mpoOrders.length} PO</span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-xs md:text-sm text-left border-collapse">
                         <thead className="bg-rose-50 text-slate-700 text-[10px] sm:text-sm border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
                                 <th className="p-3 sm:p-5 font-black uppercase">No. PO</th>
@@ -9734,18 +9809,18 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
                                         <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
+                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
                                                 <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
                                             </button>
-                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
+                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
                                                 <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
                                             </button>
-                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
+                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
                                                 <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
                                             </button>
                                         </td>
                                         <td className="p-3 sm:p-5 text-right whitespace-nowrap align-top">
-                                            <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-xl hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
+                                            <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-md hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
                                                 <i className="fa-solid fa-trash-can"></i>
                                             </button>
                                         </td>
@@ -9763,7 +9838,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
             {selectedImage && (
                 <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
                     <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
-                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
                 </div>
             )}
         </>
@@ -10110,7 +10185,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             return showToast('error', 'Hanya Admin atau staf dengan akses khusus yang bisa membatalkan antrean.');
         }
 
-        const yakin = window.confirm(`PERINGATAN!\n\nAnda akan MEMBATALKAN antrean resi untuk:\nSKU: ${sku}\nSesi: ${session}\n\nYakin ingin membatalkan?`);
+        const yakin = confirm(`PERINGATAN!\n\nAnda akan MEMBATALKAN antrean resi untuk:\nSKU: ${sku}\nSesi: ${session}\n\nYakin ingin membatalkan?`);
         if (!yakin) return;
 
         setIsLoading(true);
@@ -10147,7 +10222,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
 
         return (
             <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-white/80 backdrop-blur-sm animate-in fade-in duration-200">
-                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
+                <div className="bg-white rounded-md shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden border border-slate-200">
                     <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                         <div>
                             <h3 className="font-black text-rose-800 text-lg">Audit Pesanan Online</h3>
@@ -10156,7 +10231,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                         <button onClick={() => setAuditModal(null)} className="text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-2xl"></i></button>
                     </div>
                     <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                        <table className="w-full text-left text-sm border-collapse">
+                        <table className="w-full text-xs md:text-sm text-left text-sm border-collapse">
                             <thead className="sticky top-0 bg-rose-50 text-slate-600 font-bold border-b border-slate-200">
                                 <tr>
                                     <th className="p-3">No. Resi / Order</th>
@@ -10197,7 +10272,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
         if (!isAuthorized) return showToast('error', 'Akses ditolak.');
 
         const labelSesi = `Sesi ${session} - ${new Date(poDate).toLocaleDateString('id-ID')}`;
-        if (!window.confirm(`PERINGATAN KERAS!\n\nAnda akan membatalkan SELURUH antrean pada:\n${labelSesi}\n\nSemua barang di sesi ini akan ditandai BATAL. Lanjutkan?`)) return;
+        if (!(await showConfirm(`PERINGATAN KERAS!\n\nAnda akan membatalkan SELURUH antrean pada:\n${labelSesi}\n\nSemua barang di sesi ini akan ditandai BATAL. Lanjutkan?`))) return;
 
         setIsLoading(true);
         try {
@@ -10363,22 +10438,22 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
     const mpoToDisplay = filteredMpo.filter(o => o.status === 'OPEN' || o.status === 'SHIPPED');
 
     return (
-        <div className="bg-white p-6 rounded-3xl border shadow-sm mb-6 no-print animate-in zoom-in duration-300">
+        <div className="bg-white p-6 rounded-md border shadow-sm mb-4 no-print animate-in zoom-in duration-300">
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-industry text-rose-600 mr-2"></i> Target Produksi {activeTab === 'lery' ? "Lery's Workshop (F01)" : 'Pak Samin (F07)'}</h3>
                 {(dashView === 'ONLINE' || dashView === 'PO') && (
-                    <button onClick={() => setIsSisaFullscreen(!isSisaFullscreen)} className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-rose-100 text-rose-600 rounded-xl font-black hover:bg-rose-600 hover:text-white transition-all shadow-sm text-xs sm:text-sm">
+                    <button onClick={() => setIsSisaFullscreen(!isSisaFullscreen)} className="flex items-center gap-2 px-3 py-1.5 sm:px-4 sm:py-2 bg-rose-100 text-rose-600 rounded-md font-black hover:bg-rose-600 hover:text-white transition-all shadow-sm text-xs sm:text-sm">
                         <i className={`fa-solid ${isSisaFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
                         {isSisaFullscreen ? 'Tutup' : 'Layar Penuh'}
                     </button>
                 )}
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-6">
-                <div onClick={() => setDashView('PO')} className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${dashView === 'PO' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+                <div onClick={() => setDashView('PO')} className={`cursor-pointer p-4 rounded-md border-2 transition-all ${dashView === 'PO' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa PO Bengkel</div>
                     <div className="text-3xl font-black text-rose-600 mt-1">{pendingPO} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
                 </div>
-                <div onClick={() => setDashView('ONLINE')} className={`cursor-pointer p-4 rounded-2xl border-2 transition-all ${dashView === 'ONLINE' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
+                <div onClick={() => setDashView('ONLINE')} className={`cursor-pointer p-4 rounded-md border-2 transition-all ${dashView === 'ONLINE' ? 'bg-rose-50 border-rose-500 shadow-md' : 'bg-slate-50 border-slate-200 hover:border-rose-300'}`}>
                     <div className="text-xs font-black text-slate-500 uppercase">Sisa Online (Prioritas)</div>
                     <div className="text-3xl font-black text-rose-600 mt-1">{pendingOnline} <span className="text-sm font-bold text-slate-500">Pcs</span></div>
                 </div>
@@ -10388,7 +10463,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             {dashView === 'PO' && (
                 <div className={isSisaFullscreen ? "fixed inset-0 z-[9999] bg-white p-2 sm:p-6 overflow-y-auto" : "relative border-t pt-4"}>
                     {isSisaFullscreen && (
-                        <div className="flex justify-between items-center mb-4 bg-rose-50 p-3 rounded-xl border-2 border-rose-200">
+                        <div className="flex justify-between items-center mb-4 bg-rose-50 p-3 rounded-md border-2 border-rose-200">
                             <h3 className="text-sm sm:text-lg font-black text-rose-700 uppercase flex items-center gap-2"><i className="fa-solid fa-expand text-base"></i> Mode Fokus PO</h3>
                             <button onClick={() => setIsSisaFullscreen(false)} className="bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md hover:bg-rose-700">
                                 <i className="fa-solid fa-compress mr-1"></i> TUTUP
@@ -10412,7 +10487,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                 articleGroups[item.article][item.colorName][item.sizeName].received += (item.received || 0);
                             });
                             return (
-                                <div key={po.id} className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+                                <div key={po.id} className="bg-white border rounded-md shadow-sm overflow-hidden">
                                     <div onClick={() => setExpandedPO(isExpanded ? null : po.id)} className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center bg-rose-50/30">
                                         <div>
                                             <div className="font-black text-lg text-rose-800"><i className="fa-solid fa-file-invoice mr-2 text-rose-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-2">({po.targetDate})</span></div>
@@ -10467,7 +10542,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
             {dashView === 'ONLINE' && (
                 <div className={isSisaFullscreen ? "fixed inset-0 z-[9999] bg-white p-2 sm:p-6 overflow-y-auto" : "relative border-t pt-4"}>
                     {isSisaFullscreen && (
-                        <div className="flex justify-between items-center mb-4 bg-rose-50 p-3 rounded-xl border-2 border-rose-200">
+                        <div className="flex justify-between items-center mb-4 bg-rose-50 p-3 rounded-md border-2 border-rose-200">
                             <h3 className="text-sm sm:text-lg font-black text-rose-700 uppercase flex items-center gap-2"><i className="fa-solid fa-expand text-base"></i> Mode Fokus Sisa Online</h3>
                             <button onClick={() => setIsSisaFullscreen(false)} className="bg-rose-600 text-white px-4 py-2 rounded-lg text-xs font-black shadow-md hover:bg-rose-700">
                                 <i className="fa-solid fa-compress mr-1"></i> TUTUP
@@ -10481,7 +10556,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                         <button
                             onClick={handleRekapSesi}
                             disabled={selectedSessions.size === 0}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-black transition-all shadow-md text-sm ${selectedSessions.size > 0 ? 'bg-rose-600 text-white hover:bg-rose-700 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-md font-black transition-all shadow-md text-sm ${selectedSessions.size > 0 ? 'bg-rose-600 text-white hover:bg-rose-700 active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}
                         >
                             <i className="fa-solid fa-file-pdf"></i> REKAP SESI TERPILIH
                         </button>
@@ -10499,11 +10574,11 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                             const isExpanded = expandedOnline === sessionKey;
 
                             return (
-                                <div key={i} className={`border-2 rounded-2xl overflow-hidden shadow-sm relative ${hasUrgent ? 'border-red-300' : 'border-rose-200'}`}>
+                                <div key={i} className={`border-2 rounded-md overflow-hidden shadow-sm relative ${hasUrgent ? 'border-red-300' : 'border-rose-200'}`}>
 
                                     {/* LOGIKA BARU: Tambahkan onClick dan ganti cursor jadi pointer, serta tambahkan Panah (Chevron) */}
                                     <div onClick={() => setExpandedOnline(isExpanded ? null : sessionKey)} className={`cursor-pointer hover:bg-slate-50 transition-colors p-4 font-bold flex justify-between items-center text-sm ${hasUrgent ? 'bg-rose-50 border-b border-rose-200' : 'bg-slate-50 border-b border-slate-200'}`}>
-                                        <div className="flex items-center gap-4">
+                                        <div className="flex items-center gap-3">
                                             {/* CHECKBOX SELEKSI */}
                                             <div
                                                 onClick={(e) => { e.stopPropagation(); toggleSessionSelection(sessionKey); }}
@@ -10514,7 +10589,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                             </div>
 
                                             <div className="flex items-center gap-3 border-l pl-4 border-slate-200">
-                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${hasUrgent ? 'bg-rose-500' : 'bg-slate-700'}`}>
+                                                <div className={`w-10 h-10 rounded-md flex items-center justify-center text-white ${hasUrgent ? 'bg-rose-500' : 'bg-slate-700'}`}>
                                                     <i className="fa-solid fa-boxes-stacked text-lg"></i>
                                                 </div>
                                                 <div>
@@ -10625,7 +10700,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                 </div>
                             );
                         })}
-                        {Object.keys(onlineBySession).length === 0 && <div className="text-center p-8 text-slate-400 font-bold border-2 border-dashed border-slate-300 rounded-xl">Mantap! Tidak ada antrean prioritas Online saat ini.</div>}
+                        {Object.keys(onlineBySession).length === 0 && <div className="text-center p-6 text-slate-400 font-bold border-2 border-dashed border-slate-300 rounded-md">Mantap! Tidak ada antrean prioritas Online saat ini.</div>}
                     </div>
                 </div>
             )}
@@ -10704,7 +10779,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             setActiveSender(emp);
             setSenderIdInput('');
             beep(true);
-            showToast('success', `âœ… Terverifikasi: ${emp.nama}`);
+            showToast('success', `✅ Terverifikasi: ${emp.nama}`);
             if (valFromCam) setShowScanner(false);
         } catch (err) { showToast('error', 'Gagal verifikasi ID: ' + err.message); }
     };
@@ -10720,7 +10795,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             setActiveReceiver(emp);
             setReceiverIdInput('');
             beep(true);
-            showToast('success', `âœ… Terverifikasi: ${emp.nama}`);
+            showToast('success', `✅ Terverifikasi: ${emp.nama}`);
             if (valFromCam) setShowScanner(false);
         } catch (err) { showToast('error', 'Gagal verifikasi ID: ' + err.message); }
     };
@@ -11245,7 +11320,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         const scanData = activeDraft.scanReceived || scannedItemsPenerima;
         if (Object.keys(scanData).length === 0) return showToast('error', 'Tidak ada data scan!');
 
-        if (!confirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data detail stok. Barang Online dilewati karena sudah meluncur ke QC.`)) return;
+        if (!(await showConfirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data detail stok. Barang Online dilewati karena sudah meluncur ke QC.`))) return;
 
         setIsLoading(true);
         try {
@@ -11388,7 +11463,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     const handleUpdateStokDirect = async () => {
         if (Object.keys(scannedItemsPenerima).length === 0) return showToast('error', 'Tidak ada data scan!');
-        if (!confirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data stok. Barang Online sudah otomatis tercatat saat Konfirmasi.`)) return;
+        if (!(await showConfirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data stok. Barang Online sudah otomatis tercatat saat Konfirmasi.`))) return;
         setIsLoading(true);
         try {
             const batchOp = db.batch();
@@ -11431,7 +11506,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     // FUNGSI BARU: Hapus Surat Jalan / Draft
     const handleDeleteSuratJalan = async (id) => {
-        if (confirm('Yakin ingin menghapus Surat Jalan ini secara permanen?')) {
+        if (await showConfirm('Yakin ingin menghapus Surat Jalan ini secara permanen?')) {
             setIsLoading(true);
             try {
                 await db.collection('surat_jalan').doc(id).delete();
@@ -11454,8 +11529,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* Modal Scanner */}
             {showScanner && (
                 <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                    <div className="bg-white p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                        <div className="flex justify-between items-center mb-6">
+                    <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 className="font-bold text-xl flex items-center gap-2">
                                 <i className="fa-solid fa-camera text-rose-500"></i> {scannerLabel}
                             </h3>
@@ -11477,7 +11552,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             )}
 
             {/* Header Pilihan Bengkel */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm">
+            <div className="bg-white p-6 md:p-6 rounded-md border shadow-sm">
                 <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Produksi Bengkel</h2>
                 <p className="text-slate-500 font-bold text-sm mt-1">Pilih Bengkel Pengirim atau Bagian Penerima Gudang.</p>
 
@@ -11500,27 +11575,27 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* ============ TAB BENGKEL (PENGIRIM) ============ */}
             {(activeTab === 'lery' || activeTab === 'samin') && (
                 !activeSender ? (
-                    <div className="bg-white p-8 md:p-12 rounded-3xl border shadow-sm max-w-lg mx-auto text-center space-y-6">
+                    <div className="bg-white p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
                         <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center ${activeTab === 'lery' ? 'bg-rose-100 text-rose-500' : 'bg-rose-100 text-rose-500'}`}><i className="fa-solid fa-id-card text-5xl"></i></div>
                         <h3 className="text-2xl font-black text-rose-800">Scan ID Card {activeTab === 'lery' ? "Lery's Workshop" : 'Pak Samin'}</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai pengiriman.</p>
                         <form onSubmit={handleScanSenderId} className="flex gap-2">
-                            <input ref={senderIdRef} type="text" placeholder="Scan ID Card..." value={senderIdInput} onChange={e => setSenderIdInput(e.target.value)} className={`flex-1 p-4 border-2 rounded-xl font-bold outline-none text-center text-lg ${activeTab === 'lery' ? 'border-rose-300 bg-rose-50 focus:border-rose-500' : 'border-rose-300 bg-rose-50 focus:border-rose-500'}`} autoFocus />
-                            <button type="submit" className={`px-6 py-3 text-white rounded-xl font-black text-lg ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
+                            <input ref={senderIdRef} type="text" placeholder="Scan ID Card..." value={senderIdInput} onChange={e => setSenderIdInput(e.target.value)} className={`flex-1 p-4 border-2 rounded-md font-bold outline-none text-center text-lg ${activeTab === 'lery' ? 'border-rose-300 bg-rose-50 focus:border-rose-500' : 'border-rose-300 bg-rose-50 focus:border-rose-500'}`} autoFocus />
+                            <button type="submit" className={`px-6 py-3 text-white rounded-md font-black text-lg ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
-                        <button onClick={() => openScanner('senderId', `Scan ID Card ${activeTab === 'lery' ? 'Lery' : 'Samin'}`)} className="w-full py-4 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => openScanner('senderId', `Scan ID Card ${activeTab === 'lery' ? 'Lery' : 'Samin'}`)} className="w-full py-3 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-md font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
                         </button>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
+                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-clipboard-check mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Form Kirim {activeTab === 'lery' ? '(Lery)' : '(Samin)'}</h3>
                                 <button onClick={() => { setActiveSender(null); setScannedItemsPengirim({}); setScannedTypePengirim({}); }} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Pengirim</button>
                             </div>
 
-                            <div className={`border-2 p-4 rounded-xl flex items-center gap-4 ${activeTab === 'lery' ? 'bg-rose-50 border-rose-200' : 'bg-rose-50 border-rose-200'}`}>
+                            <div className={`border-2 p-4 rounded-md flex items-center gap-3 ${activeTab === 'lery' ? 'bg-rose-50 border-rose-200' : 'bg-rose-50 border-rose-200'}`}>
                                 <div className={`w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl flex-shrink-0 ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-500'}`}><i className="fa-solid fa-user-check"></i></div>
                                 <div>
                                     <div className="font-black text-rose-800 text-lg">{activeSender.nama}</div>
@@ -11529,16 +11604,16 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             </div>
                             <div>
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal Kirim</label>
-                                <input type="date" value={tglKirim} onChange={e => setTglKirim(e.target.value)} className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold bg-slate-50 outline-none focus:border-slate-500" />
+                                <input type="date" value={tglKirim} onChange={e => setTglKirim(e.target.value)} className="w-full p-4 border-2 border-slate-300 rounded-md mt-1.5 font-bold bg-slate-50 outline-none focus:border-slate-500" />
                             </div>
 
                             <div>
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode Barang</label>
                                 <form onSubmit={handleScanFormPengirim} className="flex gap-2 mt-1.5">
-                                    <input ref={scanRefPengirim} type="text" placeholder={`Scan produk ${activeTab === 'lery' ? 'F01' : 'F07'}...`} value={scanInputPengirim} onChange={e => setScanInputPengirim(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-slate-500" autoFocus />
-                                    <button type="submit" className={`px-5 py-3 text-white rounded-xl font-black ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-qrcode"></i></button>
+                                    <input ref={scanRefPengirim} type="text" placeholder={`Scan produk ${activeTab === 'lery' ? 'F01' : 'F07'}...`} value={scanInputPengirim} onChange={e => setScanInputPengirim(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-md font-bold bg-slate-50 outline-none focus:border-slate-500" autoFocus />
+                                    <button type="submit" className={`px-5 py-3 text-white rounded-md font-black ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
-                                <button onClick={() => openScanner('itemsPengirim', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                <button onClick={() => openScanner('itemsPengirim', 'Scan Barcode Barang')} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
                                     <i className="fa-solid fa-camera text-2xl text-slate-300"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
@@ -11546,15 +11621,15 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     </div>
                                 </button>
                             </div>
-                            <button onClick={handleKirimSJ} disabled={Object.keys(scannedItemsPengirim).length === 0} className={`w-full text-white py-4 rounded-2xl font-black text-lg transition-colors shadow-lg disabled:bg-slate-200 disabled:text-slate-400 ${activeTab === 'lery' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'}`}>
+                            <button onClick={handleKirimSJ} disabled={Object.keys(scannedItemsPengirim).length === 0} className={`w-full text-white py-3 rounded-md font-black text-lg transition-colors shadow-lg disabled:bg-slate-200 disabled:text-slate-400 ${activeTab === 'lery' ? 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/30' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'}`}>
                                 <i className="fa-solid fa-paper-plane mr-2"></i> KIRIM SURAT JALAN
                             </button>
                         </div>
 
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                            <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className={`fa-solid fa-boxes-stacked mr-2 ${activeTab === 'lery' ? 'text-rose-500' : 'text-rose-500'}`}></i>Barang Ter-scan</h3>
-                                <span className={`text-white font-black px-4 py-1.5 rounded-xl text-sm ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}>{Object.values(scannedItemsPengirim).reduce((a, b) => a + b, 0)} Pcs</span>
+                                <span className={`text-white font-black px-4 py-1.5 rounded-md text-sm ${activeTab === 'lery' ? 'bg-rose-500' : 'bg-rose-600'}`}>{Object.values(scannedItemsPengirim).reduce((a, b) => a + b, 0)} Pcs</span>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                                 {Object.keys(scannedItemsPengirim).length > 0 ? Object.entries(scannedItemsPengirim).map(([barcode, qty]) => {
@@ -11562,7 +11637,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
                                     const itemType = scannedTypePengirim[barcode] || 'UNKNOWN';
                                     return (
-                                        <div key={barcode} className="p-4 rounded-xl border-2 border-slate-200 bg-white flex justify-between items-center">
+                                        <div key={barcode} className="p-4 rounded-md border-2 border-slate-200 bg-white flex justify-between items-center">
                                             <div>
                                                 <div className="font-black text-rose-800">{variant ? variant.article : sku} <span className={activeTab === 'lery' ? 'text-rose-500' : 'text-rose-600'}>{variant ? variant.sizeName : ''}</span></div>
                                                 <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
@@ -11570,7 +11645,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                     <i className={`fa-solid ${itemType === 'ONLINE' ? 'fa-cart-shopping' : 'fa-industry'} mr-1`}></i>{itemType === 'ONLINE' ? 'ONLINE ORDER' : 'PO PABRIK'}
                                                 </span>
                                             </div>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 <button onClick={() => {
                                                     setScannedItemsPengirim(prev => {
                                                         const newQty = (prev[barcode] || 0) - 1;
@@ -11598,26 +11673,26 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             {/* ============ TAB PENERIMA SYAREN ============ */}
             {activeTab === 'faradela' && (
                 !activeReceiver ? (
-                    <div className="bg-white p-8 md:p-12 rounded-3xl border shadow-sm max-w-lg mx-auto text-center space-y-6">
+                    <div className="bg-white p-6 md:p-12 rounded-md border shadow-sm max-w-lg mx-auto text-center space-y-6">
                         <div className="w-24 h-24 mx-auto bg-blue-100 rounded-full flex items-center justify-center"><i className="fa-solid fa-id-card text-blue-600 text-5xl"></i></div>
                         <h3 className="text-2xl font-black text-rose-800">Scan ID Card Penerima</h3>
                         <p className="text-slate-500 font-bold text-sm">Scan barcode ID Card karyawan untuk memulai penerimaan barang.</p>
                         <form onSubmit={handleScanReceiverId} className="flex gap-2">
-                            <input ref={receiverIdRef} type="text" placeholder="Scan ID Card..." value={receiverIdInput} onChange={e => setReceiverIdInput(e.target.value)} className="flex-1 p-4 border-2 border-blue-300 rounded-xl font-bold bg-blue-50 outline-none focus:border-blue-500 text-center text-lg" autoFocus />
-                            <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-lg"><i className="fa-solid fa-arrow-right"></i></button>
+                            <input ref={receiverIdRef} type="text" placeholder="Scan ID Card..." value={receiverIdInput} onChange={e => setReceiverIdInput(e.target.value)} className="flex-1 p-4 border-2 border-blue-300 rounded-md font-bold bg-blue-50 outline-none focus:border-blue-500 text-center text-lg" autoFocus />
+                            <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-md font-black text-lg"><i className="fa-solid fa-arrow-right"></i></button>
                         </form>
-                        <button onClick={() => openScanner('receiverId', 'Scan ID Card Penerima')} className="w-full py-4 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-2xl font-black transition-colors flex items-center justify-center gap-2">
+                        <button onClick={() => openScanner('receiverId', 'Scan ID Card Penerima')} className="w-full py-3 bg-rose-50 hover:bg-slate-200 text-slate-600 rounded-md font-black transition-colors flex items-center justify-center gap-2">
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
                         </button>
                     </div>
                 ) : activeDraft ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
+                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-barcode text-blue-600 mr-2"></i>Verifikasi: {activeDraft.id}</h3>
                                 <button onClick={() => { setActiveDraft(null); setScannedItemsPenerima({}); setDraftConfirmed(false); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
                             </div>
-                            <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl flex items-center gap-4">
+                            <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-md flex items-center gap-3">
                                 <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0"><i className="fa-solid fa-user-check"></i></div>
                                 <div>
                                     <div className="font-black text-rose-800">{activeReceiver.nama} <span className="text-xs text-blue-600">({activeReceiver.posisi})</span></div>
@@ -11627,10 +11702,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div>
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode</label>
                                 <form onSubmit={handleScanFormPenerima} className="flex gap-2 mt-1.5">
-                                    <input ref={scanRefPenerima} type="text" placeholder="Scan atau ketik barcode..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-blue-500" autoFocus />
-                                    <button type="submit" className="px-5 py-3 bg-blue-600 text-white rounded-xl font-black"><i className="fa-solid fa-qrcode"></i></button>
+                                    <input ref={scanRefPenerima} type="text" placeholder="Scan atau ketik barcode..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-md font-bold bg-slate-50 outline-none focus:border-blue-500" autoFocus />
+                                    <button type="submit" className="px-5 py-3 bg-blue-600 text-white rounded-md font-black"><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
-                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang')} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang')} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
                                     <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
@@ -11641,7 +11716,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div className="space-y-3">
                                 <button onClick={handleKonfirmasi}
                                     disabled={draftConfirmed || !activeDraft?.items.every(item => (scannedItemsPenerima[item.fullBarcode] || 0) >= item.qty)}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none text-white py-4 rounded-2xl font-black transition-colors shadow-lg">
+                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none text-white py-3 rounded-md font-black transition-colors shadow-lg">
                                     <i className="fa-solid fa-clipboard-check mr-2"></i> KONFIRMASI PENERIMAAN
                                     {draftConfirmed && <span className="ml-2 text-xs">(Dikonfirmasi)</span>}
                                     {!draftConfirmed && !activeDraft?.items.every(item => (scannedItemsPenerima[item.fullBarcode] || 0) >= item.qty) && <span className="ml-2 text-xs font-bold text-slate-500">(Belum Lengkap)</span>}
@@ -11649,20 +11724,20 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 <button
                                     onClick={handleUpdateStok}
                                     disabled={activeDraft?.status === 'ARRIVED'}
-                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none text-white py-4 rounded-2xl font-black transition-colors shadow-lg mt-4"
+                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none text-white py-3 rounded-md font-black transition-colors shadow-lg mt-4"
                                 >
                                     <i className={`fa-solid ${activeDraft?.status === 'ARRIVED' ? 'fa-check-double' : 'fa-boxes-packing'} mr-2`}></i>
                                     {activeDraft?.status === 'ARRIVED' ? 'STOK SUDAH MASUK GUDANG' : 'UPDATE STOK GUDANG'}
                                 </button>
-                                <button onClick={handleCetakSuratJalan} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-4 rounded-2xl font-black transition-colors shadow-lg mt-4 border-2 border-rose-600/50">
+                                <button onClick={handleCetakSuratJalan} className="w-full bg-rose-500 hover:bg-rose-600 text-white py-3 rounded-md font-black transition-colors shadow-lg mt-4 border-2 border-rose-600/50">
                                     <i className="fa-solid fa-print mr-2"></i> CETAK NOTA TANDA TERIMA
                                 </button>
                             </div>
                         </div>
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                            <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-list-check text-blue-600 mr-2"></i>Cek Barang</h3>
-                                <span className="bg-blue-600 text-white font-black px-4 py-1.5 rounded-xl text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
+                                <span className="bg-blue-600 text-white font-black px-4 py-1.5 rounded-md text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                                 {activeDraft.items.map(item => {
@@ -11670,13 +11745,13 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     const scanned = scannedItemsPenerima[item.fullBarcode] || 0;
                                     const full = scanned >= expected;
                                     return (
-                                        <div key={item.fullBarcode} className={`p-4 rounded-xl border-2 flex justify-between items-center ${full ? 'border-teal-400 bg-teal-50' : 'border-slate-200'}`}>
+                                        <div key={item.fullBarcode} className={`p-4 rounded-md border-2 flex justify-between items-center ${full ? 'border-teal-400 bg-teal-50' : 'border-slate-200'}`}>
                                             <div>
                                                 <div className="font-black text-rose-800">{item.article} <span className="text-blue-500">{item.sizeName}</span></div>
                                                 <div className="text-xs text-slate-500 font-bold">{item.colorName}</div>
                                                 {item.itemType && <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${item.itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>{item.itemType === 'ONLINE' ? 'ONLINE' : 'PO'}</span>}
                                             </div>
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-center gap-3">
                                                 {scanned > 0 && !draftConfirmed && (
                                                     <button onClick={() => setScannedItemsPenerima(prev => ({ ...prev, [item.fullBarcode]: prev[item.fullBarcode] - 1 }))} className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors border border-rose-200 flex items-center justify-center shadow-sm" title="Batal Scan 1 Pcs">
                                                         <i className="fa-solid fa-minus"></i>
@@ -11696,12 +11771,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 ) : isDirectScanMode ? (
                     // ===== MODE SCAN LANGSUNG (TANPA SURAT JALAN) =====
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
+                        <div className="bg-white p-6 rounded-md border shadow-sm space-y-5">
                             <div className="flex justify-between items-center border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-bolt text-teal-600 mr-2"></i>Penerimaan Langsung</h3>
                                 <button onClick={() => { setIsDirectScanMode(false); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }} className="text-sm text-slate-500 hover:text-rose-800 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
                             </div>
-                            <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl flex items-center gap-4">
+                            <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-md flex items-center gap-3">
                                 <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0"><i className="fa-solid fa-user-check"></i></div>
                                 <div>
                                     <div className="font-black text-rose-800">{activeReceiver.nama} <span className="text-xs text-teal-600">({activeReceiver.posisi})</span></div>
@@ -11711,10 +11786,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div>
                                 <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode Barang (PO # atau Online *)</label>
                                 <form onSubmit={handleScanFormPenerima} className="flex gap-2 mt-1.5">
-                                    <input ref={scanRefPenerima} type="text" placeholder="Scan barcode PO (#) atau Online (*)..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-xl font-bold bg-slate-50 outline-none focus:border-teal-500" autoFocus disabled={directScanDone} />
-                                    <button type="submit" disabled={directScanDone} className="px-5 py-3 bg-teal-600 disabled:bg-slate-300 text-white rounded-xl font-black"><i className="fa-solid fa-qrcode"></i></button>
+                                    <input ref={scanRefPenerima} type="text" placeholder="Scan barcode PO (#) atau Online (*)..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-slate-300 rounded-md font-bold bg-slate-50 outline-none focus:border-teal-500" autoFocus disabled={directScanDone} />
+                                    <button type="submit" disabled={directScanDone} className="px-5 py-3 bg-teal-600 disabled:bg-slate-300 text-white rounded-md font-black"><i className="fa-solid fa-qrcode"></i></button>
                                 </form>
-                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barang Masuk Gudang')} disabled={directScanDone} className="mt-3 w-full py-4 bg-rose-800 hover:bg-rose-900 disabled:bg-slate-300 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barang Masuk Gudang')} disabled={directScanDone} className="mt-3 w-full py-3 bg-rose-800 hover:bg-rose-900 disabled:bg-slate-300 text-white rounded-md font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
                                     <i className="fa-solid fa-camera text-2xl text-rose-400"></i>
                                     <div className="text-left">
                                         <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
@@ -11725,22 +11800,22 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div className="space-y-3">
                                 <button onClick={handleKonfirmasiDirect}
                                     disabled={directScanDone || Object.keys(scannedItemsPenerima).length === 0}
-                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black transition-colors shadow-lg">
+                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-3 rounded-md font-black transition-colors shadow-lg">
                                     <i className="fa-solid fa-clipboard-check mr-2"></i>
                                     {directScanDone ? 'DIKONFIRMASI ✅' : 'KONFIRMASI PENERIMAAN'}
                                 </button>
                                 <button
                                     onClick={handleUpdateStokDirect}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black transition-colors shadow-lg"
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-md font-black transition-colors shadow-lg"
                                 >
                                     <i className="fa-solid fa-boxes-packing mr-2"></i> UPDATE STOK GUDANG
                                 </button>
                             </div>
                         </div>
-                        <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                        <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col">
+                            <div className="flex justify-between items-center mb-4 border-b pb-4">
                                 <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-boxes-stacked text-teal-600 mr-2"></i>Barang Ter-scan</h3>
-                                <span className="bg-teal-600 text-white font-black px-4 py-1.5 rounded-xl text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
+                                <span className="bg-teal-600 text-white font-black px-4 py-1.5 rounded-md text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
                             </div>
                             <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
                                 {Object.keys(scannedItemsPenerima).length > 0 ? Object.entries(scannedItemsPenerima).map(([barcode, qty]) => {
@@ -11748,7 +11823,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                     const variant = variants.find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
                                     const itemType = scannedTypesDirect[barcode] || 'UNKNOWN';
                                     return (
-                                        <div key={barcode} className="p-4 rounded-xl border-2 border-slate-200 bg-white flex justify-between items-center">
+                                        <div key={barcode} className="p-4 rounded-md border-2 border-slate-200 bg-white flex justify-between items-center">
                                             <div>
                                                 <div className="font-black text-rose-800">{variant ? variant.article : sku} <span className="text-teal-500">{variant ? variant.sizeName : ''}</span></div>
                                                 <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
@@ -11784,7 +11859,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 ) : (
                     // ===== DAFTAR SURAT JALAN + TOMBOL SCAN LANGSUNG =====
                     <div>
-                        <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-xl mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="bg-blue-50 border-2 border-blue-200 p-4 rounded-md mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white"><i className="fa-solid fa-user-check"></i></div>
                                 <div><span className="font-black text-rose-800">{activeReceiver.nama}</span> <span className="text-xs text-blue-600 font-bold">({activeReceiver.posisi})</span></div>
@@ -11792,7 +11867,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <div className="flex items-center gap-2 w-full sm:w-auto">
                                 <button
                                     onClick={() => { setIsDirectScanMode(true); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }}
-                                    className="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-500/30"
+                                    className="flex-1 sm:flex-none bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center justify-center gap-2 shadow-md shadow-teal-500/30"
                                 >
                                     <i className="fa-solid fa-bolt"></i> Scan Langsung
                                 </button>
@@ -11801,7 +11876,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                         </div>
                         <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                             {allDraftSJs.length === 0 && (
-                                <div className="text-center p-10 bg-white rounded-3xl border shadow-sm text-slate-400">
+                                <div className="text-center p-10 bg-white rounded-md border shadow-sm text-slate-400">
                                     <i className="fa-regular fa-folder-open text-5xl mb-3 block"></i>
                                     <h3 className="text-base font-bold">Belum Ada Surat Jalan Masuk</h3>
                                     <p className="text-xs mt-1">Minta tim Bengkel mengirim barang via tab Lery/Samin, atau gunakan tombol <b>Scan Langsung</b> di atas.</p>
@@ -11811,7 +11886,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                 const totalPcs = sj.totalPcs || (sj.items || []).reduce((a, c) => a + (c.shipped || c.qty), 0);
                                 const isConfirmed = sj.status === 'SJ_CONFIRMED' || sj.status === 'ARRIVED';
                                 return (
-                                    <div key={sj.id} className="bg-white border-2 hover:border-blue-300 p-4 rounded-2xl shadow-sm transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div key={sj.id} className="bg-white border-2 hover:border-blue-300 p-4 rounded-md shadow-sm transition flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                                         <div className="flex-1 cursor-pointer" onClick={() => openDraft(sj)}>
                                             <div className="flex items-center gap-3 mb-1">
                                                 <div className="font-black text-lg text-rose-800">{sj.id}</div>
@@ -11827,10 +11902,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                             </div>
                                         </div>
                                         <div className="flex items-center justify-end gap-2 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-                                            <button onClick={() => openDraft(sj)} className="flex-1 sm:flex-none bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-5 py-2.5 rounded-xl font-black text-sm transition-colors">
+                                            <button onClick={() => openDraft(sj)} className="flex-1 sm:flex-none bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors">
                                                 BUKA
                                             </button>
-                                            <button onClick={() => handleDeleteSuratJalan(sj.id)} className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm" title="Hapus Surat Jalan">
+                                            <button onClick={() => handleDeleteSuratJalan(sj.id)} className="w-10 h-10 rounded-md bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white flex items-center justify-center transition-colors shadow-sm" title="Hapus Surat Jalan">
                                                 <i className="fa-solid fa-trash-can"></i>
                                             </button>
                                         </div>
@@ -11969,7 +12044,7 @@ function KasOperasional({ showToast }) {
     };
 
     const hapusTransaksi = async (item) => {
-        if (confirm('Yakin ingin menghapus transaksi ini?')) {
+        if (await showConfirm('Yakin ingin menghapus transaksi ini?')) {
             try {
                 // Cukup hapus dari database saja
                 await db.collection('kas_operasional').doc(item.id).delete();
@@ -12005,16 +12080,16 @@ function KasOperasional({ showToast }) {
     return (
         <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in zoom-in duration-300">
             {/* Header & Papan Saldo */}
-            <div className="bg-white p-6 rounded-3xl border shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col md:flex-row justify-between items-center gap-3">
                 <div>
                     <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-wallet text-rose-500"></i> Kas Operasional</h2>
                 </div>
-                <button onClick={copyToWA} className="w-full md:w-auto bg-emerald-500 text-white px-6 py-3.5 rounded-xl font-black text-sm hover:bg-emerald-600 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30">
+                <button onClick={copyToWA} className="w-full md:w-auto bg-emerald-500 text-white px-6 py-3.5 rounded-md font-black text-sm hover:bg-emerald-600 transition-transform transform hover:-translate-y-1 shadow-lg shadow-emerald-500/30">
                     <i className="fa-brands fa-whatsapp text-xl mr-2"></i> COPY FORMAT WA
                 </button>
             </div>
 
-            <div className={`p-8 rounded-3xl shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-rose-900'}`}>
+            <div className={`p-6 rounded-md shadow-xl text-white font-bold relative overflow-hidden ${sisaSaldo < 0 ? 'bg-red-500' : 'bg-rose-900'}`}>
                 <i className="fa-solid fa-coins absolute -right-4 -bottom-4 text-8xl opacity-20"></i>
                 <p className="text-sm opacity-90 uppercase tracking-widest mb-1 text-rose-400">Sisa Saldo Saat Ini</p>
                 <h3 className="text-5xl font-black">Rp {sisaSaldo.toLocaleString('id-ID')}</h3>
@@ -12022,42 +12097,42 @@ function KasOperasional({ showToast }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Form Input */}
-                <div className="bg-white p-6 rounded-3xl border shadow-sm h-fit">
+                <div className="bg-white p-6 rounded-md border shadow-sm h-fit">
                     <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-pen-to-square mr-2 text-rose-500"></i> Catat Transaksi</h4>
                     <form onSubmit={handleSimpan} className="space-y-4">
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal</label>
-                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" />
+                            <input type="date" value={tanggal} onChange={(e) => setTanggal(e.target.value)} className="w-full p-4 border-2 rounded-md bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" />
                         </div>
-                        <div className="flex gap-4">
-                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'keluar' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
+                        <div className="flex gap-3">
+                            <label className={`flex-1 p-4 border-2 rounded-md cursor-pointer font-black text-center transition-colors ${form.jenis === 'keluar' ? 'bg-red-50 border-red-500 text-red-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
                                 <input type="radio" name="jenis" className="hidden" checked={form.jenis === 'keluar'} onChange={() => setForm({ ...form, jenis: 'keluar' })} />
                                 <i className="fa-solid fa-arrow-trend-down mr-2"></i> Keluar
                             </label>
-                            <label className={`flex-1 p-4 border-2 rounded-xl cursor-pointer font-black text-center transition-colors ${form.jenis === 'masuk' ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
+                            <label className={`flex-1 p-4 border-2 rounded-md cursor-pointer font-black text-center transition-colors ${form.jenis === 'masuk' ? 'bg-emerald-50 border-emerald-500 text-emerald-600 shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-400 hover:bg-rose-50'}`}>
                                 <input type="radio" name="jenis" className="hidden" checked={form.jenis === 'masuk'} onChange={() => setForm({ ...form, jenis: 'masuk' })} />
                                 <i className="fa-solid fa-arrow-trend-up mr-2"></i> Masuk
                             </label>
                         </div>
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Nominal (Rp)</label>
-                            <input type="number" value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
+                            <input type="number" value={form.nominal} onChange={(e) => setForm({ ...form, nominal: e.target.value })} className="w-full p-4 border-2 rounded-md bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
                         </div>
                         <div>
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Keterangan</label>
-                            <input type="text" value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} className="w-full p-4 border-2 rounded-xl bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
+                            <input type="text" value={form.keterangan} onChange={(e) => setForm({ ...form, keterangan: e.target.value })} className="w-full p-4 border-2 rounded-md bg-slate-50 font-bold outline-none focus:border-rose-500 mt-1" required />
                         </div>
 
                         {/* TOMBOL BUKA KAMERA ATAU PREVIEW FOTO */}
-                        <div className="bg-slate-50 p-4 rounded-xl border-2 border-slate-100 mt-2">
+                        <div className="bg-slate-50 p-4 rounded-md border-2 border-slate-100 mt-2">
                             <label className="text-xs font-black text-slate-500 uppercase tracking-wider block mb-2"><i className="fa-solid fa-camera mr-2 text-rose-500"></i> Foto Nota (Opsional)</label>
 
                             {!fotoPreview ? (
-                                <button type="button" onClick={() => startCamera('environment')} className="w-full border-2 border-dashed border-rose-300 bg-rose-50 text-rose-600 font-bold py-4 rounded-xl hover:bg-rose-100 transition-colors flex items-center justify-center gap-2">
+                                <button type="button" onClick={() => startCamera('environment')} className="w-full border-2 border-dashed border-rose-300 bg-rose-50 text-rose-600 font-bold py-3 rounded-md hover:bg-rose-100 transition-colors flex items-center justify-center gap-2">
                                     <i className="fa-solid fa-camera text-xl"></i> BUKA KAMERA NOTA
                                 </button>
                             ) : (
-                                <div className="relative group rounded-xl overflow-hidden border-2 border-rose-200">
+                                <div className="relative group rounded-md overflow-hidden border-2 border-rose-200">
                                     <img src={fotoPreview} alt="Preview Nota" className="w-full h-48 object-cover" />
                                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button type="button" onClick={() => setFotoPreview(null)} className="bg-rose-500 text-white px-4 py-2 rounded-lg font-bold">
@@ -12068,20 +12143,20 @@ function KasOperasional({ showToast }) {
                             )}
                         </div>
 
-                        <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white font-black py-4 rounded-xl hover:bg-rose-600 transition-transform transform hover:-translate-y-1 shadow-lg mt-2 relative overflow-hidden">
+                        <button type="submit" disabled={loading} className="w-full bg-rose-500 text-white font-black py-3 rounded-md hover:bg-rose-600 transition-transform transform hover:-translate-y-1 shadow-lg mt-2 relative overflow-hidden">
                             {loading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <><i className="fa-solid fa-save mr-2"></i> SIMPAN TRANSAKSI</>}
                         </button>
                     </form>
                 </div>
 
                 {/* Riwayat */}
-                <div className="bg-white p-6 rounded-3xl border shadow-sm flex flex-col h-[650px]">
+                <div className="bg-white p-6 rounded-md border shadow-sm flex flex-col h-[650px]">
                     <h4 className="font-black mb-5 text-rose-800 border-b pb-3"><i className="fa-solid fa-list-check mr-2 text-rose-500"></i> Riwayat Tanggal: <span className="text-rose-500">{tanggal}</span></h4>
                     <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar pr-2">
                         {dataHariIni.map((item) => (
-                            <div key={item.id} className="flex justify-between items-center bg-slate-50 border-2 border-slate-100 p-4 rounded-2xl">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${item.jenis === 'masuk' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                            <div key={item.id} className="flex justify-between items-center bg-slate-50 border-2 border-slate-100 p-4 rounded-md">
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-md flex items-center justify-center text-white ${item.jenis === 'masuk' ? 'bg-emerald-500' : 'bg-red-500'}`}>
                                         <i className={`fa-solid ${item.jenis === 'masuk' ? 'fa-plus' : 'fa-minus'}`}></i>
                                     </div>
                                     <div>
@@ -12109,10 +12184,10 @@ function KasOperasional({ showToast }) {
             {isCameraOpen && (
                 <div className="fixed inset-0 z- bg-black flex flex-col animate-in fade-in duration-200">
                     <div className="p-4 flex justify-between items-center absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent">
-                        <button onClick={stopCamera} className="bg-rose-500/90 text-white px-5 py-3 rounded-2xl font-black text-xs md:text-sm flex items-center gap-2 hover:bg-rose-600 backdrop-blur-sm">
+                        <button onClick={stopCamera} className="bg-rose-500/90 text-white px-5 py-3 rounded-md font-black text-xs md:text-sm flex items-center gap-2 hover:bg-rose-600 backdrop-blur-sm">
                             <i className="fa-solid fa-xmark text-lg"></i> TUTUP KAMERA
                         </button>
-                        <button onClick={switchCamera} className="bg-slate-700/90 text-white px-5 py-3 rounded-2xl font-black text-xs md:text-sm flex items-center gap-2 hover:bg-slate-600 backdrop-blur-sm">
+                        <button onClick={switchCamera} className="bg-slate-700/90 text-white px-5 py-3 rounded-md font-black text-xs md:text-sm flex items-center gap-2 hover:bg-slate-600 backdrop-blur-sm">
                             <i className="fa-solid fa-rotate text-lg"></i> GANTI KAMERA
                         </button>
                     </div>
@@ -12120,7 +12195,7 @@ function KasOperasional({ showToast }) {
                     <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden mt-16 md:mt-0">
                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="w-64 h-64 border-2 border-white/30 rounded-3xl relative">
+                            <div className="w-64 h-64 border-2 border-white/30 rounded-md relative">
                                 <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-rose-500 rounded-tl-xl"></div>
                                 <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-rose-500 rounded-tr-xl"></div>
                                 <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-rose-500 rounded-bl-xl"></div>
@@ -12129,8 +12204,8 @@ function KasOperasional({ showToast }) {
                         </div>
                     </div>
 
-                    <div className="p-8 pb-12 bg-black flex justify-center items-center">
-                        <button onClick={jepretFoto} className="w-20 h-20 bg-rose-500 rounded-full border-4 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-rose-600">
+                    <div className="p-6 pb-12 bg-black flex justify-center items-center">
+                        <button onClick={jepretFoto} className="w-20 h-20 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_20px_rgba(249,115,22,0.6)] flex items-center justify-center hover:scale-95 transition-transform active:bg-rose-600">
                             <i className="fa-solid fa-camera text-3xl text-white"></i>
                         </button>
                     </div>
@@ -12164,13 +12239,13 @@ function LoginPage({ onLogin }) {
             } catch (authError) {
                 // Jika akun belum ada, otomatis buatkan (Khusus Admin)
                 if (authError.code === 'auth/user-not-found' || authError.code === 'auth/invalid-login-credentials' || authError.code === 'auth/invalid-credential') {
-                    if (username === 'minsyaren' && password === 'Syaren@2026') {
+                    if (username === 'minsyaren' && password === '913765@Why') {
                         await firebase.auth().createUserWithEmailAndPassword(emailFormat, password);
 
                         // PERBAIKAN FINAL: Gunakan variabel 'db' langsung bawaan aplikasi Anda!
-                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: 'Syaren@2026', role: 'admin', access: [] });
+                        await db.collection('users').doc('minsyaren').set({ username: 'minsyaren', password: '913765@Why', role: 'admin', access: [] });
 
-                        alert('âœ… Akun Berhasil Terdaftar! Silakan klik MASUK SEKARANG sekali lagi.');
+                        showAlert('✅ Akun Berhasil Terdaftar! Silakan klik MASUK SEKARANG sekali lagi.', 'Informasi');
                         setLoading(false);
                         return; // Berhenti di sini agar user klik masuk lagi
                     } else {
@@ -12189,12 +12264,12 @@ function LoginPage({ onLogin }) {
             if (!snap.empty) {
                 onLogin({ id: snap.docs[0].id, ...snap.docs[0].data() });
             } else {
-                alert('Akses Ditolak! Akun terdaftar tapi data tidak ada di tabel users.');
+                showAlert('Akses Ditolak! Akun terdaftar tapi data tidak ada di tabel users.', 'Informasi');
                 await firebase.auth().signOut();
             }
 
         } catch (error) {
-            alert('GAGAL: ' + error.message);
+            showAlert('GAGAL: ' + error.message, 'Informasi');
         } finally {
             setLoading(false);
         }
@@ -12203,14 +12278,14 @@ function LoginPage({ onLogin }) {
     return (
         <div className="min-h-screen bg-[#d4c4b7] flex items-center justify-center p-4 font-sans relative overflow-hidden">
             <div className="absolute inset-0 opacity-10 flex items-center justify-center pointer-events-none"><i className="fa-solid fa-cubes text-[30rem] text-rose-500"></i></div>
-            <div className={`w-full max-w-md rounded-3xl relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-10 shadow-2xl' : ''}`}>
+            <div className={`w-full max-w-md rounded-md relative z-10 transition-all duration-500 min-h-[480px] flex flex-col justify-center ${!loading ? 'bg-white p-10 shadow-2xl' : ''}`}>
                 {!loading ? (
                     <>
                         <div className="text-center mb-10"><div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden p-2 bg-slate-50 shadow-inner border-2 border-transparent"><img src="/LogoV2.png" alt="Logo" className="w-full h-full object-contain" /></div><h2 className="text-3xl font-black text-rose-800">Syaren Management</h2><p className="text-sm font-bold text-slate-400 mt-1 tracking-widest">(Versi 2.0 by Ahmad)</p></div>
                         <form onSubmit={handleLogin} action="javascript:void(0);" className="space-y-6">
-                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
-                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
-                            <button className="w-full bg-rose-500 text-white py-4 rounded-2xl font-black text-lg hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/40 mt-4">MASUK SEKARANG</button>
+                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">USERNAME</label><input required value={username} onChange={e => setUsername(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik ID..." /></div>
+                            <div><label className="block text-sm font-black text-slate-700 mb-2 ml-1">PASSWORD</label><input required type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border-2 border-slate-200 rounded-md bg-slate-50 focus:bg-white focus:border-rose-500 outline-none transition-colors font-bold text-rose-800 text-lg shadow-inner" placeholder="Ketik Katasandi..." /></div>
+                            <button className="w-full bg-rose-500 text-white py-3 rounded-md font-black text-lg hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/40 mt-4">MASUK SEKARANG</button>
                         </form>
                     </>
                 ) : (

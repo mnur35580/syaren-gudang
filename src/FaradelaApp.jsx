@@ -1,6 +1,9 @@
-﻿const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+const toLocalDateStr = (d) => { const dt = d ? new Date(d) : new Date(); return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0'); };
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import SmartAnalyticsDashboard from './SmartAnalyticsDashboard';
+import TikTokIntegrationDashboard from './TikTokIntegrationDashboard';
+import KelolaPesananOmni from './KelolaPesananOmni';
+import CetakMassalHurufModal from './CetakMassalHurufModal';
 
 // ==========================================
 // ZxingScanner Component
@@ -146,7 +149,21 @@ try {
 
 // --- HELPER UNTUK BARCODE (GENERASI 3: PENDEK & TERBACA MANUSIA) ---
 // Format Gen3: [SKU][DDMMYY]#[nomorPO] atau [SKU][DDMMYY]*[sesi]
-// Contoh PO: 1136220626#4   Contoh Online: 1136220626*1
+// Contoh PO: 1A36140926#4   Contoh Online: 1A36140926*1
+
+// Konversi angka ke huruf: 1=A, 2=B, ..., 26=Z, 27=AA, dst
+const getLetterCode = (num) => {
+    let n = parseInt(num);
+    if (isNaN(n) || n < 1) return String(num);
+    let result = '';
+    while (n > 0) {
+        const mod = (n - 1) % 26;
+        result = String.fromCharCode(65 + mod) + result;
+        n = Math.floor((n - mod) / 26);
+    }
+    return result;
+};
+
 const buildShortBarcode = (variantInfo, printDate, type, sessionOrPo, isLegacy = false) => {
     const sku = variantInfo.sku || '';
     
@@ -370,6 +387,8 @@ function QRCodeLocal({ value }) {
 const ALL_MENUS = [
     { id: 'dashboard', label: 'Dashboard Utama', icon: 'fa-chart-simple' },
     { id: 'smart_analytics', label: 'Smart Analytics & ROP', icon: 'fa-chart-line' },
+    { id: 'kelola_pesanan', label: 'Kelola Pesanan', icon: 'fa-cubes' },
+    { id: 'tiktok_integration', label: 'Integrasi TikTok', icon: 'fa-network-wired' },
     { id: 'karyawan', label: 'Data Karyawan', icon: 'fa-id-card' },
     { id: 'upload_produk', label: 'Master Produk', icon: 'fa-box-open' },
     { id: 'mpo_pabrik', label: 'Manajemen PO Bengkel (MPB)', icon: 'fa-industry' },
@@ -649,12 +668,18 @@ function App() {
         products.forEach(p => {
             (p.colors || []).forEach((c, cIdx) => {
                 (p.sizes || []).forEach((s, sIdx) => {
-                    const sku = `${p.baseCode}${c.code}${s.code}`;
-                    const key = `${c.code}${s.code}`;
-                    const sc = p.shortCodes && p.shortCodes[key] ? p.shortCodes[key] : null;
+                    // SKU BARU: pakai huruf untuk kode warna (1=A, 2=B, 3=C, 4=D, 5=E...)
+                    const colorLetter = getLetterCode(parseInt(c.code, 10) || (cIdx + 1));
+                    const sku = `${p.baseCode}${colorLetter}${s.code}`;
+
+                    // Key numerik (untuk lookup legacySkus di database)
+                    const numericKey = `${c.code}${s.code}`;
+                    // SKU numerik lama (sebelum migrasi ke huruf) → disimpan di legacySkus
+                    const oldNumericSku = `${p.baseCode}${c.code}${s.code}`;
+
+                    const sc = p.shortCodes && p.shortCodes[numericKey] ? p.shortCodes[numericKey] : null;
                     variants.push({
                         productId: p.id, article: p.article, baseCode: p.baseCode, photo: p.photo,
-                        /* LOGIKA BARU: Pakai harga Size jika ada, kalau kosong pakai Harga Utama */
                         buyPrice: (s.buyPrice !== undefined && s.buyPrice !== '') ? Number(s.buyPrice) : (p.buyPrice || 0),
                         sellPrice: (s.sellPrice !== undefined && s.sellPrice !== '') ? Number(s.sellPrice) : (p.sellPrice || 0),
                         isActive: p.isActive,
@@ -662,10 +687,13 @@ function App() {
                         sku,
                         colorIndex: cIdx, sizeIndex: sIdx,
                         shortCode: sc,
-                        // Gen3: Daftar SKU lama agar stiker jadul tetap terbaca
                         supplier: p.supplier || "",
                         legacySkus: (() => {
-                            const dbLegacy = (p.legacySkus && p.legacySkus[key]) ? [...p.legacySkus[key]] : [];
+                            // Mulai dari legacySkus di database (key numerik)
+                            const dbLegacy = (p.legacySkus && p.legacySkus[numericKey]) ? [...p.legacySkus[numericKey]] : [];
+                            // Selalu masukkan SKU numerik lama agar barcode angka tetap terbaca
+                            if (!dbLegacy.includes(oldNumericSku)) dbLegacy.push(oldNumericSku);
+                            // Format Shopee SKU
                             const shopeeSku = `${p.article}-${c.name}-${s.name}`;
                             if (!dbLegacy.includes(shopeeSku)) dbLegacy.push(shopeeSku);
                             if (!dbLegacy.includes(shopeeSku.toUpperCase())) dbLegacy.push(shopeeSku.toUpperCase());
@@ -723,6 +751,8 @@ function App() {
         switch (activeMenu) {
             case 'dashboard': return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} />;
             case 'smart_analytics': return <SmartAnalyticsDashboard variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} setActiveMenu={setActiveMenu} />;
+            case 'kelola_pesanan': return <KelolaPesananOmni />;
+            case 'tiktok_integration': return <TikTokIntegrationDashboard />;
             case 'karyawan': return <ManajemenKaryawan setIsLoading={setIsLoading} showToast={showToast} />;
             case 'upload_produk': return <UploadProduk products={products} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'cetak_label': return <CetakLabel products={products} variants={allVariants} showToast={showToast} />;
@@ -737,7 +767,7 @@ function App() {
             case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'pantau_stok': return <PantauStok variants={allVariants} transactions={transactions} showToast={showToast} />;
             case 'stok_opname': return <StokOpname key="opname" variants={allVariants} transactions={transactions} setIsLoading={setIsLoading} showToast={showToast} currentUser={currentUser} />;
-            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} showToast={showToast} setIsLoading={setIsLoading} />;
+            case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
             case 'pengaturan': return <Pengaturan currentUser={currentUser} setIsLoading={setIsLoading} setProducts={setProducts} setTransactions={setTransactions} setCurrentUser={setCurrentUser} showToast={showToast} />;
             case 'cek_surat_jalan': return <CekSuratJalan currentUser={currentUser} variants={allVariants} mpoOrders={mpoOrders} qcOrders={qcOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
             default: return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} />;
@@ -750,7 +780,7 @@ function App() {
                 <div className={`fixed top-4 right-4 z-[99999] px-5 py-4 rounded-2xl shadow-2xl flex items-center gap-4 text-white animate-toast border-b-4 ${toast.type === 'error' ? 'bg-red-700 border-red-900' : 'bg-teal-700 border-teal-900'}`} style={{ minWidth: 'min(300px, calc(100vw - 2rem))', maxWidth: '440px' }}>
                     <i className={`fa-solid ${toast.type === 'error' ? 'fa-triangle-exclamation' : 'fa-circle-check'} text-3xl flex-shrink-0`}></i>
                     <div>
-                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'âš ï¸ Peringatan' : 'âœ… Berhasil'}</h4>
+                        <h4 className="font-black text-lg leading-tight">{toast.type === 'error' ? 'Peringatan!' : 'Berhasil!'}</h4>
                         <p className="text-sm font-semibold mt-0.5 leading-snug">{toast.message}</p>
                     </div>
                 </div>
@@ -4181,20 +4211,37 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
         transactions.forEach(t => {
             if ((t.sku !== sku && !legacy.includes(t.sku)) || !t.fullBarcode) return;
 
-            // EKSTRAK TANGGAL ASLI DARI BARCODE (Abaikan Suffix * atau #)
+            // EKSTRAK TANGGAL DARI BARCODE — support semua generasi format
             let rawBase = t.fullBarcode;
             if (rawBase.includes('#')) rawBase = rawBase.split('#')[0];
             if (rawBase.includes('*')) rawBase = rawBase.split('*')[0];
-            const dateStr = rawBase.length > 8 ? rawBase.slice(-8) : "20240101";
+            
+            let recordDate = "2024-01-01T00:00:00";
+            if (rawBase.startsWith('$')) {
+                // Gen2: $X9K2-DDMMYY
+                const parts = rawBase.split('-');
+                const ddmmyy = parts[parts.length - 1];
+                if (ddmmyy && ddmmyy.length === 6 && !isNaN(ddmmyy)) {
+                    recordDate = `20${ddmmyy.slice(4,6)}-${ddmmyy.slice(2,4)}-${ddmmyy.slice(0,2)}T00:00:00`;
+                }
+            } else if (rawBase.length >= 10 && rawBase.length <= 12 && /\d{6}$/.test(rawBase)) {
+                // Gen3: [SKU][DDMMYY], 10-12 char
+                const ddmmyy = rawBase.slice(-6);
+                recordDate = `20${ddmmyy.slice(4,6)}-${ddmmyy.slice(2,4)}-${ddmmyy.slice(0,2)}T00:00:00`;
+            } else {
+                // Legacy: last 8 chars YYYYMMDD
+                const dateStr = rawBase.length > 8 ? rawBase.slice(-8) : "20240101";
+                recordDate = `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}T00:00:00`;
+            }
 
-            if (!stockMap[t.fullBarcode]) stockMap[t.fullBarcode] = { in: 0, out: 0, dateStr: dateStr };
+            if (!stockMap[t.fullBarcode]) stockMap[t.fullBarcode] = { in: 0, out: 0, recordDate };
             if (t.type === 'IN' || t.type === 'REVISI_IN') stockMap[t.fullBarcode].in += t.qty;
             if (t.type === 'OUT' || t.type === 'REVISI_OUT') stockMap[t.fullBarcode].out += t.qty;
         });
         const availableBatches = Object.keys(stockMap)
             .map(barcode => {
                 const sisa = stockMap[barcode].in - stockMap[barcode].out;
-                const recordDate = `${stockMap[barcode].dateStr.slice(0, 4)}-${stockMap[barcode].dateStr.slice(4, 6)}-${stockMap[barcode].dateStr.slice(6, 8)}T00:00:00`;
+                const recordDate = stockMap[barcode].recordDate;
                 return { barcode, sisa, recordDate };
             })
             .filter(b => b.sisa > 0)
@@ -5629,7 +5676,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             playError(); return showToast('error', 'Resi / Chart ini sudah ada dalam daftar.');
         }
 
-        const cartOrders = qcOrders.filter(o => o.cartId === val && o.status === 'PACKED' && o.cartClosed === true);
+        const cartOrders = qcOrders.filter(o => o.cartId === val && o.status !== 'SHIPPED');
         if (cartOrders.length > 0) {
             setStagedList(prev => {
                 const filtered = prev.filter(s => !(s.type === 'RESI' && s.order && s.order.cartId === val));
@@ -5642,8 +5689,6 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
         const order = qcOrders.find(o => o.id.toUpperCase() === val);
         if (!order) { playError(); return showToast('error', 'Resi tidak dikenali di sistem.'); }
         if (order.status === 'SHIPPED') { playError(); return showToast('error', 'Paket ini sudah dikirim sebelumnya.'); }
-        if (order.status !== 'PACKED') { playError(); return showToast('error', `Paket belum selesai QC! Status: ${order.status}`); }
-        if (order.cartId && order.cartClosed !== true) { playError(); return showToast('error', `Paket ini ada di Keranjang [${order.cartId}] yang BELUM DISELESAIKAN QC-nya!`); }
         if (order.cartId && stagedListRef.current.some(s => s.type === 'CART' && s.cartId === order.cartId)) { playError(); return showToast('error', `Resi ini sudah termasuk dalam Chart [${order.cartId}].`); }
 
         setStagedList(prev => [...prev, { type: 'RESI', id: val, order, count: 1 }]);
@@ -6156,6 +6201,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
     const [isResetting, setIsResetting] = useState(false);
     const [historyModal, setHistoryModal] = useState(null); // { type, title }
     const [selectedSession, setSelectedSession] = useState(null);
+    const [hideToday, setHideToday] = useState(false);
 
     const getLaporanDefaultStart = () => {
         const now = new Date();
@@ -6656,10 +6702,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                     if (!rangeMatch) return false;
 
                     if (historyModal.type === 'IN') {
-                        return t.type === 'IN'; // Jangan masukkan ONLINE_IN ke riwayat barang masuk
+                        if (t.type !== 'IN') return false;
                     } else {
-                        return t.type === 'OUT' && !(t.note && (t.note.toLowerCase().includes('qc') || t.note.toLowerCase().includes('packing')));
+                        if (!(t.type === 'OUT' && !(t.note && (t.note.toLowerCase().includes('qc') || t.note.toLowerCase().includes('packing'))))) return false;
                     }
+                    // Filter: sembunyikan transaksi hari ini jika toggle aktif
+                    if (hideToday) {
+                        const tDate = new Date(t.date);
+                        const now = new Date();
+                        if (tDate.toDateString() === now.toDateString()) return false;
+                    }
+                    return true;
                 });
 
                 const sessions = getGroupedSessions(allFilteredTx);
@@ -6694,6 +6747,15 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [] }) {
                                 {!selectedSession ? (
                                     /* LEVEL 1: LIST GROUPED SESSIONS */
                                     <div className="flex-1 overflow-y-auto p-2 md:p-6 custom-scrollbar bg-slate-50">
+                                        {/* Toggle: Sembunyikan Hari Ini */}
+                                        <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
+                                            <span className="text-xs text-slate-500 font-bold uppercase tracking-widest">{sessions.length} Sesi Ditemukan</span>
+                                            <label className="flex items-center gap-2 cursor-pointer select-none bg-white border border-slate-200 px-4 py-2 rounded-xl shadow-sm">
+                                                <input type="checkbox" checked={hideToday} onChange={e => setHideToday(e.target.checked)} className="w-4 h-4 accent-amber-500" />
+                                                <span className="text-xs font-black text-slate-700">Sembunyikan Hari Ini</span>
+                                                {hideToday && <span className="text-[10px] bg-amber-100 text-amber-700 font-black px-2 py-0.5 rounded-full">AKTIF</span>}
+                                            </label>
+                                        </div>
                                         {sessions.length === 0 ? (
                                             <div className="text-center py-20 text-slate-400">
                                                 <i className="fa-solid fa-clock-rotate-left text-5xl mb-4 opacity-20 block"></i>
@@ -7093,6 +7155,81 @@ function UploadProduk({ products, setIsLoading, showToast }) {
         setIsLoading(false);
     };
 
+    // ✨ MIGRASI KODE WARNA KE HURUF (TAHAP 2)
+    // Mengubah color.code dari angka acak (1, 41, 9...) menjadi INDEX berurutan (1, 2, 3, 4...)
+    // SKU lama (angka) disimpan ke legacySkus agar scan barcode lama tetap berfungsi
+    const runColorCodeMigration = async () => {
+        const previewLines = products.map(p => {
+            const changes = (p.colors || []).map((c, idx) => {
+                const newCode = String(idx + 1);
+                return c.code !== newCode ? `  ${c.name}: ${c.code} → ${newCode}` : null;
+            }).filter(Boolean);
+            return changes.length > 0 ? `${p.article} (${p.baseCode}):\n${changes.join('\n')}` : null;
+        }).filter(Boolean).join('\n\n');
+
+        const confirmMsg = previewLines.length > 0 
+            ? `MIGRASI KODE WARNA → INDEX BERURUTAN\n\nPerubahan yang akan dilakukan:\n${previewLines.substring(0, 1500)}${previewLines.length > 1500 ? '\n...(dan lainnya)' : ''}\n\nSKU lama akan disimpan di legacySkus agar scan barcode lama tetap bisa. Lanjutkan?`
+            : 'Semua produk sudah menggunakan kode berurutan! Tidak ada yang perlu diubah.';
+
+        if (previewLines.length === 0) { showToast('success', 'Semua kode warna sudah berurutan!'); return; }
+        if (!confirm(confirmMsg)) return;
+
+        setIsLoading(true);
+        try {
+            let batch = db.batch();
+            let batchCount = 0;
+            let changedCount = 0;
+
+            for (const p of products) {
+                const existingLegacy = p.legacySkus ? { ...p.legacySkus } : {};
+                const newColors = (p.colors || []).map((c, idx) => {
+                    const newCode = String(idx + 1);
+                    const oldCode = c.code;
+
+                    if (oldCode !== newCode) {
+                        // Simpan semua kombinasi SKU lama ke legacySkus
+                        (p.sizes || []).forEach(s => {
+                            const oldSku = `${p.baseCode}${oldCode}${s.code}`;
+                            // Key yang baru adalah newCode + sizeCode
+                            const newKey = `${newCode}${s.code}`;
+                            // Juga simpan dengan key lama untuk kompatibilitas mundur
+                            const oldKey = `${oldCode}${s.code}`;
+
+                            if (!existingLegacy[newKey]) existingLegacy[newKey] = [];
+                            if (!existingLegacy[newKey].includes(oldSku)) existingLegacy[newKey].push(oldSku);
+
+                            if (!existingLegacy[oldKey]) existingLegacy[oldKey] = [];
+                            if (!existingLegacy[oldKey].includes(oldSku)) existingLegacy[oldKey].push(oldSku);
+                        });
+                        changedCount++;
+                    }
+                    return { ...c, code: newCode };
+                });
+
+                const docRef = db.collection('products').doc(p.id);
+                batch.update(docRef, {
+                    colors: newColors,
+                    legacySkus: existingLegacy
+                });
+                batchCount++;
+
+                if (batchCount % 450 === 0) {
+                    await batch.commit();
+                    batch = db.batch();
+                    batchCount = 0;
+                }
+            }
+
+            if (batchCount > 0) await batch.commit();
+
+            showToast('success', `✅ Migrasi Selesai! ${products.length} produk diperbarui, ${changedCount} warna diubah ke kode berurutan. SKU lama tersimpan di legacySkus.`);
+        } catch (e) {
+            showToast('error', 'Gagal migrasi kode warna: ' + e.message);
+            console.error(e);
+        }
+        setIsLoading(false);
+    };
+
     const handleEdit = (product) => {
         setForm({ article: product.article, baseCode: product.baseCode, supplier: product.supplier || '', photo: product.photo, buyPrice: product.buyPrice, sellPrice: product.sellPrice });
         setColors(product.colors || [{ name: '', code: '' }]); setSizes(product.sizes || [{ name: '', code: '' }]); setEditId(product.id);
@@ -7109,10 +7246,12 @@ function UploadProduk({ products, setIsLoading, showToast }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (colors.some(c => !c.name || !c.code) || sizes.some(s => !s.name || !s.code)) return showToast('error', "Pastikan semua nama dan kode variasi terisi!");
+        if (colors.some(c => !c.name) || sizes.some(s => !s.name || !s.code)) return showToast('error', "Pastikan semua nama dan kode variasi terisi!");
         if (form.photo && form.photo.length > 900000) return showToast('error', "Ukuran foto terlalu besar! Maksimal 800kb.");
         setIsLoading(true);
-        const dataToSave = { ...form, colors: [...colors], sizes: [...sizes], isActive: true };
+        // Auto-set color code berdasarkan index (1, 2, 3...) agar huruf SKU konsisten
+        const normalizedColors = colors.map((c, idx) => ({ ...c, code: String(idx + 1) }));
+        const dataToSave = { ...form, colors: normalizedColors, sizes: [...sizes], isActive: true };
         // Gen3: Untuk produk baru, pastikan pakai kode otomatis berurutan
         if (!editId) dataToSave.baseCode = nextBaseCode;
         try {
@@ -7169,7 +7308,10 @@ function UploadProduk({ products, setIsLoading, showToast }) {
                                 {colors.map((c, i) => (
                                     <div key={i} className="flex gap-3 items-start animate-in slide-in-from-top-2">
                                         <input required type="text" value={c.name} onChange={e => { const n = [...colors]; n[i].name = e.target.value; setColors(n); }} className="flex-1 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm bg-white shadow-inner font-bold" placeholder="Nama (ex: Hitam)" />
-                                        <input required type="text" value={c.code} onChange={e => { const n = [...colors]; n[i].code = e.target.value; setColors(n); }} className="w-1/3 px-5 py-3.5 border-2 border-slate-300 rounded-xl outline-none focus:border-orange-500 text-sm font-mono bg-white shadow-inner font-bold" placeholder="Kode (ex: 1)" />
+                                        {/* Kode warna otomatis dari urutan → tampil sebagai huruf */}
+                                        <div className="w-1/3 px-5 py-3.5 border-2 border-orange-300 rounded-xl text-sm font-mono bg-orange-50 shadow-inner font-black text-orange-700 flex items-center justify-center" title={`Kode urutan: ${i+1} → Huruf: ${getLetterCode(i+1)}`}>
+                                            {getLetterCode(i + 1)}
+                                        </div>
                                         {colors.length > 1 && <button type="button" onClick={() => { const n = [...colors]; n.splice(i, 1); setColors(n); }} className="w-12 h-[52px] flex items-center justify-center text-red-500 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-colors shadow-sm"><i className="fa-solid fa-trash-can text-lg"></i></button>}
                                     </div>
                                 ))}
@@ -7218,7 +7360,7 @@ function UploadProduk({ products, setIsLoading, showToast }) {
             </div>
 
             <div className="bg-white rounded-3xl border border-slate-200 shadow-lg overflow-hidden">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center flex-wrap gap-3">
                     <h3 className="font-black text-xl text-slate-800 flex items-center">
                         <i className="fa-solid fa-list-ul text-orange-500 mr-3"></i> Daftar Produk 
                     </h3>
@@ -7341,10 +7483,32 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
         if (matched) {
             setScannedItems(prev => {
                 if (!isMasuk) {
-                    const sysSisa = stockRef.current[cleanBarcode] || 0;
+                    // Cek stok batch exact dulu (barcode sama persis)
+                    let sysSisa = stockRef.current[cleanBarcode] || 0;
                     const draftCount = prev.filter(i => i.fullBarcode === cleanBarcode).length;
+
+                    // FALLBACK: jika barcode baru (huruf) tidak ada di batch lama (angka),
+                    // hitung total stok SKU dari SEMUA batch yang ada
+                    if (sysSisa <= 0) {
+                        let totalSkuStock = 0;
+                        let totalDraftCount = 0;
+                        Object.entries(stockRef.current).forEach(([barcode, qty]) => {
+                            if (qty > 0) {
+                                const candSku = parseGlobalSku(barcode, variantsRef.current);
+                                const bv = variantsRef.current.find(v =>
+                                    v.sku === candSku || (v.legacySkus || []).includes(candSku)
+                                );
+                                if (bv && bv.sku === matched.sku) {
+                                    totalSkuStock += qty;
+                                    totalDraftCount += prev.filter(i => i.fullBarcode === barcode).length;
+                                }
+                            }
+                        });
+                        sysSisa = totalSkuStock - totalDraftCount;
+                    }
+
                     if (sysSisa - draftCount <= 0) {
-                        playError(); showToast('error', `Stok habis! Sisa batch ini: ${sysSisa}`);
+                        playError(); showToast('error', `Stok habis! Total stok SKU ini: ${sysSisa}`);
                         return prev;
                     }
                 }
@@ -8217,9 +8381,15 @@ function CetakLabel({ products, variants, showToast }) {
 }
 
 // 5. Laporan Stok (Diperbarui untuk mengakomodasi Data Revisi)
-function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast }) {
+﻿function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast }) {
+    const [omzetDiscount, setOmzetDiscount] = React.useState(0);
+    const [localDiscount, setLocalDiscount] = React.useState('');
+    const handleUpdateDiscount = () => { setOmzetDiscount(Number(localDiscount) || 0); };
     const [showResetModal, setShowResetModal] = useState(false);
+    const [showCetakHurufModal, setShowCetakHurufModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
+    const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
 
     const calculatedStock = variants.map(v => {
         const legacy = v.legacySkus || [];
@@ -8235,7 +8405,7 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const totalBuyValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.buyPrice), 0);
     const totalSellValue = calculatedStock.reduce((acc, curr) => acc + (curr.stock * curr.sellPrice), 0);
 
-    // Mengurutkan produk menggunakan logika Custom Faradela
+    // Mengurutkan produk menggunakan logika Custom Syaren
     const sortedProducts = [...products].sort((a, b) => {
         const infoA = parseArticleForSortGlobal(a.article);
         const infoB = parseArticleForSortGlobal(b.article);
@@ -8255,6 +8425,13 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
     const tableRows = [];
     sortedProducts.forEach(prod => {
         const colors = prod.colors || [];
+        
+        let articleTotalQty = 0;
+        colors.forEach(color => {
+            const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
+            articleTotalQty += sizesArray.reduce((acc, curr) => acc + curr.stock, 0);
+        });
+
         colors.forEach((color, idx) => {
             const sizesArray = calculatedStock.filter(v => v.productId === prod.id && v.colorCode === color.code);
             if (sizesArray.length > 0) {
@@ -8269,7 +8446,8 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 tableRows.push({
                     article: prod.article, colorName: color.name, isFirstRow: idx === 0, rowSpan: colors.length,
                     buyPrice: prod.buyPrice || 0, sellPrice: prod.sellPrice || 0, sizes: sizesArray,
-                    rowTotalBeli, rowTotalJual
+                    rowTotalBeli, rowTotalJual, photo: sizesArray.length > 0 ? sizesArray[0].photo : null,
+                    articleTotalQty
                 });
             }
         });
@@ -8362,24 +8540,38 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 <div className="absolute top-0 right-0 p-10 opacity-5"><i className="fa-solid fa-box-open text-9xl"></i></div>
                 <div className="px-4 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-boxes-stacked text-orange-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Stok Fisik</p></div><p className="text-5xl font-black text-white">{totalPhysicalStock} <span className="text-xl font-bold text-slate-500">Pcs</span></p></div>
                 <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-wallet text-emerald-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Total Nilai Aset (Beli)</p></div><p className="text-3xl font-black text-emerald-400">{formatRp(totalBuyValue)}</p></div>
-                <div className="px-4 pt-6 md:pt-0 relative z-10"><div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-orange-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div><p className="text-3xl font-black text-orange-400">{formatRp(totalSellValue)}</p></div>
+                <div className="px-4 pt-6 md:pt-0 relative z-10">
+                    <div className="flex items-center gap-2 mb-2"><i className="fa-solid fa-sack-dollar text-orange-400"></i><p className="text-slate-400 text-sm font-bold uppercase tracking-wider">Estimasi Omzet (Jual)</p></div>
+                    <p className="text-3xl font-black text-orange-400">{formatRp(totalSellValue * (1 - omzetDiscount / 100))}</p>
+                    <div className="mt-3 flex items-center gap-2 bg-slate-800 p-1.5 rounded-lg border border-slate-700/50 w-max relative z-20 shadow-inner">
+                        <span className="text-xs font-bold text-orange-300 ml-1">Diskon:</span>
+                        <input type="number" min="0" max="100" placeholder="0" value={localDiscount} onChange={e => setLocalDiscount(e.target.value)} className="w-12 bg-slate-950 border border-slate-600 rounded-md text-white text-xs font-bold px-1.5 py-1 outline-none focus:border-orange-400 text-center" />
+                        <span className="text-xs font-bold text-orange-300 -ml-1">%</span>
+                        <button type="button" onClick={handleUpdateDiscount} className="bg-rose-600 hover:bg-rose-500 text-white rounded-md px-2.5 py-1 text-xs font-bold shadow-md transition-colors ml-1">Set</button>
+                    </div>
+                    {omzetDiscount > 0 && <div className="mt-1.5 text-[10px] text-orange-300 font-semibold tracking-wide">Omzet Asli: {formatRp(totalSellValue)}</div>}
+                </div>
             </div>
 
-            <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center">
+            <div className={`bg-white border shadow-sm transition-all duration-300 flex flex-col ${isFullScreenLaporan ? 'fixed inset-0 z-[99999] rounded-none' : 'rounded-2xl overflow-hidden mt-8'}`}>
+                <div className="p-6 border-b bg-slate-50 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-center shrink-0">
                     <h3 className="text-xl font-black text-slate-800 flex items-center"><i className="fa-solid fa-table-list text-orange-500 mr-3"></i> Detail Stok Per Article</h3>
-                    <div className="flex items-center gap-3 w-full md:w-auto">
-                        <button type="button" onClick={() => setShowResetModal(true)} className="flex-1 md:flex-none bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
-                        <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
+                    <div className="flex items-center gap-3 w-full md:w-auto overflow-x-auto custom-scrollbar pb-2 md:pb-0">
+                        <button type="button" onClick={() => setIsFullScreenLaporan(!isFullScreenLaporan)} className="shrink-0 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-600 transition-colors px-4 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-blue-100 shadow-sm"><i className={`fa-solid ${isFullScreenLaporan ? 'fa-compress' : 'fa-expand'} mr-2 text-lg`}></i> {isFullScreenLaporan ? 'Tutup Fullscreen' : 'Fullscreen'}</button>
+                        <button type="button" onClick={() => setShowResetModal(true)} className="shrink-0 bg-rose-50 hover:bg-rose-600 hover:text-white text-rose-600 transition-colors px-5 py-3 rounded-xl font-black text-sm flex items-center justify-center border border-rose-100 shadow-sm"><i className="fa-solid fa-rotate-left mr-2 text-lg"></i> Reset Stok</button>
+                        <button type="button" onClick={downloadExcel} className="shrink-0 bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 transition-colors px-6 py-3 rounded-xl font-black text-sm flex items-center justify-center shadow-sm"><i className="fa-solid fa-file-excel mr-2 text-lg"></i> Download Excel</button>
                     </div>
                 </div>
-                <div className="overflow-x-auto custom-scrollbar pb-4">
-                    <table className="w-full text-left text-sm border-collapse">
+                <div className={`overflow-auto custom-scrollbar ${isFullScreenLaporan ? 'flex-1 h-full' : 'pb-4'}`}>
+                    <table className="w-full text-left text-sm border-collapse min-w-max">
                         <thead className="bg-slate-100 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-5 font-black uppercase tracking-wider border-r">Article</th><th className="p-5 font-black uppercase tracking-wider border-r">Warna</th>
-                                {allSizeNames.map(s => <th key={s} className="p-5 text-center border-r font-black uppercase text-orange-600 tracking-wider w-16">{s}</th>)}
-                                <th className="p-5 text-center font-black uppercase tracking-wider bg-orange-100 text-blue-900 border-l-4 border-white">Total Qty</th><th className="p-5 text-right font-black uppercase tracking-wider border-r">Total Harga Beli</th><th className="p-5 text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Total Harga Jual</th>
+                                <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r sticky left-0 z-20 bg-slate-100 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">Article</th>
+                                <th className="p-1.5 sm:p-5 text-[9px] sm:text-sm font-black uppercase tracking-wider border-r bg-slate-100">Warna</th>
+                                {allSizeNames.map(s => <th key={s} className="p-1 sm:p-5 text-[10px] sm:text-sm text-center border-r font-black uppercase text-orange-600 tracking-wider min-w-[24px] sm:w-16">{s}</th>)}
+                                <th className="hidden sm:table-cell p-5 text-sm text-center font-black uppercase tracking-wider bg-orange-100 text-blue-900 border-l-2 border-white">Qty</th>
+                                <th className="hidden sm:table-cell p-5 text-sm text-right font-black uppercase tracking-wider border-r">Beli</th>
+                                <th className="hidden sm:table-cell p-5 text-sm text-right font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 border-l border-emerald-100">Jual</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -8390,23 +8582,36 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                 return (
                                     <tr key={`${row.article}-${row.colorName}-${idx}`} className="border-b border-slate-100 hover:bg-slate-50 transition-colors whitespace-nowrap">
                                         {row.isFirstRow && (
-                                            <td className="p-5 border-r border-slate-200 align-top bg-white" rowSpan={row.rowSpan}>
-                                                <div className="font-extrabold text-slate-800 text-base">{row.article}</div>
-                                                <div className="mt-2 text-xs font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 inline-block">
-                                                    <div className="flex items-center gap-2"><span className="w-8 font-bold">Beli:</span> <span className="font-mono">{formatRp(row.buyPrice)}</span></div>
-                                                    <div className="flex items-center gap-2 mt-1 text-emerald-600"><span className="w-8 font-bold">Jual:</span> <span className="font-mono">{formatRp(row.sellPrice)}</span></div>
+                                            <td className="p-1.5 sm:p-4 border-r border-slate-200 align-top bg-white min-w-[70px] max-w-[85px] sm:min-w-[140px] sm:max-w-[160px] sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]" rowSpan={row.rowSpan}>
+                                                <div className="flex flex-col items-center text-center gap-1 sm:gap-3">
+                                                    {row.photo && (
+                                                        <div className="w-10 h-10 sm:w-20 sm:h-20 shrink-0 rounded-xl overflow-hidden border-2 border-slate-100 shadow-md cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSelectedImage(row.photo)}>
+                                                            <img src={row.photo} alt={row.article} className="w-full h-full object-cover" loading="lazy" />
+                                                        </div>
+                                                    )}
+                                                    <div className="w-full flex flex-col justify-between h-full">
+                                                        <div className="font-extrabold text-rose-800 text-[10px] sm:text-[13px] whitespace-normal break-words leading-tight">{row.article}</div>
+                                                        <div className="mt-1 sm:hidden text-center bg-rose-100/70 text-rose-800 font-black rounded-md text-[9px] py-0.5 w-full border border-rose-200/50">{row.articleTotalQty} Pcs</div>
+                                                        <div className="hidden sm:block mt-3 text-[10px] font-normal text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 w-full text-left">
+                                                            <div className="flex justify-between items-center gap-1"><span className="font-bold">Beli:</span> <span className="font-mono tracking-tighter">{formatRp(row.buyPrice)}</span></div>
+                                                            <div className="flex justify-between items-center gap-1 mt-1 text-emerald-600"><span className="font-bold">Jual:</span> <span className="font-mono tracking-tighter">{formatRp(row.sellPrice)}</span></div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </td>
                                         )}
-                                        <td className="p-5 font-bold text-slate-600 border-r border-slate-100">{row.colorName}</td>
+                                        <td className="p-1.5 sm:p-5 border-r border-slate-100">
+                                            <div className="font-bold text-slate-700 text-[9px] sm:text-sm whitespace-nowrap">{row.colorName}</div>
+                                            <div className="sm:hidden font-extrabold text-rose-600 text-[8px] mt-0.5">{totalPerColor} Pcs</div>
+                                        </td>
                                         {allSizeNames.map(sz => {
                                             const matchedSize = row.sizes.find(s => s.sizeName === sz);
                                             const qty = matchedSize ? matchedSize.stock : 0;
-                                            return <td key={sz} className={`p-5 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-slate-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
+                                            return <td key={sz} className={`p-1 sm:p-5 text-center text-[10px] sm:text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
                                         })}
-                                        <td className="p-5 text-center font-black text-lg text-orange-600 bg-orange-50/50 border-l-4 border-white">{totalPerColor}</td>
-                                        <td className="p-5 text-right font-bold text-slate-600 border-r border-slate-100">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
-                                        <td className="p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
+                                        <td className="hidden sm:table-cell p-5 text-center font-black text-lg text-rose-600 bg-orange-50/50 border-l-2 border-white">{totalPerColor}</td>
+                                        <td className="hidden sm:table-cell p-5 text-right font-bold text-slate-600 border-r border-slate-100 text-sm">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
+                                        <td className="hidden sm:table-cell p-5 text-right font-black text-emerald-600 bg-emerald-50/30 border-l border-emerald-50 text-sm">{totalJual > 0 ? formatRp(totalJual) : '-'}</td>
                                     </tr>
                                 );
                             })}
@@ -8415,6 +8620,13 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                     </table>
                 </div>
             </div>
+            {/* Image Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </div>
     );
 }
@@ -8433,7 +8645,7 @@ function PantauStok({ variants, transactions, showToast }) {
             
             let recordDateStr = "2024-01-01T00:00:00Z";
             if (rawBase.startsWith('$')) {
-                // Short Barcode: $X9K2-100626
+                // Short Barcode Gen2: $X9K2-100626 → DDMMYY setelah tanda '-'
                 const parts = rawBase.split('-');
                 if (parts.length > 1) {
                     const ddmmyy = parts[parts.length - 1]; // "100626"
@@ -8444,8 +8656,16 @@ function PantauStok({ variants, transactions, showToast }) {
                         recordDateStr = `${yy}-${mm}-${dd}T00:00:00Z`;
                     }
                 }
+            } else if (rawBase.length >= 10 && rawBase.length <= 12 && /\d{6}$/.test(rawBase)) {
+                // Barcode Gen3 (baru): format [SKU][DDMMYY] panjang 10-12 char
+                // Ambil 6 digit terakhir dan baca sebagai DDMMYY
+                const ddmmyy = rawBase.slice(-6);
+                const dd = ddmmyy.slice(0, 2);
+                const mm = ddmmyy.slice(2, 4);
+                const yy = "20" + ddmmyy.slice(4, 6);
+                recordDateStr = `${yy}-${mm}-${dd}T00:00:00Z`;
             } else {
-                // Legacy Barcode: F07-08.1-HITAM-4020260610
+                // Legacy Barcode lama: F07-08.1-HITAM-4020260610 → 8 digit terakhir YYYYMMDD
                 const dateStr = rawBase.length > 8 ? rawBase.slice(-8) : "20240101";
                 if (dateStr.length === 8) {
                     recordDateStr = `${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T00:00:00Z`;
@@ -8529,11 +8749,11 @@ function PantauStok({ variants, transactions, showToast }) {
                         {data.map((item, i) => (
                             <div key={i} className="flex justify-between items-center p-4 border-2 border-slate-100 rounded-2xl bg-slate-50 hover:border-slate-300 transition-colors">
                                 <div>
-                                    <div className="font-black text-slate-800 text-lg">{item.article}</div>
-                                    <div className="font-bold text-slate-500 text-sm mt-0.5">{item.colorName} - Sz: <span className="text-orange-500 font-black">{item.sizeName}</span></div>
-                                    <div className="text-xs font-bold text-slate-400 mt-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"><i className="fa-regular fa-calendar-check mr-1 text-orange-500"></i> Cetak: {new Date(item.originalDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                                    <div className="font-black text-rose-800 text-lg">{item.article}</div>
+                                    <div className="font-bold text-slate-500 text-sm mt-0.5">{item.colorName} - Sz: <span className="text-rose-500 font-black">{item.sizeName}</span></div>
+                                    <div className="text-xs font-bold text-slate-400 mt-2 bg-white px-3 py-1.5 rounded-lg border shadow-sm"><i className="fa-regular fa-calendar-check mr-1 text-rose-500"></i> Cetak: {new Date(item.originalDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                                 </div>
-                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-2xl border-2 shadow-sm text-orange-600">{item.qty} Pcs</span></div>
+                                <div className="text-right"><span className="font-black text-xl bg-white px-5 py-3 rounded-2xl border-2 shadow-sm text-rose-600">{item.qty} Pcs</span></div>
                             </div>
                         ))}
                         {data.length === 0 && <div className="text-center py-10 text-slate-400"><i className="fa-solid fa-box-open text-5xl mb-4 opacity-30"></i><p className="font-bold">Stok kategori ini kosong / habis terjual.</p></div>}
@@ -8545,15 +8765,15 @@ function PantauStok({ variants, transactions, showToast }) {
 
     return (
         <div className="space-y-6">
-            <div className="bg-slate-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="bg-rose-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="absolute top-0 right-0 p-8 opacity-10"><i className="fa-solid fa-eye text-9xl"></i></div>
-                <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-orange-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
+                <div className="relative z-10"><h2 className="text-3xl font-black flex items-center gap-3 mb-2"><i className="fa-solid fa-eye text-rose-400"></i> Analisis Umur Stok (FIFO)</h2><p className="text-slate-300 text-sm max-w-2xl leading-relaxed">Menghitung <b>Sisa Barang Fisik</b> berdasarkan tanggal cetak barcode secara otomatis.</p></div>
                 <button type="button" onClick={downloadExcel} className="relative z-10 bg-emerald-500 hover:bg-emerald-400 text-white font-black px-6 py-4 rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center transition-transform transform hover:-translate-y-1 w-full md:w-auto justify-center"><i className="fa-solid fa-file-excel text-2xl mr-3"></i> DOWNLOAD EXCEL</button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <CategorySection title="Stok Baru" subtitle="0 s/d 3 Bulan" dataKey="baru" data={inventoryData.baru} colorClass="text-emerald-600" borderClass="border-emerald-200" bgClass="bg-emerald-100" icon="fa-leaf" />
-                <CategorySection title="Stok Lama" subtitle="3 s/d 6 Bulan" dataKey="lama" data={inventoryData.lama} colorClass="text-amber-600" borderClass="border-amber-200" bgClass="bg-amber-100" icon="fa-hourglass-half" />
-                <CategorySection title="Stok Sudah Lama" subtitle="6 s/d 12 Bulan" dataKey="sudahLama" data={inventoryData.sudahLama} colorClass="text-orange-600" borderClass="border-orange-200" bgClass="bg-orange-100" icon="fa-calendar-minus" />
+                <CategorySection title="Stok Lama" subtitle="3 s/d 6 Bulan" dataKey="lama" data={inventoryData.lama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-hourglass-half" />
+                <CategorySection title="Stok Sudah Lama" subtitle="6 s/d 12 Bulan" dataKey="sudahLama" data={inventoryData.sudahLama} colorClass="text-rose-600" borderClass="border-rose-200" bgClass="bg-rose-100" icon="fa-calendar-minus" />
                 <CategorySection title="Stok Lama Banget" subtitle="Lebih dari 1 Tahun" dataKey="lamaBanget" data={inventoryData.lamaBanget} colorClass="text-red-600" borderClass="border-red-200" bgClass="bg-red-100" icon="fa-triangle-exclamation" />
             </div>
         </div>
@@ -8573,7 +8793,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
 
     const handleSaveUser = async (e) => {
         e.preventDefault(); setIsLoading(true);
-        const emailFormat = formUser.username.toLowerCase() + '@faradela.com';
+        const emailFormat = formUser.username.toLowerCase() + '@syaren.com';
         try {
             let secondaryApp;
             const apps = firebase.apps.filter(app => app.name === "Secondary");
@@ -8642,15 +8862,15 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-3xl border shadow-sm">
                 <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
-                    <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-users-gear text-orange-500 mr-2"></i> Manajemen Sub-Akun</h3>
-                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
+                    <h3 className="text-xl font-black text-rose-800"><i className="fa-solid fa-users-gear text-rose-500 mr-2"></i> Manajemen Sub-Akun</h3>
+                    <button type="button" onClick={() => setShowAdd(!showAdd)} className={`px-5 py-2.5 rounded-xl font-bold text-sm transition-colors ${showAdd ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white'}`}><i className={`fa-solid ${showAdd ? 'fa-xmark' : 'fa-plus'} mr-1`}></i> {showAdd ? 'Batal' : 'Tambah Karyawan'}</button>
                 </div>
 
                 {showAdd && (
                     <form onSubmit={handleSaveUser} action="javascript:void(0);" className="mb-8 p-6 bg-slate-50 border-2 border-slate-200 rounded-2xl space-y-5 shadow-inner">
                         <div className="grid grid-cols-2 gap-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-orange-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-orange-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Username</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.username} onChange={e => setFormUser({ ...formUser, username: e.target.value })} /></div>
+                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Password</label><input required className="w-full p-3 border-2 border-slate-300 rounded-xl focus:border-rose-500 outline-none" value={formUser.password} onChange={e => setFormUser({ ...formUser, password: e.target.value })} /></div>
                         </div>
                         <div>
                             <label className="block text-sm font-bold text-slate-700 mb-2">Beri Akses Menu:</label>
@@ -8659,14 +8879,14 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                     ...ALL_MENUS.filter(m => !m.adminOnly && m.id !== 'dashboard' && m.id !== 'cek_surat_jalan').map(m => ({ id: m.id, label: m.label })),
                                     { id: 'sj_lery', label: 'Bengkel - Lery Workshop (F01)' },
                                     { id: 'sj_samin', label: 'Bengkel - Pak Samin (F07)' },
-                                    { id: 'sj_faradela', label: 'Penerima - Faradela Official' },
+                                    { id: 'sj_syaren', label: 'Penerima - Syaren Official' },
                                     { id: 'delete_antrean', label: 'Akses Hapus Pesanan Online' }
                                 ].map(m => (
-                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-xl cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-orange-50 border-orange-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-orange-500 focus:ring-blue-500" />{m.label}</label>
+                                    <label key={m.id} className={`flex items-center gap-3 text-sm p-3 border-2 rounded-xl cursor-pointer transition-colors ${formUser.access.includes(m.id) ? 'bg-rose-50 border-rose-400 font-bold text-blue-900' : 'bg-white border-slate-200 text-slate-600 hover:bg-rose-50'}`}><input type="checkbox" checked={formUser.access.includes(m.id)} onChange={() => toggleAccess(m.id)} className="w-5 h-5 rounded text-rose-500 focus:ring-blue-500" />{m.label}</label>
                                 ))}
                             </div>
                         </div>
-                        <button className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-4 rounded-xl mt-4 shadow-lg shadow-orange-500/30">SIMPAN SUB-AKUN</button>
+                        <button className="w-full bg-rose-500 hover:bg-rose-600 text-white font-black py-4 rounded-xl mt-4 shadow-lg shadow-rose-500/30">SIMPAN SUB-AKUN</button>
                     </form>
                 )}
 
@@ -8674,7 +8894,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                     {users.map(u => (
                         <div key={u.id} className="flex justify-between items-center p-5 border-2 border-slate-100 rounded-2xl bg-white shadow-sm hover:border-slate-300 transition-colors">
                             <div>
-                                <div className="font-black text-slate-800 text-lg">{u.username} <span className={`text-[10px] px-2 py-0.5 rounded-md ml-2 uppercase align-middle ${u.role === 'admin' ? 'bg-orange-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{u.role}</span></div>
+                                <div className="font-black text-rose-800 text-lg">{u.username} <span className={`text-[10px] px-2 py-0.5 rounded-md ml-2 uppercase align-middle ${u.role === 'admin' ? 'bg-rose-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{u.role}</span></div>
                                 <div className="text-xs text-slate-500 font-semibold mt-1.5 leading-relaxed">
                                     Akses: {u.role === 'admin' ? 'Semua Menu (Full Access)' : (
                                         (u.access || []).length > 0 ? (u.access || []).map(accId => {
@@ -8682,7 +8902,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                                             if (found) return found.label;
                                             if (accId === 'sj_lery') return 'Workshop (F01)';
                                             if (accId === 'sj_samin') return 'Workshop (F07)';
-                                            if (accId === 'sj_faradela') return 'Penerima';
+                                            if (accId === 'sj_syaren') return 'Penerima';
                                             if (accId === 'delete_antrean') return 'Hapus Pesanan Online';
                                             return accId;
                                         }).join(', ') : 'Tidak Ada Akses'
@@ -8700,7 +8920,7 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
                 <h3 className="text-2xl font-black text-rose-800 mb-3 relative z-10"><i className="fa-solid fa-skull text-rose-600 mr-2"></i> Danger Zone: Reset Data</h3>
                 <p className="text-sm text-rose-700 font-semibold mb-6 relative z-10">Tindakan ini akan <b className="uppercase">menghapus seluruh</b> Master Produk dan Riwayat Transaksi secara permanen. Database akan dikosongkan. Masukkan Password Admin Utama untuk memverifikasi.</p>
                 <form onSubmit={handleReset} action="javascript:void(0);" className="space-y-4 relative z-10">
-                    <input required type="password" placeholder="Masukkan Password Admin..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-300 focus:border-rose-600 outline-none rounded-xl font-bold bg-white" />
+                    <input required type="password" placeholder="Masukkan Password Admin..." value={resetPass} onChange={e => setResetPass(e.target.value)} className="w-full p-4 border-2 border-rose-300 focus:border-slate-600 outline-none rounded-xl font-bold bg-white" />
                     <button type="submit" className="w-full bg-rose-600 hover:bg-rose-700 text-white font-black py-4 rounded-xl shadow-xl shadow-rose-600/30 transition-transform transform hover:-translate-y-1">HAPUS SELURUH DATA SEKARANG</button>
                 </form>
             </div>
@@ -8708,13 +8928,11 @@ function Pengaturan({ currentUser, setIsLoading, setProducts, setTransactions, s
     );
 }
 
-// ==========================================
-// MPO PABRIK V2 (INPUT MATRIKS, PREVIEW, SCAN KIRIM)
-// ==========================================
-function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
+function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, setIsLoading }) {
     const [showForm, setShowForm] = useState(false);
     const [targetDate, setTargetDate] = useState('');
     const [poDate, setPoDate] = useState(toLocalDateStr());
+    const [selectedImage, setSelectedImage] = useState(null);
     const [mpoDraftList, setMpoDraftList] = useState(() => {
         try {
             const saved = localStorage.getItem('smart_mpo_draft');
@@ -8727,37 +8945,125 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         return [];
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [bengkelName, setBengkelName] = useState('');
+    const [targetStock, setTargetStock] = useState('');
     const [qtys, setQtys] = useState({});
     const [previewModal, setPreviewModal] = useState(false);
+    
+    const [history, setHistory] = useState([]);
+    const [future, setFuture] = useState([]);
+
+    const updateDraftList = (newList) => {
+        setHistory(prev => [...prev, mpoDraftList]);
+        setFuture([]);
+        setMpoDraftList(newList);
+    };
+
+    const handleApplyTargetStock = () => {
+        const target = parseInt(targetStock);
+        if (isNaN(target) || target <= 0) return showToast('error', 'Masukkan angka target yang valid (minimal 1)');
+        
+        const newQtys = { ...qtys };
+        filteredVariants.forEach(v => {
+            const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
+                if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
+                if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
+                return sum;
+            }, 0);
+            
+            const needed = target - variantStock;
+            newQtys[v.sku] = needed > 0 ? needed : 0;
+        });
+        setQtys(newQtys);
+    };
+
+    const handleUndo = useCallback(() => {
+        setHistory(prev => {
+            if (prev.length === 0) return prev;
+            const previous = prev[prev.length - 1];
+            setFuture(fPrev => [mpoDraftList, ...fPrev]);
+            setMpoDraftList(previous);
+            return prev.slice(0, -1);
+        });
+    }, [mpoDraftList]);
+
+    const handleRedo = useCallback(() => {
+        setFuture(prev => {
+            if (prev.length === 0) return prev;
+            const next = prev[0];
+            setHistory(hPrev => [...hPrev, mpoDraftList]);
+            setMpoDraftList(next);
+            return prev.slice(1);
+        });
+    }, [mpoDraftList]);
+
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                e.preventDefault();
+                handleUndo();
+            } else if (e.ctrlKey && e.key === 'y') {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo]);
 
     const nextPoNumber = mpoOrders.length > 0 ? Math.max(...mpoOrders.map(o => o.poNumber)) + 1 : 1;
     const newPoId = 'PO' + nextPoNumber;
 
     const safeLower = (str) => (str || '').toString().toLowerCase();
     const query = (searchQuery || '').toLowerCase().trim();
-    const filteredVariants = variants.filter(v => {
+    let filteredVariants = variants.filter(v => {
         if (!v.isActive || !query) return false;
         if (/^\d{8,}$/.test(query)) return safeLower(v.sku) === query || safeLower(v.baseCode) === query;
         const words = query.split(/\s+/);
         return words.every(word => safeLower(v.article).includes(word) || safeLower(v.colorName).includes(word) || safeLower(v.sizeName).includes(word) || safeLower(v.sku).includes(word) || safeLower(v.baseCode).includes(word));
-    }).slice(0, 30);
+    });
+    
+    let isExactArticle = false;
+    if (query) {
+        isExactArticle = variants.some(v => safeLower(v.article) === query);
+        filteredVariants.sort((a, b) => {
+            const aExact = safeLower(a.sku) === query || safeLower(a.baseCode) === query;
+            const bExact = safeLower(b.sku) === query || safeLower(b.baseCode) === query;
+            if (aExact && !bExact) return -1;
+            if (!aExact && bExact) return 1;
+            return 0;
+        });
+    }
+    
+    if (!isExactArticle) {
+        filteredVariants = filteredVariants.slice(0, 30);
+    }
 
     const addToDraft = (variant) => {
         if (!targetDate) return showToast('error', 'Silakan isi Target Tanggal Selesai terlebih dahulu!');
-        const qty = qtys[variant.sku] || 1;
+        const inputVal = qtys[variant.sku];
+        
+        let qty = 1;
+        if (inputVal !== undefined && inputVal !== '') {
+            qty = parseInt(inputVal);
+            if (isNaN(qty) || qty <= 0) {
+                return showToast('error', 'Qty tidak valid! (Minimal 1)');
+            }
+        }
+
         const existingList = [...mpoDraftList];
         const existingIdx = existingList.findIndex(x => x.sku === variant.sku);
         if (existingIdx > -1) {
-            existingList[existingIdx].qty += qty;
+            existingList[existingIdx] = { ...existingList[existingIdx], qty: existingList[existingIdx].qty + qty };
         } else {
             existingList.push({ ...variant, qty, received: 0, shipped: 0 });
         }
-        setMpoDraftList(existingList);
+        updateDraftList(existingList);
         showToast('success', `${qty} pcs ${variant.article} ${variant.sizeName} dimasukkan antrean MPO.`);
     };
 
     const removeDraft = (sku) => {
-        setMpoDraftList(mpoDraftList.filter(x => x.sku !== sku));
+        updateDraftList(mpoDraftList.filter(x => x.sku !== sku));
     };
 
     const handleDuplicatePO = (po) => {
@@ -8784,7 +9090,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             }
         });
 
-        setMpoDraftList(existingList);
+        updateDraftList(existingList);
         setShowForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
         showToast('success', `Berhasil! Isi PO ${po.id} disalin ke keranjang. Silakan simpan untuk membuat PO baru.`);
@@ -8807,6 +9113,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             const poData = {
                 id: newPoId,
                 poNumber: nextPoNumber,
+                bengkelName: bengkelName,
                 poDate: poDate,
                 targetDate: targetDate,
                 createdAt: new Date().toISOString(),
@@ -8829,17 +9136,16 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             showToast('success', `PO Pabrik [${newPoId}] berhasil dibuat!`);
             setPreviewModal(false);
             setShowForm(false);
-            setMpoDraftList([]); // CHANGED
+            setHistory([]);
+            setFuture([]);
+            setMpoDraftList([]);
             setTargetDate('');
         } catch (err) {
             showToast('error', 'Gagal membuat PO: ' + err.message);
         }
         setIsLoading(false);
     };
-    const cetakMPO = (po) => {
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
-
+    const cetakMPO = (po, mode = 'print') => {
         // ---- Build matrix data: group by article+color, columns = sizes ----
         const allSizes = [...new Set(po.items.map(i => i.sizeName))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
         const groups = [];
@@ -8894,24 +9200,25 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             else if (c.includes('pink') || c.includes('salem') || c.includes('rose')) style = 'background:#e91e63;color:#fff;';
             else if (c.includes('kuning') || c.includes('yellow') || c.includes('gold')) style = 'background:#f9a825;color:#333;';
             else if (c.includes('ungu') || c.includes('purple') || c.includes('lilac') || c.includes('lavender')) style = 'background:#7b1fa2;color:#fff;';
-            else if (c.includes('orange') || c.includes('oren')) style = 'background:#ef6c00;color:#fff;';
+            else if (c.includes('rose') || c.includes('oren')) style = 'background:#ef6c00;color:#fff;';
             else if (c.includes('apricot') || c.includes('peach')) style = 'background:#ffab91;color:#4e342e;';
             else if (c.includes('tan') || c.includes('khaki') || c.includes('beige')) style = 'background:#d2b48c;color:#4e342e;';
             else if (c.includes('tosca') || c.includes('teal') || c.includes('cyan') || c.includes('mint')) style = 'background:#00897b;color:#fff;';
             else if (c.includes('burgundy') || c.includes('wine')) style = 'background:#6d1a36;color:#fff;';
             else style = 'background:#fff3e0;color:#e65100;border:1px solid #ffcc80;';
-            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;letter-spacing:.5px;text-transform:uppercase;${style}">${name}</span>`;
+            return `<span style="display:inline-block;padding:3px 10px;border-radius:5px;font-weight:900;font-size:10px;text-transform:uppercase;${style}">${name}</span>`;
         };
 
         // ---- Build table rows ----
         let rowsHtml = '';
         groups.forEach((g) => {
-            const isFirst = !articleRendered[g.article];
-            const rowspan = articleRowCount[g.article];
-            articleRendered[g.article] = true;
             const rowTotal = allSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0);
             rowsHtml += `<tr>`;
-            if (isFirst) rowsHtml += `<td rowspan="${rowspan}" style="font-weight:900;font-size:13px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+            if (!articleRendered[g.article]) {
+                const rowspan = articleRowCount[g.article];
+                rowsHtml += `<td rowspan="${rowspan}" style="font-weight:900;font-size:12px;text-align:center;vertical-align:middle;background:#fff8f0;border-right:2px solid #e65100;">${g.article}</td>`;
+                articleRendered[g.article] = true;
+            }
             rowsHtml += `<td style="text-align:center;vertical-align:middle;">${colorCell(g.colorName)}</td>`;
             allSizes.forEach(sz => {
                 const qty = g.sizes[sz] || 0;
@@ -8945,17 +9252,17 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
 
     /* ===== HEADER AREA ===== */
     .page-header { border: 2.5px solid #e65100; border-radius: 8px; padding: 14px 18px 10px; margin-bottom: 16px; position: relative; }
-    .company-name { font-size: 20px; font-weight: 900; color: #e65100; letter-spacing: 1px; text-align: center; text-transform: uppercase; }
-    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; letter-spacing: 2px; margin-top: 2px; }
+    .company-name { font-size: 20px; font-weight: 900; color: #e65100; text-align: center; text-transform: uppercase; }
+    .doc-title { font-size: 13px; font-weight: 900; color: #333; text-align: center; text-transform: uppercase; margin-top: 2px; }
     .bengkel-badge {
       display: inline-block; background: #e65100; color: #fff;
       font-size: 11px; font-weight: 900; padding: 2px 12px;
-      border-radius: 20px; letter-spacing: 2px; text-transform: uppercase;
+      border-radius: 20px; text-transform: uppercase;
       margin-top: 4px;
     }
-    .header-center { text-align: center; }
-    .po-info { display: flex; justify-content: center; gap: 24px; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; flex-wrap: wrap; }
-    .po-info span { background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; }
+    .header-center { text-align: center; width: 100%; }
+    .po-info { text-align: center; margin-top: 10px; font-size: 11px; font-weight: bold; color: #555; }
+    .po-info span { display: inline-block; background: #f5f5f5; border: 1px solid #e0e0e0; border-radius: 6px; padding: 3px 12px; margin: 0 10px; }
     .po-info span b { color: #e65100; }
 
     /* ===== TABLE ===== */
@@ -8966,11 +9273,11 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     tr:hover td { background: #fff3e0; }
 
     /* ===== FOOTER ===== */
-    .sign-area { display: flex; justify-content: space-around; margin-top: 24px; }
-    .sign-box { text-align: center; width: 30%; }
-    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .sign-area { display: table; width: 100%; table-layout: fixed; margin-top: 24px; }
+    .sign-box { display: table-cell; text-align: center; }
+    .sign-box .label { font-size: 10px; font-weight: bold; color: #777; text-transform: uppercase; margin-bottom: 4px; }
     .sign-box .role { font-size: 11px; font-weight: 900; color: #333; margin-bottom: 50px; }
-    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; }
+    .sign-box .line { border-top: 1.5px solid #333; padding-top: 4px; font-size: 10px; color: #888; margin: 0 auto; width: 80%; }
     .footer-note { text-align:center; font-size:9px; color:#aaa; margin-top: 12px; border-top:1px dashed #ddd; padding-top: 6px; }
 
     @media print {
@@ -9024,18 +9331,49 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
     </div>
     <div class="sign-box">
       <div class="label">Diterima Oleh</div>
-      <div class="role">Pihak Bengkel</div>
+      <div class="role">${po.bengkelName || 'Pihak Bengkel'}</div>
       <div class="line">(................................)</div>
     </div>
   </div>
 
   <div class="footer-note">Dokumen ini dicetak secara otomatis oleh sistem Faradela Management &bull; ${poDateLabel}</div>
-
-  <script>setTimeout(() => window.print(), 600);<\/script>
 </body>
 </html>`;
+
+        if (mode === 'download') {
+            showToast('info', 'Sedang memproses gambar SPO, mohon tunggu...', 2000);
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.width = '800px';
+            iframe.style.height = '1200px';
+            iframe.style.top = '-9999px';
+            document.body.appendChild(iframe);
+            
+            iframe.contentWindow.document.open();
+            iframe.contentWindow.document.write(htmlContent);
+            iframe.contentWindow.document.close();
+            
+            setTimeout(() => {
+                html2canvas(iframe.contentWindow.document.body, { scale: 2, useCORS: true }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = `SPO-${po.id}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    document.body.removeChild(iframe);
+                    showToast('success', 'Gambar SPO berhasil diunduh!');
+                }).catch(err => {
+                    console.error(err);
+                    showToast('error', 'Gagal memproses gambar SPO.');
+                    document.body.removeChild(iframe);
+                });
+            }, 1000);
+            return;
+        }
+
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return showToast('error', 'Izinkan Pop-up Blocker untuk cetak PO!');
         printWindow.document.open();
-        printWindow.document.write(htmlContent);
+        printWindow.document.write(htmlContent + `<script>setTimeout(() => window.print(), 600);</script>`);
         printWindow.document.close();
     };
 
@@ -9059,16 +9397,16 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         const prodCode = getProductionCode(targetDateStr);
 
         po.items.forEach(item => {
-            let isLegacy = false;
             let variantRef = variants.find(v => v.sku === item.sku);
             if (!variantRef) {
                 variantRef = variants.find(v => (v.legacySkus || []).includes(item.sku));
-                if (variantRef) isLegacy = true; // Jika ketemu di legacySkus, berarti ini PO lama
             }
             if (!variantRef) variantRef = { sku: item.sku }; // Fallback
-            
-            const skuToPrint = isLegacy ? item.sku : variantRef.sku;
-            const fullBarcode = buildShortBarcode({ ...variantRef, sku: skuToPrint }, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber, isLegacy);
+
+            // SELALU pakai SKU baru (huruf) dari allVariants, bukan SKU lama dari PO
+            const skuToPrint = variantRef.sku;
+            // isLegacy=false agar selalu cetak format Gen3 baru (huruf + DDMMYY)
+            const fullBarcode = buildShortBarcode({ ...variantRef, sku: skuToPrint }, po.targetDate || po.createdAt.split('T')[0], 'PO', po.poNumber, false);
             const toPrint = item.qty - (item.received || 0);
 
             for (let i = 0; i < toPrint; i++) {
@@ -9080,7 +9418,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                     <div class="cell br bb" style="flex-direction: column;"><svg class="barcode-svg" jsbarcode-value="${fullBarcode}" jsbarcode-format="CODE128" jsbarcode-width="2" jsbarcode-height="55" jsbarcode-displayvalue="false" jsbarcode-margin="0" jsbarcode-fontsize="14"></svg></div>
                                     <div class="cell bb"><div class="prod-code">${prodCode}</div></div>
                                     <div class="cell br" style="flex-direction: column;"><div class="size-text">${item.sizeName}</div><div class="color-text">${item.colorName}</div></div>
-                                    <div class="cell br" style="flex-direction: column;"><div class="article-text">${item.article}</div><div class="price-text">Rp. ${(variantRef.sellPrice || 0).toLocaleString('id-ID')}</div></div>
+                                    <div class="cell br" style="flex-direction: column;"><div class="article-text" style="font-size: ${item.article.length > 12 ? '12px' : (item.article.length > 7 ? '16px' : '20px')};">${item.article}</div><div class="price-text">Rp. ${(variantRef.sellPrice || 0).toLocaleString('id-ID')}</div></div>
                                     <div class="cell"><div class="qrcode-target" data-value="${fullBarcode}"></div></div>
                                 </div>
                             </div>
@@ -9112,10 +9450,10 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                         .size-text { font-size: 48px; font-weight: 900; line-height: 1; }
                         .color-text { font-size: 18px; font-weight: bold; text-transform: uppercase; margin-top: 4px; }
                         .prod-code { font-size: 36px; font-weight: 900; letter-spacing: 2px; }
-                        .article-text { font-size: 20px; font-weight: 900; }
+                        .article-text { font-size: 40px; font-weight: 900; line-height: 1.1; text-align: center; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100%; }
                         .mpo-badge { font-size: 14px; background: black; color: white; padding: 2px 5px; margin-top: 5px; font-weight: bold; }
                         .sell-price { font-size: 32px; font-weight: 900; margin-top: 2px; margin-bottom: 5px; }
-                        .po-corner { position: absolute; top: 1px; right: 2px; font-size: 12px; font-weight: 900; color: black; z-index: 10; padding: 2px; }
+                        .po-corner { position: absolute; top: 1px; left: 2px; font-size: 12px; font-weight: 900; color: black; z-index: 10; padding: 2px; }
                         .price-text { font-size: 14px; font-weight: 900; color: #222; margin-top: 4px; border: 1.5px solid #666; padding: 2px 8px; border-radius: 4px; }
                     </style></head><body>`;
 
@@ -9172,13 +9510,13 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
         <div className="space-y-6">
             <div className="bg-white p-6 md:p-8 rounded-3xl border shadow-sm flex justify-between items-center">
                 <div>
-                    <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-industry text-orange-500"></i> Manajemen PO Bengkel</h2>
+                    <h2 className="text-2xl font-black text-rose-800 flex items-center gap-3"><i className="fa-solid fa-industry text-rose-500"></i> Manajemen PO Bengkel</h2>
                     <p className="text-slate-500 font-bold text-sm mt-1">Buat Matrix Order, cetak SP dan label barcode</p>
                 </div>
                 {showForm ? (
                     <button onClick={() => setShowForm(false)} className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-xl font-black transition-colors">Batal</button>
                 ) : (
-                    <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white shadow-md rounded-xl font-black transition-colors">+ BIKIN PO MPO</button>
+                    <button onClick={() => setShowForm(true)} className="px-5 py-2.5 bg-rose-500 hover:bg-rose-600 text-white shadow-md rounded-xl font-black transition-colors">+ BIKIN PO MPO</button>
                 )}
             </div>
 
@@ -9201,31 +9539,31 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                     if (c.includes('pink') || c.includes('salem') || c.includes('rose')) return { background: '#e91e63', color: '#fff' };
                     if (c.includes('kuning') || c.includes('yellow') || c.includes('gold')) return { background: '#f9a825', color: '#333' };
                     if (c.includes('ungu') || c.includes('purple') || c.includes('lilac') || c.includes('lavender')) return { background: '#7b1fa2', color: '#fff' };
-                    if (c.includes('orange') || c.includes('oren')) return { background: '#ef6c00', color: '#fff' };
+                    if (c.includes('rose') || c.includes('oren')) return { background: '#ef6c00', color: '#fff' };
                     if (c.includes('silver') || c.includes('grey') || c.includes('gray')) return { background: '#bdbdbd', color: '#333' };
                     if (c.includes('apricot') || c.includes('peach')) return { background: '#ffab91', color: '#4e342e' };
                     if (c.includes('tan') || c.includes('khaki') || c.includes('beige')) return { background: '#d2b48c', color: '#4e342e' };
                     if (c.includes('tosca') || c.includes('teal') || c.includes('cyan') || c.includes('mint')) return { background: '#00897b', color: '#fff' };
                     if (c.includes('burgundy') || c.includes('wine')) return { background: '#6d1a36', color: '#fff' };
-                    // Default: orange accent
+                    // Default: rose accent
                     return { background: '#fff3e0', color: '#e65100', border: '1px solid #ffcc80' };
                 };
 
                 return (
-                    <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-rose-900/80 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-3xl p-6 md:p-8 w-full max-w-3xl max-h-[90vh] flex flex-col shadow-2xl">
-                            <h3 className="text-2xl font-black text-slate-800 mb-2">Preview PO <span className="text-orange-500">{newPoId}</span></h3>
+                            <h3 className="text-2xl font-black text-rose-800 mb-2">Preview PO <span className="text-rose-500">{newPoId}</span></h3>
                             <p className="text-slate-500 font-bold text-sm mb-6 border-b pb-4">Tanggal PO: {poDate} &nbsp;|&nbsp; Target Selesai: {targetDate}</p>
                             <div className="flex-1 overflow-auto bg-slate-50 border rounded-2xl mb-6 shadow-inner p-2 custom-scrollbar">
                                 <table className="w-full text-left text-sm border-collapse">
-                                    <thead className="bg-slate-100 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
+                                    <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 whitespace-nowrap">
                                         <tr>
                                             <th className="p-3 font-black uppercase text-center border-r">Article</th>
                                             <th className="p-3 font-black uppercase text-center border-r">Warna</th>
                                             {previewSizes.map(sz => (
-                                                <th key={sz} className="p-3 text-center border-r font-black uppercase text-orange-600 w-12">{sz}</th>
+                                                <th key={sz} className="p-3 text-center border-r font-black uppercase text-rose-600 w-12">{sz}</th>
                                             ))}
-                                            <th className="p-3 text-center font-black uppercase bg-orange-100 text-blue-900 w-24">Total</th>
+                                            <th className="p-3 text-center font-black uppercase bg-rose-100 text-blue-900 w-24">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -9237,7 +9575,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                             return (
                                                 <tr key={idx} className="border-b border-slate-100 hover:bg-white transition-colors whitespace-nowrap">
                                                     {isFirstRowForArticle && (
-                                                        <td className="p-3 border-r border-slate-100 font-black text-slate-800 text-base text-center align-middle bg-white" rowSpan={rowsForArticle}>
+                                                        <td className="p-3 border-r border-slate-100 font-black text-rose-800 text-base text-center align-middle bg-white" rowSpan={rowsForArticle}>
                                                             {group.article}
                                                         </td>
                                                     )}
@@ -9247,12 +9585,12 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                                     {previewSizes.map(sz => {
                                                         const qty = group.sizes[sz] || 0;
                                                         return (
-                                                            <td key={sz} className={`p-3 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-slate-800 font-black bg-slate-50'}`}>
+                                                            <td key={sz} className={`p-3 text-center text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>
                                                                 {qty > 0 ? qty : '-'}
                                                             </td>
                                                         );
                                                     })}
-                                                    <td className="p-3 text-center font-black text-lg text-orange-600 bg-orange-50/50">
+                                                    <td className="p-3 text-center font-black text-lg text-rose-600 bg-rose-50/50">
                                                         {rowTotal}
                                                     </td>
                                                 </tr>
@@ -9265,12 +9603,12 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                                             {previewSizes.map(sz => {
                                                 const colTotal = previewGroups.reduce((acc, g) => acc + (g.sizes[sz] || 0), 0);
                                                 return (
-                                                    <td key={sz} className="p-3 text-center border-r border-slate-300 text-slate-800 text-lg">
+                                                    <td key={sz} className="p-3 text-center border-r border-slate-300 text-rose-800 text-lg">
                                                         {colTotal > 0 ? colTotal : '-'}
                                                     </td>
                                                 );
                                             })}
-                                            <td className="p-3 text-center text-orange-700 bg-orange-200 text-2xl border-t-2 border-orange-300">
+                                            <td className="p-3 text-center text-rose-700 bg-rose-200 text-2xl border-t-2 border-rose-300">
                                                 {previewGroups.reduce((acc, g) => acc + previewSizes.reduce((s, sz) => s + (g.sizes[sz] || 0), 0), 0)}
                                             </td>
                                         </tr>
@@ -9279,7 +9617,7 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                             </div>
                             <div className="flex gap-4">
                                 <button onClick={() => setPreviewModal(false)} className="flex-1 px-6 py-4 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black rounded-xl transition-colors">KEMBALI KE DRAFT</button>
-                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-4 bg-orange-500 hover:bg-orange-600 text-white font-black rounded-xl transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
+                                <button onClick={handleSaveMPO} className="flex-1 px-6 py-4 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl transition-colors shadow-lg"><i className="fa-solid fa-check-double mr-2"></i> KONFIRMASI SIMPAN</button>
                             </div>
                         </div>
                     </div>
@@ -9288,37 +9626,64 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
 
             {showForm && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print mb-8">
-                    <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col h-[650px]">
-                        <h3 className="text-xl font-black mb-6 flex items-center gap-3 text-slate-800 border-b-2 border-slate-100 pb-4"><i className="fa-solid fa-tags text-orange-500 bg-orange-50 p-3 rounded-xl"></i> Cari Produk</h3>
-                        <div className="space-y-4 mb-4">
-                            <div className="flex gap-4">
+                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border shadow-sm flex flex-col h-[550px] sm:h-[650px]">
+                        <h3 className="text-sm sm:text-xl font-black mb-2 sm:mb-6 flex items-center gap-2 sm:gap-3 text-rose-800 border-b-2 border-slate-100 pb-2 sm:pb-4"><i className="fa-solid fa-tags text-rose-500 bg-rose-50 p-2 sm:p-3 rounded-lg sm:rounded-xl"></i> Cari Produk</h3>
+                        <div className="space-y-2 sm:space-y-4 mb-2 sm:mb-4">
+                            <div className="flex gap-2 sm:gap-4">
                                 <div className="flex-1">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
-                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-slate-800 outline-none focus:border-orange-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
+                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Tanggal PO</label>
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={poDate} onChange={e => setPoDate(e.target.value)} required />
                                 </div>
                                 <div className="flex-1">
-                                    <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
-                                    <input type="date" className="w-full p-4 border-2 border-slate-300 rounded-xl mt-1.5 font-bold text-slate-800 outline-none focus:border-orange-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
+                                    <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Target Selesai</label>
+                                    <input type="date" className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={targetDate} onChange={e => setTargetDate(e.target.value)} required />
                                 </div>
                             </div>
+                            <div>
+                                <label className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Nama Bengkel</label>
+                                <input type="text" placeholder="Masukkan Nama Bengkel..." className="w-full p-2 sm:p-4 border-2 border-slate-300 rounded-lg sm:rounded-xl mt-1 font-bold text-[11px] sm:text-base text-rose-800 outline-none focus:border-rose-500 bg-slate-50" value={bengkelName} onChange={e => setBengkelName(e.target.value)} />
+                            </div>
                             <div className="relative">
-                                <i className="fa-solid fa-search absolute left-5 top-4 text-slate-400 text-lg"></i>
-                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-14 pr-4 py-4 border-2 border-slate-300 rounded-xl text-base outline-none focus:border-orange-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                                <i className="fa-solid fa-search absolute left-3 top-3 sm:left-5 sm:top-4 text-slate-400 text-sm sm:text-lg"></i>
+                                <input type="text" placeholder="Ketik Article, Warna, Size..." className="w-full pl-8 pr-3 py-2 sm:pl-14 sm:pr-4 sm:py-4 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 bg-slate-50 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                            </div>
+                            <div className="flex gap-2 items-center">
+                                <input type="number" placeholder="Target stok tiap SKU..." className="w-full px-3 py-2 sm:px-4 sm:py-3 border-2 border-slate-300 rounded-lg sm:rounded-xl text-xs sm:text-base outline-none focus:border-rose-500 font-bold bg-white" value={targetStock} onChange={e => setTargetStock(e.target.value)} />
+                                <button type="button" onClick={handleApplyTargetStock} className="bg-rose-500 hover:bg-rose-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-sm whitespace-nowrap shadow-md transition-colors"><i className="fa-solid fa-bolt mr-1 sm:mr-2"></i>Apply</button>
                             </div>
                         </div>
                         <div className="flex-1 overflow-y-auto border-2 border-slate-200 rounded-2xl bg-slate-50 p-2 space-y-2 shadow-inner custom-scrollbar">
-                            {filteredVariants.map(v => (
-                                <div key={v.sku} className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-orange-400 transition-colors gap-4">
-                                    <div className="flex items-center gap-4">
-                                        <img src={v.photo} className="w-14 h-14 object-cover rounded-xl border shadow-sm" />
-                                        <div><div className="text-base font-black text-slate-800">{v.article}</div><div className="text-xs font-bold text-slate-500 mt-1">{v.colorName} &bull; Size: <span className="text-orange-500 text-sm font-black">{v.sizeName}</span>{v.legacySkus && <span className="text-[10px] text-slate-400 font-normal ml-2 tracking-wide">(Old SKU: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "FORMAT ERROR"})</span>}</div></div>
+                            {filteredVariants.map(v => {
+                                const variantStock = transactions.filter(t => t.sku === v.sku || (v.legacySkus || []).includes(t.sku)).reduce((sum, t) => {
+                                    if (t.type === 'IN' || t.type === 'REVISI_IN') return sum + t.qty;
+                                    if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
+                                    return sum;
+                                }, 0);
+                                return (
+                                <div key={v.sku} className="flex flex-row items-center justify-between p-2 sm:p-4 bg-white border-2 border-transparent rounded-xl shadow-sm hover:border-rose-400 transition-colors gap-2 sm:gap-4">
+                                    <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
+                                        <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-xl border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
+                                        <div className="min-w-0">
+                                            <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
+                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight">
+                                                {v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull; <span className="text-emerald-600 font-black">Stok: {variantStock}</span>
+                                                {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2 w-full md:w-auto">
-                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] || 1} onChange={e => setQtys({ ...qtys, [v.sku]: parseInt(e.target.value) || 1 })} className="w-16 px-2 py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-sm outline-none focus:border-orange-500 bg-slate-50" />
-                                        <button type="button" onClick={() => addToDraft(v)} className="flex-1 md:flex-none bg-orange-100 text-orange-600 hover:bg-orange-500 hover:text-white transition-colors px-4 py-3 rounded-xl font-black text-xs whitespace-nowrap"><i className="fa-solid fa-plus mr-1"></i> PO</button>
+                                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                                        <input type="number" min="1" placeholder="Qty" value={qtys[v.sku] !== undefined ? qtys[v.sku] : 1} onChange={e => setQtys({ ...qtys, [v.sku]: e.target.value === '' ? '' : parseInt(e.target.value) || 0 })} className="w-12 sm:w-16 px-1 py-2 sm:px-2 sm:py-3 border-2 border-slate-300 rounded-lg text-center font-bold text-[10px] sm:text-sm outline-none focus:border-rose-500 bg-slate-50" />
+                                        <div className="relative">
+                                            {mpoDraftList.find(x => x.sku === v.sku) && (
+                                                <div className="absolute -top-2 -right-2 bg-emerald-500 text-white text-[9px] sm:text-[10px] font-black px-1.5 py-0.5 rounded-full border-2 border-white shadow-sm z-20 flex items-center gap-1 animate-pulse">
+                                                    {mpoDraftList.find(x => x.sku === v.sku).qty} <i className="fa-solid fa-check"></i>
+                                                </div>
+                                            )}
+                                            <button type="button" onClick={() => addToDraft(v)} className="bg-rose-100 text-rose-600 hover:bg-rose-500 hover:text-white transition-colors px-2 py-2 sm:px-4 sm:py-3 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-xs whitespace-nowrap relative z-10"><i className="fa-solid fa-plus sm:mr-1"></i><span className="hidden sm:inline"> PO</span></button>
+                                        </div>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                             {filteredVariants.length === 0 && (
                                 <div className="text-center text-sm font-bold text-slate-500 py-10">
                                     <i className="fa-solid fa-box-open text-4xl mb-3 text-slate-300 block"></i>
@@ -9328,45 +9693,49 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
                         </div>
                     </div>
 
-                    <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[650px] relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-8xl"></i></div>
-                        <div className="flex justify-between items-center mb-6 border-b border-slate-100 pb-4 relative z-10">
-                            <h3 className="text-2xl font-black text-slate-800 flex items-center gap-3"><i className="fa-solid fa-list-check text-orange-500"></i> Antrean PO (Draft: {newPoId})</h3>
-                            <span className="text-white font-black bg-orange-500 px-4 py-2 rounded-xl text-sm shadow-md">{mpoDraftList.length} Item</span>
+                    <div className="bg-white p-4 sm:p-8 rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl flex flex-col h-[350px] sm:h-[650px] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 sm:p-8 opacity-5 text-slate-400"><i className="fa-solid fa-industry text-6xl sm:text-8xl"></i></div>
+                        <div className="flex justify-between items-center mb-3 sm:mb-6 border-b border-slate-100 pb-2 sm:pb-4 relative z-10">
+                            <h3 className="text-base sm:text-2xl font-black text-rose-800 flex items-center gap-2 sm:gap-3"><i className="fa-solid fa-list-check text-rose-500"></i> Antrean PO (Draft: {newPoId})</h3>
+                            <div className="flex gap-1 sm:gap-2 items-center">
+                                <button type="button" onClick={handleUndo} disabled={history.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Undo (Ctrl+Z)"><i className="fa-solid fa-rotate-left"></i></button>
+                                <button type="button" onClick={handleRedo} disabled={future.length === 0} className="w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-500 rounded-lg sm:rounded-xl hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-[10px] sm:text-sm shadow-sm transition-all" title="Redo (Ctrl+Y)"><i className="fa-solid fa-rotate-right"></i></button>
+                                <span className="text-white font-black bg-rose-500 px-2 sm:px-4 py-1 sm:py-2 rounded-lg sm:rounded-xl text-[10px] sm:text-sm shadow-md ml-1">{mpoDraftList.length} Item</span>
+                            </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto space-y-2 mb-6 bg-slate-50 rounded-2xl p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
+                        <div className="flex-1 overflow-y-auto space-y-2 mb-3 sm:mb-6 bg-slate-50 rounded-xl sm:rounded-2xl p-2 sm:p-3 shadow-inner custom-scrollbar relative z-10 border border-slate-200">
                             {mpoDraftList.map((item) => (
                                 <div key={item.sku} className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                                     <div className="text-sm text-slate-600 flex items-center gap-3">
-                                        <span className="font-black text-slate-800 text-base">{item.article}</span>
-                                        <span className="font-bold text-slate-500">({item.colorName} - <b className="text-orange-500">{item.sizeName}</b>)</span>
+                                        <span className="font-black text-rose-800 text-base">{item.article}</span>
+                                        <span className="font-bold text-slate-500">({item.colorName} - <b className="text-rose-500">{item.sizeName}</b>)</span>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className="font-black text-lg text-slate-800">{item.qty} Pcs</span>
-                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-slate-100 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
+                                        <span className="font-black text-lg text-rose-800">{item.qty} Pcs</span>
+                                        <button type="button" onClick={() => removeDraft(item.sku)} className="text-red-500 hover:text-white w-10 h-10 flex items-center justify-center bg-rose-50 hover:bg-red-500 rounded-xl transition-colors"><i className="fa-solid fa-trash-can text-lg"></i></button>
                                     </div>
                                 </div>
                             ))}
                             {mpoDraftList.length === 0 && <div className="text-slate-400 font-medium text-sm text-center py-10">Pilih produk dari kolom di sebelah kiri</div>}
                         </div>
-                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-slate-900 hover:bg-black text-white py-5 rounded-2xl font-black text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-3"></i> LIHAT PREVIEW DAFTAR PO</button>
+                        <button type="button" onClick={askPreview} disabled={mpoDraftList.length === 0} className="w-full bg-rose-900 hover:bg-black text-white py-3 sm:py-5 rounded-xl sm:rounded-2xl font-black text-sm sm:text-xl disabled:opacity-50 transition-transform transform hover:-translate-y-1 shadow-lg shadow-slate-900/30 relative z-10"><i className="fa-regular fa-eye mr-2 sm:mr-3"></i> PREVIEW DAFTAR PO</button>
                     </div>
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
-                <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-                    <h3 className="font-black text-xl text-slate-800"><i className="fa-solid fa-list-ul text-orange-500 mr-2"></i> Riwayat Daftar PO</h3>
-                    <span className="bg-blue-200 text-blue-900 font-black px-4 py-1.5 rounded-full text-sm shadow-inner">{mpoOrders.length} PO</span>
+            <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                <div className="p-4 sm:p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                    <h3 className="font-black text-base sm:text-xl text-rose-800"><i className="fa-solid fa-list-ul text-rose-500 mr-2"></i> Riwayat Daftar PO</h3>
+                    <span className="bg-blue-200 text-blue-900 font-black px-3 sm:px-4 py-1 sm:py-1.5 rounded-full text-[10px] sm:text-sm shadow-inner">{mpoOrders.length} PO</span>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-100 text-slate-700 text-sm border-b-4 border-slate-200">
+                        <thead className="bg-rose-50 text-slate-700 text-[10px] sm:text-sm border-b-4 border-slate-200 whitespace-nowrap">
                             <tr>
-                                <th className="p-5 font-black uppercase">No. PO</th>
-                                <th className="p-5 font-black uppercase">Info & Target</th>
-                                <th className="p-5 font-black text-center uppercase">Aksi MPO</th>
-                                <th className="p-5 font-black text-right uppercase">Setting</th>
+                                <th className="p-3 sm:p-5 font-black uppercase">No. PO</th>
+                                <th className="p-3 sm:p-5 font-black uppercase">Info & Target</th>
+                                <th className="p-3 sm:p-5 font-black text-center uppercase">Aksi MPO</th>
+                                <th className="p-3 sm:p-5 font-black text-right uppercase">Setting</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -9377,27 +9746,27 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
 
                                 return (
                                     <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="p-5">
-                                            <div className="font-black text-xl text-slate-900">{po.id}</div>
-                                            <span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'amber')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'amber')}-700 text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span>
+                                        <td className="p-3 sm:p-5 align-top">
+                                            <div className="font-black text-sm sm:text-xl text-rose-900">{po.id}</div>
+                                            <div className="mt-1"><span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-700 text-[8px] sm:text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span></div>
                                         </td>
-                                        <td className="p-5 leading-relaxed">
-                                            <div className="text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
-                                            <div className="text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
-                                            <div className="text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
+                                        <td className="p-3 sm:p-5 leading-relaxed align-top">
+                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
+                                            <div className="text-[10px] sm:text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
+                                            <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
-                                        <td className="p-5 text-center space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po)} className="px-3 py-2 rounded-xl border bg-white text-slate-600 hover:bg-slate-100 shadow-sm transition-colors text-xs font-bold" title="Cetak Surat Pesanan">
-                                                <i className="fa-solid fa-print mr-1"></i> SP
+                                        <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
+                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
+                                                <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
                                             </button>
-                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-3 py-2 rounded-xl border bg-orange-100 text-orange-700 hover:bg-orange-500 hover:text-white shadow-sm transition-colors text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
-                                                <i className="fa-solid fa-barcode mr-1"></i> LBL
+                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
+                                                <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
                                             </button>
-                                            <button type="button" onClick={() => handleDuplicatePO(po)} className="px-3 py-2 rounded-xl border bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white shadow-sm transition-colors text-xs font-bold" title="Duplikat PO ke Keranjang">
-                                                <i className="fa-solid fa-copy mr-1"></i> DUP
+                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-xl border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
+                                                <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
                                             </button>
                                         </td>
-                                        <td className="p-5 text-right whitespace-nowrap">
+                                        <td className="p-3 sm:p-5 text-right whitespace-nowrap align-top">
                                             <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-xl hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
                                                 <i className="fa-solid fa-trash-can"></i>
                                             </button>
@@ -9412,14 +9781,17 @@ function ManajemenMPO({ variants, mpoOrders = [], showToast, setIsLoading }) {
             </div>
         </div>
 
+            {/* Image Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-2xl"></i></button>
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </>
     )
 }
 
-// ==========================================
-// ==========================================
-// KOMPONEN DASHBOARD PRODUKSI (BENGKEL)
-// ==========================================
 function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transactions, activeTab, showToast, setIsLoading }) {
     const loadJsPdf = async () => {
         if (!window.jspdf) {
@@ -10320,6 +10692,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     const scanRefPenerima = useRef(null);
     const receiverIdRef = useRef(null);
 
+    // ==== SCAN DIRECT STATE ====
+    const [isDirectScanMode, setIsDirectScanMode] = useState(false);
+    const [directScanDone, setDirectScanDone] = useState(false);
+    const [scannedTypesDirect, setScannedTypesDirect] = useState({});
+    const [directSjId, setDirectSjId] = useState(null);
+
     const draftSJs = mpoOrders.filter(o => o.status === 'SHIPPED' || o.status === 'SJ_CONFIRMED');
 
     const parseSku = (raw) => parseGlobalSku(raw, variants);
@@ -10579,10 +10957,179 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
         if (scanRefPenerima.current) scanRefPenerima.current.focus();
     };
 
+    // ---- DIRECT SCAN PROCESSOR (Syaren Official - Langsung Tanpa Surat Jalan) ----
+    const processScanDirect = (raw) => {
+        if (!activeReceiver) { showToast('error', 'Scan ID Card Penerima terlebih dahulu!'); return; }
+        const fullBarcode = raw.trim().toUpperCase();
+        const itemType = detectBarcodeType(fullBarcode);
+        if (itemType === 'UNKNOWN') {
+            beep(false);
+            showToast('error', 'Barcode tidak valid! Harus dari label PO (#) atau Online (*) yang dicetak sistem.');
+            return;
+        }
+        const sku = parseSku(fullBarcode);
+        const variantExists = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
+        if (!variantExists) {
+            beep(false);
+            showToast('error', `DITOLAK! Barang tidak terdaftar di Master Produk.`);
+            return;
+        }
+        if (itemType === 'PO') {
+            const poStr = fullBarcode.split('#')[1];
+            const poNum = fullBarcode.startsWith('$') ? parseInt(poStr, 36) : parseInt(poStr, 10);
+            const poExists = (mpoOrders || []).find(o => o.poNumber === poNum);
+            if (!poExists) {
+                beep(false);
+                showToast('error', `DITOLAK! PO Pabrik #${poStr} tidak ditemukan di sistem.`);
+                return;
+            }
+        }
+        setScannedItemsPenerima(prev => ({ ...prev, [fullBarcode]: (prev[fullBarcode] || 0) + 1 }));
+        setScannedTypesDirect(prev => ({ ...prev, [fullBarcode]: itemType }));
+        beep(true);
+        setScanInputPenerima('');
+        if (scanRefPenerima.current) scanRefPenerima.current.focus();
+    };
+
+    // ---- KONFIRMASI & UPDATE STOK LANGSUNG (Tanpa Surat Jalan) ----
+    const handleKonfirmasiDirect = async () => {
+        if (!activeReceiver) return showToast('error', 'Scan ID Card Penerima terlebih dahulu!');
+        if (Object.keys(scannedItemsPenerima).length === 0) return showToast('error', 'Belum ada barang di-scan!');
+        setIsLoading(true);
+        try {
+            const sjId = 'SJ-DIRECT-' + Date.now();
+            const batchOp = db.batch();
+            const nowStr = new Date().toISOString();
+            const sjItems = Object.entries(scannedItemsPenerima).map(([barcode, qty]) => {
+                const sku = parseSku(barcode);
+                const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
+                return {
+                    fullBarcode: barcode, sku, qty,
+                    itemType: scannedTypesDirect[barcode] || 'UNKNOWN',
+                    article: variant ? variant.article : '-',
+                    colorName: variant ? variant.colorName : '-',
+                    sizeName: variant ? variant.sizeName : '-',
+                };
+            });
+            batchOp.set(db.collection('surat_jalan').doc(sjId), {
+                id: sjId, status: 'SJ_CONFIRMED', createdAt: nowStr, confirmedAt: nowStr,
+                workshop: 'Langsung (Gudang Faradela)', tglKirim: toLocalDateStr(),
+                namaPengirim: '-', pengirimId: '-',
+                namaPenerima: activeReceiver.nama, penerimaId: activeReceiver.idKaryawan,
+                penerimaPosisi: activeReceiver.posisi,
+                items: sjItems, totalPcs: sjItems.reduce((a, c) => a + c.qty, 0),
+                scanReceived: { ...scannedItemsPenerima }, directScan: true,
+            });
+            // Update PO received
+            const mpoUpdates = {};
+            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
+                if (barcode.includes('#')) {
+                    const poNumber = parseInt(barcode.split('#')[1], 10);
+                    if (!mpoUpdates[poNumber]) mpoUpdates[poNumber] = {};
+                    const cleanSku = parseSku(barcode);
+                    mpoUpdates[poNumber][cleanSku] = (mpoUpdates[poNumber][cleanSku] || 0) + qty;
+                }
+            }
+            for (const poNum of Object.keys(mpoUpdates)) {
+                const poDoc = (mpoOrders || []).find(o => o.poNumber === parseInt(poNum, 10));
+                if (poDoc) {
+                    let allReceived = true;
+                    const newItems = (poDoc.items || []).map(pit => {
+                        const safeSku = (pit.sku || '').trim().toUpperCase();
+                        const addQty = mpoUpdates[poNum][safeSku] || 0;
+                        const newReceived = (pit.received || 0) + addQty;
+                        if (newReceived < pit.qty) allReceived = false;
+                        return { ...pit, received: newReceived };
+                    });
+                    batchOp.update(db.collection('purchase_orders').doc(poDoc.id), { items: newItems, status: allReceived ? 'ARRIVED' : poDoc.status });
+                }
+            }
+            // Transaksi ONLINE_IN + update QC orders
+            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
+                const cleanSku = parseSku(barcode);
+                const isOnline = barcode.includes('*');
+                const txRef = db.collection('transactions').doc();
+                if (isOnline) {
+                    const finalBarcode = `${cleanSku}${toLocalDateStr().replace(/-/g, '')}`;
+                    batchOp.set(txRef, {
+                        sku: cleanSku, qty, type: 'ONLINE_IN', fullBarcode: finalBarcode,
+                        date: nowStr, orderNo: sjId, note: `Cross-Docking QC (Langsung) via ${sjId}`,
+                        user: activeReceiver.nama, batchId: sjId
+                    });
+                    const sessionNum = parseInt(barcode.split('*')[1], 10) || 1;
+                    let remainingToFulfill = qty;
+                    const targets = (qcOrders || []).filter(o =>
+                        (o.status === 'PENDING' || o.status === 'TRANSIT') &&
+                        (o.session || 1) === sessionNum &&
+                        (o.items || []).some(it => (it.prodStatus || it.status) === 'PO' && (it.sysSku === cleanSku || it.sku === cleanSku))
+                    ).sort((a, b) => (a.deadline || '').localeCompare(b.deadline || ''));
+                    for (const order of targets) {
+                        if (remainingToFulfill <= 0) break;
+                        let orderUpdated = false;
+                        const newItems = order.items.map(it => {
+                            if (remainingToFulfill > 0 && (it.prodStatus || it.status) === 'PO' && (it.sysSku === cleanSku || it.sku === cleanSku)) {
+                                remainingToFulfill -= it.qty; orderUpdated = true;
+                                return { ...it, status: 'READY', prodStatus: 'READY', fulfilledFromPO: true };
+                            }
+                            return it;
+                        });
+                        if (orderUpdated) batchOp.update(db.collection('qc_orders').doc(order.id), { items: newItems });
+                    }
+                }
+            }
+            await batchOp.commit();
+            setDirectSjId(sjId);
+            setDirectScanDone(true);
+            beep(true);
+            showToast('success', `✅ Penerimaan dikonfirmasi! ${sjItems.reduce((a,c)=>a+c.qty,0)} pcs diterima oleh ${activeReceiver.nama}.`);
+        } catch (err) {
+            showToast('error', 'Gagal konfirmasi: ' + err.message);
+        }
+        setIsLoading(false);
+    };
+
+    const handleUpdateStokDirect = async () => {
+        if (Object.keys(scannedItemsPenerima).length === 0) return showToast('error', 'Tidak ada data scan!');
+        if (!confirm(`Update Rak Stok Fisik Gudang?\n\nHanya barang PO Pabrik yang akan masuk ke data stok. Barang Online sudah otomatis tercatat saat Konfirmasi.`)) return;
+        setIsLoading(true);
+        try {
+            const batchOp = db.batch();
+            const sjId = directSjId || ('SJ-DIRECT-' + Date.now());
+            const nowStr = new Date().toISOString();
+            const operatorName = activeReceiver?.nama || 'Staff Gudang';
+            for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
+                if (qty > 0 && !barcode.includes('*')) {
+                    const cleanSku = parseSku(barcode);
+                    const txRef = db.collection('transactions').doc();
+                    batchOp.set(txRef, {
+                        sku: cleanSku, qty, type: 'IN', fullBarcode: barcode,
+                        date: nowStr, orderNo: sjId, batchId: sjId,
+                        user: operatorName, note: `Penerimaan Langsung Gudang via ${sjId}`
+                    });
+                }
+            }
+            if (directSjId) {
+                batchOp.update(db.collection('surat_jalan').doc(directSjId), { status: 'ARRIVED', arrivedAt: nowStr });
+            }
+            await batchOp.commit();
+            beep(true);
+            showToast('success', 'Rak fisik gudang berhasil ditambah dari penerimaan langsung!');
+            setIsDirectScanMode(false);
+            setDirectScanDone(false);
+            setScannedItemsPenerima({});
+            setScannedTypesDirect({});
+            setDirectSjId(null);
+        } catch (err) {
+            showToast('error', 'Gagal update stok: ' + err.message);
+        }
+        setIsLoading(false);
+    };
+
     const handleScanFormPenerima = (e) => {
         e.preventDefault();
         if (!scanInputPenerima.trim()) return;
-        processScanPenerima(scanInputPenerima);
+        if (isDirectScanMode) processScanDirect(scanInputPenerima);
+        else processScanPenerima(scanInputPenerima);
     };
 
     const handleKonfirmasi = async () => {
@@ -10939,7 +11486,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             if (scannerType === 'senderId') handleScanSenderId(null, text);
                             else if (scannerType === 'receiverId') handleScanReceiverId(null, text);
                             else if (scannerType === 'itemsPengirim') processScanPengirim(text);
-                            else if (scannerType === 'itemsPenerima') processScanPenerima(text);
+                            else if (scannerType === 'itemsPenerima') {
+                                if (isDirectScanMode) processScanDirect(text);
+                                else processScanPenerima(text);
+                            }
                         }} />
                     </div>
                 </div>
@@ -11079,6 +11629,90 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             <i className="fa-solid fa-camera text-xl"></i> Scan Pakai Kamera HP
                         </button>
                     </div>
+                ) : isDirectScanMode ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
+                            <div className="flex justify-between items-center border-b pb-4">
+                                <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-bolt text-teal-500 mr-2"></i>Scan Langsung</h3>
+                                <button onClick={() => { setIsDirectScanMode(false); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-arrow-left mr-1"></i>Kembali</button>
+                            </div>
+                            <div className="bg-teal-50 border-2 border-teal-200 p-4 rounded-xl flex items-center gap-4">
+                                <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center text-white text-xl flex-shrink-0"><i className="fa-solid fa-user-check"></i></div>
+                                <div>
+                                    <div className="font-black text-slate-800">{activeReceiver.nama} <span className="text-xs text-teal-600">({activeReceiver.posisi})</span></div>
+                                    <div className="text-xs font-bold text-slate-500">Mode: <b className="text-teal-700">Penerimaan Langsung (Tanpa SJ)</b></div>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-black text-slate-500 uppercase tracking-wider">Scan Barcode Barang</label>
+                                <form onSubmit={handleScanFormPenerima} className="flex gap-2 mt-1.5">
+                                    <input ref={scanRefPenerima} type="text" placeholder="Scan PO (#) atau Online (*) barcode..." value={scanInputPenerima} onChange={e => setScanInputPenerima(e.target.value)} className="flex-1 p-4 border-2 border-teal-300 rounded-xl font-bold bg-teal-50 outline-none focus:border-teal-500" autoFocus />
+                                    <button type="submit" className="px-5 py-3 bg-teal-600 text-white rounded-xl font-black"><i className="fa-solid fa-qrcode"></i></button>
+                                </form>
+                                <button onClick={() => openScanner('itemsPenerima', 'Scan Barcode Barang (Langsung)')} className="mt-3 w-full py-4 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-black flex items-center justify-center gap-3 transition-transform transform active:scale-95 shadow-lg">
+                                    <i className="fa-solid fa-camera text-2xl text-teal-400"></i>
+                                    <div className="text-left">
+                                        <div className="text-xs opacity-75 uppercase">Gunakan Kamera</div>
+                                        <div className="text-sm">SCAN BARCODE HP</div>
+                                    </div>
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                <button onClick={handleKonfirmasiDirect}
+                                    disabled={directScanDone || Object.keys(scannedItemsPenerima).length === 0}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black transition-colors shadow-lg">
+                                    <i className="fa-solid fa-clipboard-check mr-2"></i>
+                                    {directScanDone ? '✅ SUDAH DIKONFIRMASI' : 'KONFIRMASI PENERIMAAN'}
+                                </button>
+                                <button onClick={handleUpdateStokDirect}
+                                    disabled={Object.keys(scannedItemsPenerima).length === 0}
+                                    className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-slate-200 disabled:text-slate-400 text-white py-4 rounded-2xl font-black transition-colors shadow-lg mt-2">
+                                    <i className="fa-solid fa-boxes-packing mr-2"></i> UPDATE STOK GUDANG
+                                </button>
+                            </div>
+                        </div>
+                        <div className="bg-white p-8 rounded-3xl border shadow-sm flex flex-col">
+                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                <h3 className="text-xl font-black text-slate-800"><i className="fa-solid fa-boxes-stacked text-teal-600 mr-2"></i>Barang Ter-scan</h3>
+                                <span className="bg-teal-600 text-white font-black px-4 py-1.5 rounded-xl text-sm">{Object.values(scannedItemsPenerima).reduce((a, b) => a + b, 0)} Pcs</span>
+                            </div>
+                            <div className="flex-1 overflow-y-auto space-y-2 custom-scrollbar">
+                                {Object.keys(scannedItemsPenerima).length > 0 ? Object.entries(scannedItemsPenerima).map(([barcode, qty]) => {
+                                    const sku = parseSku(barcode);
+                                    const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
+                                    const itemType = scannedTypesDirect[barcode] || 'UNKNOWN';
+                                    return (
+                                        <div key={barcode} className="p-4 rounded-xl border-2 border-teal-200 bg-teal-50 flex justify-between items-center">
+                                            <div>
+                                                <div className="font-black text-slate-800">{variant ? variant.article : sku} <span className="text-teal-600">{variant ? variant.sizeName : ''}</span></div>
+                                                <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
+                                                <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                    <i className={`fa-solid ${itemType === 'ONLINE' ? 'fa-cart-shopping' : 'fa-industry'} mr-1`}></i>{itemType === 'ONLINE' ? 'ONLINE ORDER' : 'PO PABRIK'}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                {!directScanDone && (
+                                                    <button onClick={() => {
+                                                        setScannedItemsPenerima(prev => {
+                                                            const newQty = (prev[barcode] || 0) - 1;
+                                                            const ns = { ...prev };
+                                                            if (newQty <= 0) delete ns[barcode]; else ns[barcode] = newQty;
+                                                            return ns;
+                                                        });
+                                                    }} className="w-10 h-10 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors border border-rose-200 flex items-center justify-center shadow-sm">
+                                                        <i className="fa-solid fa-minus"></i>
+                                                    </button>
+                                                )}
+                                                <div className="text-right">
+                                                    <span className="font-black text-2xl text-slate-800">{qty}</span><span className="text-slate-400 font-bold ml-1">Pcs</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : <div className="text-center text-slate-400 font-bold py-16"><i className="fa-solid fa-barcode text-4xl block mb-3 opacity-30"></i>Scan barcode barang untuk memulai</div>}
+                            </div>
+                        </div>
+                    </div>
                 ) : activeDraft ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-8 rounded-3xl border shadow-sm space-y-5">
@@ -11175,6 +11809,19 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                             </div>
                             <button onClick={() => setActiveReceiver(null)} className="text-sm text-slate-500 hover:text-red-600 font-bold"><i className="fa-solid fa-right-from-bracket mr-1"></i>Ganti Penerima</button>
                         </div>
+
+                        {/* TOMBOL SCAN LANGSUNG */}
+                        <button
+                            onClick={() => { setIsDirectScanMode(true); setScannedItemsPenerima({}); setScannedTypesDirect({}); setDirectScanDone(false); setDirectSjId(null); }}
+                            className="w-full mb-4 py-4 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-2xl font-black text-lg transition-all shadow-lg shadow-teal-500/30 flex items-center justify-center gap-3 active:scale-95"
+                        >
+                            <i className="fa-solid fa-bolt text-yellow-300 text-2xl"></i>
+                            <div className="text-left">
+                                <div className="text-xs opacity-80 uppercase tracking-wider">Barang Datang Langsung</div>
+                                <div>⚡ SCAN LANGSUNG (Tanpa SJ)</div>
+                            </div>
+                        </button>
+
                         <div className="space-y-3 max-h-[500px] overflow-y-auto custom-scrollbar pr-2">
                             {allDraftSJs.length === 0 && (
                                 <div className="text-center p-10 bg-white rounded-3xl border shadow-sm text-slate-400">
@@ -11194,6 +11841,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                 <span className={`font-black px-2 py-0.5 rounded text-[10px] uppercase ${isConfirmed ? 'bg-teal-100 text-teal-700' : 'bg-blue-100 text-blue-700'}`}>
                                                     {isConfirmed ? 'SELESAI' : 'MENUNGGU'}
                                                 </span>
+                                                {sj.directScan && <span className="font-black px-2 py-0.5 rounded text-[10px] uppercase bg-teal-700 text-white">LANGSUNG</span>}
                                             </div>
                                             <div className="text-xs font-bold text-slate-500 flex flex-wrap items-center gap-x-3 gap-y-1">
                                                 <span><i className="fa-solid fa-industry mr-1"></i>{sj.workshop || 'Bengkel'}</span>
