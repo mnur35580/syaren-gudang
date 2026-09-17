@@ -577,15 +577,22 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                         });
                                         const colors = Array.from(new Set(art.variants.map(v => v.colorName || '-')));
                                         
-                                        // Hitung total penjualan per warna untuk sorting
-                                        const colorSales = {};
+                                        const isStockMode = bestSellerSort.startsWith('stock');
+                                        const isAsc = bestSellerSort.endsWith('Asc');
+
+                                        // Hitung total per warna untuk sorting baris
+                                        const colorTotal = {};
                                         colors.forEach(c => {
-                                            colorSales[c] = art.variants.filter(v => (v.colorName || '-') === c).reduce((sum, v) => sum + v.sales, 0);
+                                            colorTotal[c] = art.variants.filter(v => (v.colorName || '-') === c).reduce((sum, v) => sum + (isStockMode ? (parseInt(v.stock) || 0) : v.sales), 0);
                                         });
-                                        colors.sort((a, b) => colorSales[b] - colorSales[a]);
+                                        colors.sort((a, b) => isAsc ? colorTotal[a] - colorTotal[b] : colorTotal[b] - colorTotal[a]);
                                         
-                                        // Cari nilai penjualan tertinggi untuk ranking
-                                        const uniqueSales = Array.from(new Set(art.variants.map(v => v.sales).filter(s => s > 0))).sort((a, b) => b - a);
+                                        // Cari nilai unik untuk ranking juara
+                                        let uniqueVals = Array.from(new Set(art.variants.map(v => isStockMode ? (parseInt(v.stock) || 0) : v.sales)));
+                                        if (!isStockMode) {
+                                            uniqueVals = uniqueVals.filter(val => val > 0); // Abaikan 0 jika mode penjualan
+                                        }
+                                        uniqueVals.sort((a, b) => isAsc ? a - b : b - a);
 
                                         return (
                                             <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -605,29 +612,31 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                 <td className="p-3 text-left font-bold text-slate-700 border-r border-slate-100">{c}</td>
                                                                 {sizes.map(s => {
                                                                     const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
+                                                                    const val = v ? (isStockMode ? (parseInt(v.stock) || 0) : v.sales) : null;
+                                                                    const shouldShowBadge = v && (isStockMode ? true : val > 0);
                                                                     
                                                                     let highlightClass = "border-transparent";
                                                                     let badge = null;
                                                                     let textColor = "text-slate-300";
 
-                                                                    if (v && v.sales > 0) {
-                                                                        const salesRank = uniqueSales.indexOf(v.sales) + 1;
-                                                                        let badgeContent = `#${salesRank}`;
+                                                                    if (shouldShowBadge) {
+                                                                        const rank = uniqueVals.indexOf(val) + 1;
+                                                                        let badgeContent = `#${rank}`;
                                                                         let badgeColor = "bg-slate-700 text-white border-slate-800"; // Default for rank 4+
                                                                         
-                                                                        textColor = "text-slate-700"; // Default text color for normal sales
+                                                                        textColor = "text-slate-700"; // Default text color for normal
                                                                         highlightClass = "bg-slate-50 border-slate-200";
                                                                         
-                                                                        if (salesRank === 1) {
+                                                                        if (rank === 1) {
                                                                             highlightClass = "bg-rose-50 border-rose-300 shadow-sm";
                                                                             badgeColor = "bg-rose-500 text-white border-rose-600";
                                                                             badgeContent = "👑 1";
                                                                             textColor = "text-rose-700";
-                                                                        } else if (salesRank === 2) {
+                                                                        } else if (rank === 2) {
                                                                             highlightClass = "bg-violet-50 border-violet-300 shadow-sm";
                                                                             badgeColor = "bg-violet-500 text-white border-violet-600";
                                                                             textColor = "text-violet-700";
-                                                                        } else if (salesRank === 3) {
+                                                                        } else if (rank === 3) {
                                                                             highlightClass = "bg-emerald-50 border-emerald-300 shadow-sm";
                                                                             badgeColor = "bg-emerald-500 text-white border-emerald-600";
                                                                             textColor = "text-emerald-700";
@@ -646,7 +655,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                                 <div className={`relative flex items-center justify-center w-full h-full p-2 rounded-md border transition-all ${highlightClass}`}>
                                                                                     {badge}
                                                                                     <div className={`font-bold text-lg ${textColor}`}>
-                                                                                        {v.sales}
+                                                                                        {val}
                                                                                     </div>
                                                                                 </div>
                                                                             ) : (
@@ -656,7 +665,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                     );
                                                                 })}
                                                                 <td className="p-3 bg-rose-50/50 font-black text-rose-700 text-base">
-                                                                    {colorSales[c]}
+                                                                    {colorTotal[c]}
                                                                 </td>
                                                             </tr>
                                                         ))}
