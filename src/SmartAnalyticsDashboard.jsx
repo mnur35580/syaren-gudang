@@ -490,7 +490,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                     <tbody className="divide-y divide-slate-100 text-sm">
                                                         {colors.map((c, cIdx) => (
                                                             <tr key={cIdx} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="p-1.5 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[10px] md:text-sm break-all md:break-normal truncate max-w-[50px] md:max-w-none">{c}</td>
+                                                                <td className="p-1.5 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[9px] md:text-sm break-words md:break-normal">{c}</td>
                                                                 {sizes.map(s => {
                                                                     const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
                                                                     const val = v ? (isStockMode ? (parseInt(v.stock) || 0) : v.sales) : null;
@@ -524,18 +524,18 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                         }
 
                                                                         badge = (
-                                                                            <span className={`absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 text-[8px] md:text-[9px] font-black rounded-full px-1 py-0.5 md:px-1.5 md:py-0.5 shadow-sm border z-10 ${badgeColor}`}>
+                                                                            <span className={`static md:absolute md:-top-2 md:-right-2 text-[6px] md:text-[9px] font-black rounded md:rounded-full px-0.5 md:px-1.5 md:py-0.5 mb-0.5 md:mb-0 shadow-sm border z-10 ${badgeColor}`}>
                                                                                 {badgeContent}
                                                                             </span>
                                                                         );
                                                                     }
 
                                                                     return (
-                                                                        <td key={s} className="p-1 md:p-2 border-r border-slate-100">
+                                                                        <td key={s} className="p-0.5 md:p-2 border-r border-slate-100">
                                                                             {v ? (
-                                                                                <div className={`relative flex items-center justify-center w-full h-full p-1 md:p-2 rounded border transition-all ${highlightClass}`}>
+                                                                                <div className={`relative flex flex-col md:flex-row items-center justify-center w-full h-full p-0.5 md:p-2 rounded border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-bold text-[11px] md:text-lg ${textColor}`}>
+                                                                                    <div className={`font-bold text-[10px] md:text-lg leading-none md:leading-normal ${textColor}`}>
                                                                                         {val}
                                                                                     </div>
                                                                                 </div>
