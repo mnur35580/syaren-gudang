@@ -613,24 +613,24 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                     if (v && v.sales > 0) {
                                                                         const salesRank = uniqueSales.indexOf(v.sales) + 1;
                                                                         let badgeContent = `#${salesRank}`;
-                                                                        let badgeColor = "bg-white text-slate-500 border-slate-200";
+                                                                        let badgeColor = "bg-slate-700 text-white border-slate-800"; // Default for rank 4+
                                                                         
-                                                                        textColor = "text-emerald-600";
-                                                                        highlightClass = "bg-slate-50 border-slate-100";
+                                                                        textColor = "text-slate-700"; // Default text color for normal sales
+                                                                        highlightClass = "bg-slate-50 border-slate-200";
                                                                         
                                                                         if (salesRank === 1) {
-                                                                            highlightClass = "bg-yellow-100 border-yellow-300 shadow-sm";
-                                                                            badgeColor = "bg-yellow-400 text-yellow-900 border-yellow-500";
+                                                                            highlightClass = "bg-rose-50 border-rose-300 shadow-sm";
+                                                                            badgeColor = "bg-rose-500 text-white border-rose-600";
                                                                             badgeContent = "👑 1";
-                                                                            textColor = "text-yellow-700";
+                                                                            textColor = "text-rose-700";
                                                                         } else if (salesRank === 2) {
-                                                                            highlightClass = "bg-slate-200 border-slate-300 shadow-sm";
-                                                                            badgeColor = "bg-slate-400 text-white border-slate-500";
-                                                                            textColor = "text-slate-700";
+                                                                            highlightClass = "bg-blue-50 border-blue-300 shadow-sm";
+                                                                            badgeColor = "bg-blue-500 text-white border-blue-600";
+                                                                            textColor = "text-blue-700";
                                                                         } else if (salesRank === 3) {
-                                                                            highlightClass = "bg-orange-100 border-orange-300 shadow-sm";
-                                                                            badgeColor = "bg-orange-400 text-white border-orange-500";
-                                                                            textColor = "text-orange-800";
+                                                                            highlightClass = "bg-emerald-50 border-emerald-300 shadow-sm";
+                                                                            badgeColor = "bg-emerald-500 text-white border-emerald-600";
+                                                                            textColor = "text-emerald-700";
                                                                         }
 
                                                                         badge = (
