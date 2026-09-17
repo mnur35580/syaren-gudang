@@ -6311,11 +6311,117 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     const [showSettings, setShowSettings] = useState(false);
     const [waTarget, setWaTarget] = useState(() => localStorage.getItem('syaren_waTarget') || '');
     const [waTime, setWaTime] = useState(() => localStorage.getItem('syaren_waTime') || '23:00');
+    
+    const [waTargetType, setWaTargetType] = useState(() => {
+        const t = localStorage.getItem('syaren_waTarget') || '';
+        return t.endsWith('@g.us') ? 'group' : 'number';
+    });
+    const [waGroups, setWaGroups] = useState([]);
+    const [groupSearch, setGroupSearch] = useState('');
+    const [showGroupDropdown, setShowGroupDropdown] = useState(false);
+    
+    // Hardcoded credentials
+    const WA_SERVER = "https://ahddev.my.id"; 
+    const WA_API_KEY = "80a27a0b31e579d83439f00b9cf618b1";
+
+    const [waStatus, setWaStatus] = useState('Menunggu...');
+    const [waQrCode, setWaQrCode] = useState(null);
+
+    React.useEffect(() => {
+        if (!window.db) return;
+        const unsubscribe = window.db.collection('settings').doc('whatsapp')
+            .onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    if (data.waTarget) { 
+                        setWaTarget(data.waTarget); 
+                        setWaTargetType(data.waTarget.endsWith('@g.us') ? 'group' : 'number');
+                        localStorage.setItem('syaren_waTarget', data.waTarget); 
+                    }
+                    if (data.waTime) { setWaTime(data.waTime); localStorage.setItem('syaren_waTime', data.waTime); }
+                }
+            });
+        return () => unsubscribe();
+    }, []);
+
+    React.useEffect(() => {
+        if (showSettings && waStatus === 'Terhubung') {
+            const fetchGroups = async () => {
+                try {
+                    const url = WA_SERVER.startsWith('http') ? WA_SERVER : `http://${WA_SERVER}`;
+                    const res = await fetch(`${url}/api/groups`, {
+                        headers: { 'x-api-key': WA_API_KEY }
+                    });
+                    const data = await res.json();
+                    if (data.success && data.groups) {
+                        setWaGroups(data.groups);
+                    }
+                } catch (e) {
+                    console.error('Failed to fetch groups', e);
+                }
+            };
+            fetchGroups();
+        }
+    }, [waStatus, showSettings]);
+
+    const checkWaStatus = async () => {
+        try {
+            // Catatan: Jika ahddev.my.id tidak memiliki SSL (https), browser akan memblokir request (Mixed Content).
+            // Kita coba dengan HTTPS dulu, jika gagal API servernya perlu disetting HTTPS / reverse proxy.
+            const url = WA_SERVER.startsWith('http') ? WA_SERVER : `http://${WA_SERVER}`;
+            const res = await fetch(`${url}/api/status`, {
+                headers: { 'x-api-key': WA_API_KEY, 'Content-Type': 'application/json' }
+            });
+            const data = await res.json();
+            if (data.status === 'connected' || data.status === 'Terhubung' || data.connected) {
+                setWaStatus('Terhubung');
+                setWaQrCode(null);
+            } else if (data.qr) {
+                setWaStatus('Menunggu Scan QR');
+                setWaQrCode(data.qr);
+            } else {
+                setWaStatus(data.status || 'Terputus');
+                setWaQrCode(null);
+            }
+        } catch (error) {
+            console.error('Error Cek Status WA:', error);
+            setWaStatus('Gagal terhubung ke Server WA');
+        }
+    };
+
+    React.useEffect(() => {
+        if (showSettings) {
+            checkWaStatus();
+            const interval = setInterval(checkWaStatus, 5000); // Poll every 5s
+            return () => clearInterval(interval);
+        }
+    }, [showSettings]);
+
+    const handleLogoutWa = async () => {
+        if (!window.confirm("Apakah Anda yakin ingin Logout WA dari aplikasi ini?")) return;
+        
+        try {
+            setWaStatus('Proses Logout...');
+            const url = WA_SERVER.startsWith('http') ? WA_SERVER : `http://${WA_SERVER}`;
+            await fetch(`${url}/api/logout`, {
+                method: 'POST',
+                headers: { 'x-api-key': WA_API_KEY, 'Content-Type': 'application/json' }
+            });
+            
+            // Tunggu 1 detik agar server sempat mereset WA dan siap memberikan QR baru
+            setTimeout(() => {
+                checkWaStatus();
+                showAlert('Berhasil Logout dari WhatsApp! Sesi telah direset.', 'Informasi');
+            }, 1000);
+        } catch (e) {
+            console.error(e);
+            showAlert('Logout gagal, pastikan API Server berjalan.', 'Informasi');
+            checkWaStatus();
+        }
+    };
 
     const saveWaSettings = async (e) => {
         e.preventDefault();
-        // Since Dashboard doesn't receive setIsLoading and showToast natively, we use alert for now
-        // wait, I can just use alert or pass them in App.jsx. Let's just use alert to be completely safe and avoid prop drilling issues that might cause another crash!
         try {
             const url = import.meta.env.VITE_GAS_WEBHOOK_URL;
             await fetch(url, {
@@ -6324,8 +6430,15 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
             });
             localStorage.setItem('syaren_waTarget', waTarget);
             localStorage.setItem('syaren_waTime', waTime);
-            showAlert('Pengaturan Laporan WA berhasil disimpan!', 'Informasi');
-            setShowSettings(false);
+            
+            if (window.db) {
+                await window.db.collection('settings').doc('whatsapp').set({
+                    waTarget, waTime,
+                    updatedAt: new Date().toISOString()
+                }, { merge: true });
+            }
+
+            showAlert('Pengaturan Jam & Target berhasil disimpan dan disinkronkan!', 'Informasi');
         } catch (error) {
             console.error(error);
             showAlert('Gagal menyimpan pengaturan.', 'Informasi');
@@ -6621,7 +6734,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 * Repair = ${inDetails['Repair']}
 4. Total Brg Keluar ( Scan Out ) :
 * Penjualan ( Off + Online ) = ${outDetails['Penjualan (Off + Online)']}
-* Resize = ${outDetails['Resize']}
+* Resize = ${inDetails['Resize']}
 * Lainnya (...) = ${outDetails['Lainnya']}
 * Reject = ${outDetails['Reject']}
 * Endors & Affiliate = ${outDetails['Endors & Affiliate']}
@@ -6639,7 +6752,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
         .reduce((acc, po) => acc + (po.items || []).reduce((s, i) => s + Math.max(0, (i.qty || 0) - (i.received || 0)), 0), 0);
 
     const handleResetAntrean = async () => {
-        if (!(await showConfirm(`PERINGATAN KERAS! âš ï¸\n\nAnda akan menghapus SELURUH data Sistem Pesanan Online (SPO) secara PERMANEN, meliputi:\n1. Semua Antrean QC\n2. Semua Riwayat Pesanan (History)\n3. Semua Draft Antrean Produksi\n\nTindakan ini tidak bisa dibatalkan. Yakin ingin RESET TOTAL?`))) return;
+        if (!(await showConfirm(`PERINGATAN KERAS! ⚠️ \n\nAnda akan menghapus SELURUH data Sistem Pesanan Online (SPO) secara PERMANEN, meliputi:\n1. Semua Antrean QC\n2. Semua Riwayat Pesanan (History)\n3. Semua Draft Antrean Produksi\n\nTindakan ini tidak bisa dibatalkan. Yakin ingin RESET TOTAL?`))) return;
 
         setIsResetting(true);
         // Karena Dashboard tidak punya prop showToast, kita gunakan alert/loading state lokal
@@ -6684,19 +6797,109 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                     <div className="bg-white rounded-md p-4 md:p-6 w-full max-w-md shadow-2xl relative border-2 border-rose-100">
                         <div className="w-12 md:w-14 h-12 md:h-14 bg-rose-100 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4"><i className="fa-brands fa-whatsapp text-xl md:text-3xl"></i></div>
                         <h3 className="text-lg md:text-2xl font-black text-rose-800 text-center mb-4">Pengaturan Laporan WA</h3>
-                        <form onSubmit={saveWaSettings} className="space-y-5">
-                            <div>
-                                <label className="block text-sm font-bold text-rose-700 mb-2">Nomor WhatsApp Tujuan</label>
-                                <input required type="text" value={waTarget} onChange={e => setWaTarget(e.target.value)} className="w-full p-4 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" placeholder="081234567890" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-bold text-rose-700 mb-2">Jam Pengiriman Otomatis</label>
-                                <input required type="time" value={waTime} onChange={e => setWaTime(e.target.value)} className="w-full p-4 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-rose-50 text-rose-800" />
-                                
-                            </div>
-                            <div className="flex gap-3 pt-4">
-                                <button type="button" onClick={() => setShowSettings(false)} className="flex-1 py-3 font-bold text-rose-500 bg-rose-50 rounded-md hover:bg-rose-100 transition-colors">BATAL</button>
-                                <button type="submit" className="flex-1 py-3 font-black text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">SIMPAN</button>
+                        
+                        <div className="mb-5 p-4 rounded-md border-2 border-rose-100 bg-rose-50 text-center relative overflow-hidden">
+                            <div className="text-sm font-bold text-rose-700 mb-1">Status WhatsApp Server API</div>
+                            <div className={`text-lg font-black ${waStatus === 'Terhubung' ? 'text-green-600' : 'text-orange-500'}`}>{waStatus}</div>
+                            
+                            {waStatus === 'Terhubung' && (
+                                <button type="button" onClick={handleLogoutWa} className="mt-3 px-4 py-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-md font-bold text-xs transition-colors border border-red-200">
+                                    <i className="fa-solid fa-right-from-bracket mr-1"></i> LOGOUT / GANTI AKUN
+                                </button>
+                            )}
+
+                            {waQrCode && (
+                                <div className="mt-4 flex flex-col items-center animate-in zoom-in duration-300">
+                                    <div className="p-2 bg-white rounded-lg shadow-sm border border-slate-200">
+                                        <img src={waQrCode.includes('data:image') ? waQrCode : `data:image/png;base64,${waQrCode}`} alt="QR Code Login" className="w-56 h-56 md:w-64 md:h-64 object-contain" />
+                                    </div>
+                                    <p className="text-xs font-bold text-slate-500 mt-3 animate-pulse">
+                                        <i className="fa-solid fa-expand mr-1"></i> Scan QR ini dari HP Anda
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+
+                        <form onSubmit={saveWaSettings} className="space-y-4">
+                            {waStatus === 'Terhubung' && (
+                                <>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-sm font-bold text-rose-700 mb-1">Tipe Tujuan</label>
+                                            <select value={waTargetType} onChange={e => {
+                                                setWaTargetType(e.target.value);
+                                                setWaTarget('');
+                                            }} className="w-full p-3 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-white text-rose-800 text-sm">
+                                                <option value="number">Nomor Pribadi</option>
+                                                <option value="group">Grup WhatsApp</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-bold text-rose-700 mb-1">Jam Pengiriman</label>
+                                            <input required type="time" value={waTime} onChange={e => setWaTime(e.target.value)} className="w-full p-3 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-white text-rose-800 text-sm" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-rose-700 mb-1">
+                                            {waTargetType === 'number' ? 'Nomor Tujuan' : 'Pilih Grup'}
+                                        </label>
+                                        {waTargetType === 'number' ? (
+                                            <input required type="text" value={waTarget} onChange={e => setWaTarget(e.target.value)} className="w-full p-3 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-white text-rose-800 text-sm" placeholder="Contoh: 081234567890" />
+                                        ) : (
+                                            <div className="relative">
+                                                <div 
+                                                    onClick={() => setShowGroupDropdown(!showGroupDropdown)}
+                                                    className="w-full p-3 rounded-md border-2 border-rose-200 outline-none focus:border-rose-500 font-bold bg-white text-rose-800 text-sm cursor-pointer flex justify-between items-center"
+                                                >
+                                                    <span className="truncate">
+                                                        {waTarget ? (waGroups.find(g => g.id === waTarget)?.name || waTarget) : '-- Pilih Grup --'}
+                                                    </span>
+                                                    <i className={`fa-solid fa-chevron-${showGroupDropdown ? 'up' : 'down'} text-rose-400`}></i>
+                                                </div>
+                                                
+                                                {showGroupDropdown && (
+                                                    <div className="absolute z-50 w-full mt-1 bg-white border border-rose-200 rounded-md shadow-2xl overflow-hidden flex flex-col max-h-64">
+                                                        <div className="p-2 border-b border-rose-100 bg-rose-50 sticky top-0">
+                                                            <input 
+                                                                type="text"
+                                                                autoFocus
+                                                                placeholder="Cari nama grup..."
+                                                                value={groupSearch}
+                                                                onChange={e => setGroupSearch(e.target.value)}
+                                                                className="w-full p-2 text-sm border border-rose-200 rounded-md outline-none focus:border-rose-400 bg-white"
+                                                            />
+                                                        </div>
+                                                        <div className="overflow-y-auto">
+                                                            {waGroups.filter(g => (g.name || '').toLowerCase().includes(groupSearch.toLowerCase())).map(g => (
+                                                                <div 
+                                                                    key={g.id} 
+                                                                    onClick={() => {
+                                                                        setWaTarget(g.id);
+                                                                        setShowGroupDropdown(false);
+                                                                        setGroupSearch('');
+                                                                    }}
+                                                                    className={`p-3 text-sm cursor-pointer border-b border-rose-50 hover:bg-rose-50 flex justify-between items-center transition-colors ${waTarget === g.id ? 'bg-rose-100 font-bold text-rose-800' : 'text-gray-700'}`}
+                                                                >
+                                                                    <span className="truncate pr-2">{g.name || 'Grup Tanpa Nama'}</span>
+                                                                    <span className="text-xs text-rose-400 flex-shrink-0 bg-white px-2 py-1 rounded-full shadow-sm font-bold border border-rose-100">{g.participantsCount} org</span>
+                                                                </div>
+                                                            ))}
+                                                            {waGroups.filter(g => (g.name || '').toLowerCase().includes(groupSearch.toLowerCase())).length === 0 && (
+                                                                <div className="p-4 text-sm text-gray-500 text-center italic font-medium">Grup tidak ditemukan</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setShowSettings(false)} className={`py-3 font-bold text-rose-500 bg-white border border-rose-200 rounded-md hover:bg-rose-50 transition-colors ${waStatus === 'Terhubung' ? 'flex-1' : 'w-full'}`}>TUTUP</button>
+                                {waStatus === 'Terhubung' && (
+                                    <button type="submit" className="flex-1 py-3 font-black text-white bg-rose-500 rounded-md hover:bg-rose-600 transition-colors shadow-lg shadow-rose-500/30">SIMPAN KONFIGURASI</button>
+                                )}
                             </div>
                         </form>
                     </div>
