@@ -7941,6 +7941,16 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
     const [comparisonResult, setComparisonResult] = useState(null);
     const inputRef = useRef(null);
     const lastScanRef = useRef({ text: '', time: 0 }); // TAMBAHAN UNTUK KAMERA CONTINUOUS
+    const [showBlocksModal, setShowBlocksModal] = useState(false);
+    const [selectedBlockId, setSelectedBlockId] = useState(null);
+
+    const [savedBlocks, setSavedBlocks] = useState(() => {
+        try {
+            const saved = localStorage.getItem('opname_blocks_draft');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { }
+        return [];
+    });
 
     const [scannedItems, setScannedItems] = useState(() => {
         try {
@@ -7989,10 +7999,22 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
 
 
-    const handleSimpanDraft = () => {
+    const handleSelesaiSatuBlok = () => {
         const dataTerbaru = scannedItemsRef.current;
         if (dataTerbaru.length === 0) return showToast('error', 'Belum ada data scan.');
-        try { localStorage.setItem('opname_manual_draft', JSON.stringify(dataTerbaru)); playConfirm(); showToast('success', `Aman! tersimpan ke Draft.`); } catch (e) { showToast('error', 'Gagal menyimpan!'); }
+        try { 
+            const newBlock = { id: 'BLOK-' + Date.now(), timestamp: new Date().toISOString(), items: dataTerbaru };
+            const updatedBlocks = [newBlock, ...savedBlocks];
+            localStorage.setItem('opname_blocks_draft', JSON.stringify(updatedBlocks));
+            setSavedBlocks(updatedBlocks);
+            
+            setScannedItems([]); 
+            scannedItemsRef.current = []; 
+            localStorage.removeItem('opname_manual_draft'); 
+            
+            playConfirm(); 
+            showToast('success', `Aman! tersimpan ke Blok Baru.`); 
+        } catch (e) { showToast('error', 'Gagal menyimpan!'); }
         if (inputRef.current) inputRef.current.focus();
     };
 
@@ -8002,6 +8024,9 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
     const handleEvaluate = () => {
         setIsLoading(true); const dataTerbaru = scannedItemsRef.current;
+        const allBlockedItems = savedBlocks.flatMap(b => b.items);
+        const combinedScans = [...dataTerbaru, ...allBlockedItems];
+        
         setTimeout(() => {
             const sysStock = {};
             transactions.forEach(t => {
@@ -8011,7 +8036,7 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                 if (t.type === 'OUT' || t.type === 'REVISI_OUT') sysStock[t.fullBarcode] -= t.qty;
             });
             const scanStock = {};
-            dataTerbaru.forEach(item => {
+            combinedScans.forEach(item => {
                 if (!scanStock[item.fullBarcode]) scanStock[item.fullBarcode] = 0;
                 scanStock[item.fullBarcode] += 1;
             });
@@ -8026,6 +8051,9 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                 const skuCandidate = parseGlobalSku(bc, variants);
 
                 const variant = variants.find(v => v.sku === skuCandidate || (v.legacySkus || []).includes(skuCandidate));
+                
+                if (!variant && scanQty === 0) return; // Hide ghost items (deleted from master, not scanned physically)
+
                 result.push({ fullBarcode: bc, variant, sysQty, scanQty, diff });
             });
             result.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff) || (a.variant?.article || '').localeCompare(b.variant?.article || ''));
@@ -8098,11 +8126,11 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
 
     if (step === 1) {
         return (
-            <div className="max-w-3xl mx-auto bg-white p-4 md:p-6 rounded-md border-2 border-purple-200 shadow-xl relative">
+            <div className="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-md border-2 border-purple-200 shadow-md relative">
                 {showCamera && (
                     <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4">
-                        <div className="bg-white p-4 md:p-6 rounded-md w-full max-w-md shadow-2xl">
-                            <div className="flex justify-between items-center mb-4">
+                        <div className="bg-white p-6 rounded-md w-full max-w-md shadow-2xl">
+                            <div className="flex justify-between items-center mb-6">
                                 <h3 className="font-bold text-xl flex items-center gap-2"><i className="fa-solid fa-camera text-purple-600"></i> Kamera Opname</h3>
                                 <button type="button" onClick={() => setShowCamera(false)} className="bg-red-50 text-red-600 p-2 rounded-full"><i className="fa-solid fa-xmark text-xl"></i></button>
                             </div>
@@ -8111,46 +8139,60 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
                     </div>
                 )}
 
-                <div className="flex justify-between items-center bg-purple-900 text-white p-4 md:p-6 md:p-6 rounded-md shadow-inner mb-4 relative overflow-hidden">
-                    <i className="fa-solid fa-cloud-arrow-down absolute -right-4 -bottom-4 text-purple-800 text-lg md:text-2xl md:text-4xl md:text-6xl md:text-8xl opacity-40"></i>
-                    <div className="relative z-10"><h2 className="text-xl md:text-2xl font-black flex items-center gap-3"><i className="fa-solid fa-clipboard-check text-purple-400"></i> Stok Opname</h2><p className="text-purple-200 text-xs md:text-sm mt-2 font-bold tracking-widest uppercase">Total Scan Fisik Sementara</p></div>
-                    <div className="text-xl md:text-3xl md:text-5xl md:text-6xl font-black text-purple-300 relative z-10">{scannedItems.length}</div>
-                </div>
-
-                <div className="flex flex-col gap-3 mb-4 border-b-4 border-slate-100 pb-6">
-                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0} className="w-full py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-md font-black text-xl flex justify-center items-center gap-3 shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1"><i className="fa-solid fa-magnifying-glass-chart text-lg md:text-2xl"></i> SELESAI SCAN & EVALUASI</button>
-                    <div className="flex gap-3">
-                        <button type="button" onClick={handleSimpanDraft} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-md font-bold flex justify-center items-center gap-2 transition-colors shadow-sm"><i className="fa-solid fa-mug-hot"></i> Jeda & Draft</button>
-                        <button type="button" onClick={async () => { if (await showConfirm('Hapus semua draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem('opname_manual_draft'); } }} disabled={scannedItems.length === 0} className="flex-1 py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border-2 border-rose-200 rounded-md font-bold flex justify-center items-center gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
+                <div className="flex justify-between items-center bg-purple-900 text-white p-3 md:p-6 rounded-sm shadow-sm mb-3 md:mb-6 relative overflow-hidden">
+                    <i className="fa-solid fa-cloud-arrow-down absolute -right-4 -bottom-4 text-purple-800 text-8xl opacity-40"></i>
+                    <div className="relative z-10"><h2 className="text-xl md:text-2xl font-display font-bold flex items-center gap-2 md:gap-3"><i className="fa-solid fa-clipboard-check text-purple-400"></i> Stok Opname</h2><p className="text-purple-200 text-[10px] md:text-sm mt-1 md:mt-2 font-bold tracking-widest uppercase">Total Scan Fisik Sementara</p></div>
+                    <div className="flex items-center gap-4 relative z-10">
+                        {savedBlocks.length > 0 && (
+                            <div className="text-right border-r-2 border-purple-700 pr-4 mr-2 hidden md:block">
+                                <div className="text-sm font-bold text-purple-200">{savedBlocks.length} Blok Tersimpan</div>
+                                <div className="text-xs text-purple-300">{savedBlocks.reduce((a, b) => a + b.items.length, 0)} Items Draft</div>
+                            </div>
+                        )}
+                        <div className="text-center">
+                            <div className="text-3xl md:text-6xl font-bold text-purple-300">{scannedItems.length}</div>
+                            {savedBlocks.length > 0 && (
+                                <div className="text-[9px] md:hidden text-purple-300 mt-1 font-bold">+{savedBlocks.reduce((a, b) => a + b.items.length, 0)} Draft</div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                <div className="mb-4">
-                    <div className="flex gap-3 mt-2">
+                <div className="flex flex-col gap-2 md:gap-3 mb-3 md:mb-5 border-b-2 md:border-b-4 border-slate-100 pb-3 md:pb-5">
+                    <button type="button" onClick={handleEvaluate} disabled={scannedItems.length === 0 && savedBlocks.length === 0} className="w-full py-2.5 md:py-3.5 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-300 text-white rounded-sm font-bold text-sm md:text-lg flex justify-center items-center gap-2 md:gap-3 shadow-md shadow-purple-500/30 transition-transform transform hover:-translate-y-0.5"><i className="fa-solid fa-magnifying-glass-chart text-lg md:text-xl"></i> SELESAI SCAN & EVALUASI</button>
+                    <div className="flex gap-2 md:gap-3">
+                        <button type="button" onClick={handleSelesaiSatuBlok} disabled={scannedItems.length === 0} className="flex-1 py-2 md:py-2.5 bg-amber-500 hover:bg-amber-600 shadow-md disabled:bg-slate-300 text-white rounded-sm text-xs md:text-sm font-bold flex justify-center items-center gap-1.5 md:gap-2 transition-colors shadow-sm"><i className="fa-solid fa-layer-group"></i> Selesai Satu Blok</button>
+                        <button type="button" onClick={async () => { if (await showConfirm('Hapus semua antrean dan blok draft hasil scan opname saat ini?')) { setScannedItems([]); scannedItemsRef.current = []; setSavedBlocks([]); localStorage.removeItem('opname_manual_draft'); localStorage.removeItem('opname_blocks_draft'); } }} disabled={scannedItems.length === 0 && savedBlocks.length === 0} className="flex-1 py-2 md:py-3 bg-rose-50 hover:bg-rose-100 disabled:border-slate-200 disabled:text-slate-400 text-rose-600 border border-rose-200 md:border-2 rounded-sm text-xs md:text-sm font-bold flex justify-center items-center gap-1.5 md:gap-2 transition-colors"><i className="fa-solid fa-rotate-left"></i> Ulang Awal</button>
+                    </div>
+                </div>
+
+                <div className="mb-3 md:mb-6">
+                    <div className="flex gap-2 md:gap-4 mt-1 md:mt-2">
                         <div className="relative flex-1">
-                            <i className="fa-solid fa-barcode absolute left-6 top-5 text-purple-400 text-lg md:text-2xl"></i>
-                            <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-16 pr-6 py-3.5 text-xl md:text-2xl border-2 border-purple-200 focus:border-purple-500 rounded-md font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-inner" placeholder="KODE..." />
+                            <i className="fa-solid fa-barcode absolute left-3 md:left-6 top-3 md:top-5 text-purple-400 text-xl md:text-2xl"></i>
+                            <input ref={inputRef} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (inputRef.current && inputRef.current.value) { const val = inputRef.current.value; inputRef.current.value = ''; processBarcode(val); } } }} className="w-full pl-10 md:pl-16 pr-3 md:pr-6 py-2.5 md:py-5 text-lg md:text-3xl border-2 md:border-4 border-purple-200 focus:border-purple-500 rounded-sm font-mono tracking-widest outline-none bg-slate-50 focus:bg-white transition-colors shadow-sm" placeholder="KODE..." />
                         </div>
-                        <button type="button" onClick={() => setShowCamera(true)} className="bg-rose-800 hover:bg-rose-900 text-white px-4 md:px-6 md:px-8 rounded-md flex flex-col items-center justify-center font-bold text-sm shadow-xl transition-transform transform hover:-translate-y-1 border-b-4 border-slate-950"><i className="fa-solid fa-camera text-xl md:text-3xl mb-1 text-purple-400"></i> Kamera</button>
+                        <button type="button" onClick={() => setShowCamera(true)} className="bg-gradient-to-r from-slate-800 to-slate-900 shadow-md hover:bg-slate-700 text-white shadow-md px-3 md:px-8 py-2 md:py-0 rounded-sm flex flex-col items-center justify-center font-bold text-[10px] md:text-sm shadow-md transition-transform transform hover:-translate-y-1 border-b-2 md:border-b-4 border-slate-950"><i className="fa-solid fa-camera text-xl md:text-3xl mb-0.5 md:mb-1 text-purple-400"></i> Kamera</button>
                     </div>
                 </div>
 
                 <div>
-                    <h3 className="font-black text-lg text-rose-800 mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-purple-500"></i> 10 Barang Terakhir di-Scan</h3>
-                    <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2 custom-scrollbar bg-rose-50 p-4 rounded-md border-2 border-slate-200 shadow-inner">
+                    <h3 className="font-bold text-base md:text-lg text-slate-800 mb-2 md:mb-4 flex items-center gap-2"><i className="fa-solid fa-list-ol text-purple-500"></i> 10 Barang Terakhir di-Scan</h3>
+                    <div className="max-h-[400px] overflow-y-auto space-y-2 md:space-y-3 pr-1 md:pr-2 custom-scrollbar bg-slate-100 p-2 md:p-4 rounded-md border md:border-2 border-slate-200 shadow-sm">
                         {scannedItems.slice(0, 10).map((item, idx) => (
-                            <div key={item.id} className="flex items-center justify-between p-4 md:p-5 border-2 border-slate-200 rounded-md bg-white shadow-sm animate-in slide-in-from-left-4">
-                                <div className="flex items-center gap-3 md:gap-5">
-                                    <span className="text-slate-300 font-black text-lg md:text-2xl w-8 text-right">{scannedItems.length - idx}.</span>
+                            <div key={item.id} className="flex items-center justify-between p-3 md:p-5 border border-slate-200 rounded-sm bg-white shadow-sm animate-in slide-in-from-left-4">
+                                <div className="flex items-center gap-2 md:gap-5">
+                                    <span className="text-slate-300 font-bold text-lg md:text-2xl w-6 md:w-8 text-right">{scannedItems.length - idx}.</span>
                                     <div>
-                                        <div className="font-black text-rose-900 text-base md:text-lg">{item.variantInfo.article}</div>
-                                        <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - Sz: <span className="text-rose-500 font-black">{item.variantInfo.sizeName}</span></div>
+                                        <div className="font-bold text-slate-900 text-sm md:text-lg">{item.variantInfo.article}</div>
+                                        <div className="text-[10px] md:text-sm font-bold text-slate-600 mt-0.5 md:mt-1">{item.variantInfo.colorName} - <span className="text-orange-500 font-bold">{item.variantInfo.sizeName}</span></div>
+                                        <div className="text-[9px] md:text-[11px] text-slate-500 font-mono mt-1 md:mt-2 bg-slate-100 px-1 md:px-2 py-0.5 md:py-1 rounded-md inline-block border border-slate-200">ID: {item.fullBarcode}</div>
                                     </div>
                                 </div>
-                                <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-12 h-12 rounded-md transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-xl font-black"></i></button>
+                                <button type="button" onClick={() => hapusItem(item.id)} className="text-rose-500 bg-rose-50 hover:bg-rose-500 hover:text-white w-8 h-8 md:w-12 md:h-12 rounded-sm transition-colors flex items-center justify-center border border-rose-100"><i className="fa-solid fa-xmark text-sm md:text-lg font-display font-bold"></i></button>
                             </div>
                         ))}
-                        {scannedItems.length === 0 && <div className="py-4 md:py-6 md:py-12 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-lg md:text-2xl md:text-4xl md:text-6xl mb-4 opacity-50"></i><span className="font-bold text-lg">Mulai scan barang fisik di gudang.</span></div>}
+                        {scannedItems.length === 0 && <div className="py-8 md:py-16 flex flex-col items-center justify-center text-slate-400"><i className="fa-solid fa-box-open text-4xl md:text-6xl mb-2 md:mb-4 opacity-50"></i><span className="font-bold text-sm md:text-lg">Mulai scan barang fisik di gudang.</span></div>}
                     </div>
                 </div>
             </div>
@@ -8158,42 +8200,104 @@ function StokOpname({ variants, transactions, setIsLoading, showToast, currentUs
     }
 
     return (
-        <div className="space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="flex flex-col md:flex-row gap-3 items-center justify-between bg-white p-4 rounded-md border shadow-sm">
-                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-rose-50 hover:bg-slate-200 text-slate-700 px-4 md:px-6 py-3 rounded-md font-bold transition-colors"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
-                <div className="flex gap-3 w-full md:w-auto">
-                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-4 md:px-6 py-3 rounded-md font-bold transition-colors shadow-sm"><i className="fa-solid fa-file-excel mr-2"></i> Excel Bermasalah</button>
-                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-4 md:px-6 py-3 rounded-md font-black shadow-lg shadow-purple-500/30 transition-transform transform hover:-translate-y-1">SESUAIKAN STOK SEKARANG</button>
+        <div className="space-y-4 md:space-y-6 max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col md:flex-row gap-3 md:gap-4 items-center justify-between bg-white p-3 md:p-4 rounded-md border shadow-sm">
+                <button type="button" onClick={() => setStep(1)} className="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 md:px-6 py-2.5 md:py-3 rounded-sm font-bold transition-colors text-sm md:text-base"><i className="fa-solid fa-arrow-left mr-2"></i> Lanjutkan Scan Fisik</button>
+                <div className="flex gap-2 md:gap-3 w-full md:w-auto">
+                    <button type="button" onClick={downloadExcel} className="flex-1 md:flex-none bg-emerald-100 hover:bg-emerald-600 hover:text-white text-emerald-700 px-2 md:px-6 py-2.5 md:py-3 rounded-sm font-bold transition-colors shadow-sm text-xs md:text-base flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2"><i className="fa-solid fa-file-excel md:mr-0"></i> <span className="text-center">Excel Bermasalah</span></button>
+                    <button type="button" onClick={handleAdjustStock} className="flex-1 md:flex-none bg-purple-600 hover:bg-purple-700 text-white px-2 md:px-8 py-2.5 md:py-3 rounded-sm font-bold shadow-md shadow-purple-500/30 transition-transform transform hover:-translate-y-1 text-[11px] sm:text-xs md:text-base text-center flex items-center justify-center leading-tight">SESUAIKAN STOK SEKARANG</button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-rose-900 text-white p-4 md:p-6 rounded-md border-2 border-slate-800 shadow-xl text-center"><p className="text-slate-400 font-bold text-sm uppercase tracking-wider mb-2">Total di Sistem Server</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalSystem}</div></div>
-                <div className="bg-rose-500 text-white p-4 md:p-6 rounded-md border-2 border-rose-500 shadow-xl text-center"><p className="text-blue-200 font-bold text-sm uppercase tracking-wider mb-2">Total Scan Fisik</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalScanned}</div></div>
-                <div className={`p-4 md:p-6 rounded-md border-2 shadow-xl text-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-sm uppercase tracking-wider mb-2">Item Bermasalah (Selisih)</p><div className="text-xl md:text-3xl md:text-5xl font-black">{totalDiffAbsolute}</div></div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
+                <div className="bg-slate-900 text-white p-3 md:p-6 rounded-md border-2 md:border-4 border-slate-800 shadow-md text-center flex flex-col justify-center"><p className="text-slate-400 font-bold text-[10px] md:text-sm uppercase tracking-wider mb-1 md:mb-2 leading-tight">Total di Sistem Server</p><div className="text-2xl md:text-5xl font-bold">{totalSystem}</div></div>
+                <div onClick={() => { if(savedBlocks.length > 0) setShowBlocksModal(true); }} className={`${savedBlocks.length > 0 ? 'cursor-pointer hover:bg-slate-100 hover:border-purple-300' : ''} transition-colors bg-white text-slate-800 p-3 md:p-6 rounded-md border-2 md:border-4 border-slate-200 shadow-md text-center group flex flex-col justify-center`}><p className="text-slate-500 font-bold text-[10px] md:text-sm uppercase tracking-wider mb-1 md:mb-2 group-hover:text-purple-600 transition-colors leading-tight">Total Draft / Blok</p><div className={`text-2xl md:text-5xl font-bold ${savedBlocks.length > 0 ? 'text-purple-600' : 'text-slate-300'}`}>{savedBlocks.reduce((a, b) => a + b.items.length, 0)}</div></div>
+                <div className="bg-orange-500 text-white p-3 md:p-6 rounded-md border-2 md:border-4 border-orange-500 shadow-md text-center flex flex-col justify-center"><p className="text-blue-200 font-bold text-[10px] md:text-sm uppercase tracking-wider mb-1 md:mb-2 leading-tight">Total Scan Fisik</p><div className="text-2xl md:text-5xl font-bold">{totalScanned}</div></div>
+                <div className={`p-3 md:p-6 rounded-md border-2 md:border-4 shadow-md text-center flex flex-col justify-center ${totalDiffAbsolute === 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-rose-50 border-rose-200 text-rose-700'}`}><p className="font-bold text-[10px] md:text-sm uppercase tracking-wider mb-1 md:mb-2 leading-tight">Item Bermasalah (Selisih)</p><div className="text-2xl md:text-5xl font-bold">{totalDiffAbsolute}</div></div>
             </div>
 
-            <div className="bg-white rounded-md border shadow-lg overflow-hidden">
-                <div className="p-4 md:p-6 border-b bg-slate-50"><h3 className="font-black text-xl text-rose-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
+            {/* Modal List Blok */}
+            {showBlocksModal && (
+                <div className="fixed inset-0 z-[110] bg-slate-900/80 flex items-center justify-center p-4" onClick={() => setShowBlocksModal(false)}>
+                    <div className="bg-white rounded-md shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center bg-purple-900 text-white px-6 py-4 border-b border-purple-800">
+                            <h3 className="font-bold text-lg"><i className="fa-solid fa-layer-group mr-2"></i> Daftar Blok Tersimpan</h3>
+                            <button onClick={() => setShowBlocksModal(false)} className="text-purple-200 hover:text-white transition-colors w-8 h-8 flex items-center justify-center bg-purple-800 rounded-full hover:bg-purple-700"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="max-h-[60vh] overflow-y-auto p-4 md:p-6 custom-scrollbar space-y-3 bg-slate-50">
+                            {savedBlocks.map((block, idx) => (
+                                <div key={block.id} onClick={() => setSelectedBlockId(block.id)} className="flex justify-between items-center bg-white border-2 border-slate-200 p-4 rounded-md cursor-pointer hover:border-purple-300 hover:bg-purple-50 transition-colors shadow-sm group">
+                                    <div className="flex items-center gap-4">
+                                        <div className="bg-purple-100 text-purple-700 font-bold w-12 h-12 rounded-full flex items-center justify-center text-xl group-hover:bg-purple-600 group-hover:text-white transition-colors">{savedBlocks.length - idx}</div>
+                                        <div>
+                                            <div className="font-bold text-slate-800 group-hover:text-purple-700">Blok {savedBlocks.length - idx}</div>
+                                            <div className="text-xs font-bold text-slate-500 mt-1"><i className="fa-regular fa-clock"></i> {new Date(block.timestamp).toLocaleTimeString('id-ID')}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right bg-slate-50 px-4 py-2 border border-slate-100 rounded-md group-hover:bg-white group-hover:border-purple-200 transition-colors">
+                                        <div className="text-2xl font-bold text-purple-600">{block.items.length}</div>
+                                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Items</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Detail Item dalam Blok */}
+            {selectedBlockId && (
+                <div className="fixed inset-0 z-[120] bg-slate-900/80 flex items-center justify-center p-4" onClick={() => setSelectedBlockId(null)}>
+                    <div className="bg-white rounded-md shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 flex flex-col max-h-[85vh]" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center bg-purple-100 text-purple-900 px-6 py-4 border-b-2 border-purple-200 shadow-sm z-10">
+                            <h3 className="font-bold text-lg"><i className="fa-solid fa-box-open mr-2 text-purple-600"></i> Detail Item Blok</h3>
+                            <button onClick={() => setSelectedBlockId(null)} className="text-purple-500 hover:text-purple-800 w-8 h-8 flex items-center justify-center bg-white rounded-full shadow-sm hover:shadow-md transition-all"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar bg-slate-100 relative">
+                            <div className="space-y-2 md:space-y-3">
+                                {savedBlocks.find(b => b.id === selectedBlockId)?.items.map((item, idx) => (
+                                    <div key={item.id} className="bg-white border-2 border-slate-200 rounded-md p-3 md:p-4 flex gap-3 md:gap-5 items-center shadow-sm">
+                                        <div className="text-slate-300 font-bold text-xl md:text-2xl w-6 md:w-8 text-right">{savedBlocks.find(b => b.id === selectedBlockId)?.items.length - idx}.</div>
+                                        <div>
+                                            <div className="font-bold text-slate-900 text-sm md:text-base">{item.variantInfo.article}</div>
+                                            <div className="text-xs md:text-sm font-bold text-slate-600 mt-1">{item.variantInfo.colorName} - <span className="text-orange-500">{item.variantInfo.sizeName}</span></div>
+                                            <div className="text-[9px] md:text-xs text-slate-500 font-mono mt-1 md:mt-2 bg-slate-50 px-1.5 py-0.5 rounded-sm inline-block border border-slate-200">ID: {item.fullBarcode}</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="bg-white rounded-md border shadow-md overflow-hidden">
+                <div className="p-3 md:p-6 border-b bg-slate-50"><h3 className="font-bold text-base md:text-xl text-slate-800"><i className="fa-solid fa-scale-unbalanced text-purple-500 mr-2"></i> Laporan Selisih Stok per Batch</h3></div>
                 <div className="overflow-x-auto custom-scrollbar max-h-[600px]">
-                    <table className="w-full text-xs md:text-sm text-xs md:text-sm text-left text-sm border-collapse">
-                        <thead className="bg-rose-50 text-slate-700 border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
-                            <tr><th className="p-3 md:p-4 font-black uppercase">Detail Produk</th><th className="p-3 md:p-4 font-black uppercase text-center border-x border-slate-200">Barcode Batch</th><th className="p-3 md:p-4 font-black uppercase text-center bg-slate-200/50">Stok Sistem</th><th className="p-3 md:p-4 font-black uppercase text-center bg-rose-50">Stok Scan Fisik</th><th className="p-3 md:p-4 font-black uppercase text-center border-l border-slate-200">Selisih</th></tr>
+                    <table className="w-full text-left text-[10px] sm:text-xs md:text-sm border-collapse">
+                        <thead className="bg-slate-100 text-slate-700 border-b-2 md:border-b-4 border-slate-200 sticky top-0 z-10 whitespace-nowrap">
+                            <tr>
+                                <th className="p-2 md:p-5 font-bold uppercase text-[9px] sm:text-[10px] md:text-sm">Detail Produk</th>
+                                <th className="p-2 md:p-5 font-bold uppercase text-center border-x border-slate-200 text-[9px] sm:text-[10px] md:text-sm">Barcode Batch</th>
+                                <th className="p-2 md:p-5 font-bold uppercase text-center bg-slate-200/50 text-[9px] sm:text-[10px] md:text-sm">Stok Sistem</th>
+                                <th className="p-2 md:p-5 font-bold uppercase text-center bg-orange-50 text-[9px] sm:text-[10px] md:text-sm">Stok Scan Fisik</th>
+                                <th className="p-2 md:p-5 font-bold uppercase text-center border-l border-slate-200 text-[9px] sm:text-[10px] md:text-sm">Selisih</th>
+                            </tr>
                         </thead>
                         <tbody>
                             {comparisonResult && comparisonResult.map((c, i) => {
                                 const isDiff = c.diff !== 0;
                                 return (
                                     <tr key={i} className={`border-b border-slate-100 transition-colors whitespace-nowrap ${isDiff ? (c.diff > 0 ? 'bg-emerald-50/40 hover:bg-emerald-50' : 'bg-rose-50/40 hover:bg-rose-50') : 'hover:bg-slate-50'}`}>
-                                        <td className="p-3 md:p-4"><div className="font-black text-rose-800 text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-xs font-bold text-slate-500 mt-1">{c.variant?.colorName || '-'} - Sz: <span className="text-rose-500 font-black">{c.variant?.sizeName || '-'}</span></div></td>
-                                        <td className="p-3 md:p-4 text-center font-mono text-xs text-slate-500 border-x border-slate-100">{c.fullBarcode}</td>
-                                        <td className="p-3 md:p-4 text-center font-bold text-slate-600 bg-slate-50/50 text-lg">{c.sysQty}</td>
-                                        <td className="p-3 md:p-4 text-center font-black text-rose-600 bg-rose-50/30 text-lg">{c.scanQty}</td>
-                                        <td className="p-3 md:p-4 text-center border-l border-slate-100">{c.diff === 0 ? <span className="text-slate-300 font-black"><i className="fa-solid fa-check"></i> Pas</span> : c.diff > 0 ? <span className="text-emerald-600 font-black bg-emerald-100 px-3 py-1.5 rounded-lg">+ {c.diff} (Lebih)</span> : <span className="text-rose-600 font-black bg-rose-100 px-3 py-1.5 rounded-lg">{c.diff} (Hilang)</span>}</td>
+                                        <td className="p-2 md:p-5"><div className="font-bold text-slate-800 text-xs sm:text-sm md:text-base">{c.variant?.article || 'PRODUK DIHAPUS'}</div><div className="text-[9px] sm:text-[10px] md:text-xs font-bold text-slate-500 mt-0.5 md:mt-1">{c.variant?.colorName || '-'} - <span className="text-orange-500 font-bold">{c.variant?.sizeName || '-'}</span></div></td>
+                                        <td className="p-2 md:p-5 text-center font-mono text-[9px] sm:text-[10px] md:text-xs text-slate-500 border-x border-slate-100">{c.fullBarcode}</td>
+                                        <td className="p-2 md:p-5 text-center font-bold text-slate-600 bg-slate-50/50 text-sm md:text-lg">{c.sysQty}</td>
+                                        <td className="p-2 md:p-5 text-center font-bold text-orange-600 bg-orange-50/30 text-sm md:text-lg">{c.scanQty}</td>
+                                        <td className="p-2 md:p-5 text-center border-l border-slate-100">{c.diff === 0 ? <span className="text-slate-300 font-bold text-[10px] md:text-sm"><i className="fa-solid fa-check"></i> Pas</span> : c.diff > 0 ? <span className="text-emerald-600 font-bold bg-emerald-100 px-1.5 md:px-3 py-1 md:py-1.5 rounded-sm text-[9px] md:text-sm">+ {c.diff} (Lebih)</span> : <span className="text-rose-600 font-bold bg-rose-100 px-1.5 md:px-3 py-1 md:py-1.5 rounded-sm text-[9px] md:text-sm">{c.diff} (Hilang)</span>}</td>
                                     </tr>
                                 );
                             })}
-                            {(!comparisonResult || comparisonResult.length === 0) && <tr><td colSpan="5" className="p-5 md:p-10 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                            {(!comparisonResult || comparisonResult.length === 0) && <tr><td colSpan="5" className="p-12 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
                         </tbody>
                     </table>
                 </div>
