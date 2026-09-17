@@ -567,24 +567,68 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                         </div>
                                     </div>
                                     
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {art.variants.map((v, vIdx) => (
-                                            <div key={v.id || vIdx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between hover:border-rose-300 transition-colors">
-                                                <div>
-                                                    <div className="font-bold text-slate-700 text-sm">{v.variantName}</div>
-                                                    <div className="text-xs text-slate-400 mt-1 font-mono">{v.id || v.sku}</div>
-                                                </div>
-                                                <div className="text-right flex flex-col items-end gap-1">
-                                                    <div className={`px-2 py-0.5 rounded text-xs font-black ${v.sales > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                        <i className="fa-solid fa-arrow-trend-up mr-1"></i> {v.sales} Laku
-                                                    </div>
-                                                    <div className={`px-2 py-0.5 rounded text-xs font-bold ${v.stock <= 5 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                        {v.stock} Stok
-                                                    </div>
-                                                </div>
+                                    {(() => {
+                                        // Ekstrak ukuran dan warna unik
+                                        const sizes = Array.from(new Set(art.variants.map(v => v.sizeName || '-'))).sort((a, b) => {
+                                            const numA = parseInt(a);
+                                            const numB = parseInt(b);
+                                            if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+                                            return a.localeCompare(b);
+                                        });
+                                        const colors = Array.from(new Set(art.variants.map(v => v.colorName || '-')));
+                                        
+                                        // Hitung total penjualan per warna untuk sorting
+                                        const colorSales = {};
+                                        colors.forEach(c => {
+                                            colorSales[c] = art.variants.filter(v => (v.colorName || '-') === c).reduce((sum, v) => sum + v.sales, 0);
+                                        });
+                                        colors.sort((a, b) => colorSales[b] - colorSales[a]);
+
+                                        return (
+                                            <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                                                <table className="w-full text-center border-collapse min-w-max">
+                                                    <thead>
+                                                        <tr className="bg-rose-50 text-rose-800 text-xs uppercase tracking-wider font-black border-b-2 border-rose-100">
+                                                            <th className="p-3 text-left border-r border-rose-100">Warna</th>
+                                                            {sizes.map(s => (
+                                                                <th key={s} className="p-3 border-r border-rose-100 w-16">{s}</th>
+                                                            ))}
+                                                            <th className="p-3 bg-rose-100 text-rose-900 w-24">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 text-sm">
+                                                        {colors.map((c, cIdx) => (
+                                                            <tr key={cIdx} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="p-3 text-left font-bold text-slate-700 border-r border-slate-100">{c}</td>
+                                                                {sizes.map(s => {
+                                                                    const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
+                                                                    return (
+                                                                        <td key={s} className="p-3 border-r border-slate-100">
+                                                                            {v ? (
+                                                                                <div className="flex flex-col items-center justify-center">
+                                                                                    <div className={`font-black text-base ${v.sales > 0 ? 'text-emerald-600' : 'text-slate-300'}`}>
+                                                                                        {v.sales}
+                                                                                    </div>
+                                                                                    <div className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                                                                        S: {v.stock}
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <span className="text-slate-200">-</span>
+                                                                            )}
+                                                                        </td>
+                                                                    );
+                                                                })}
+                                                                <td className="p-3 bg-rose-50/50 font-black text-rose-700 text-base">
+                                                                    {colorSales[c]}
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
                                             </div>
-                                        ))}
-                                    </div>
+                                        );
+                                    })()}
                                 </div>
                             )}
                         </div>
