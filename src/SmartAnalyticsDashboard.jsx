@@ -357,15 +357,15 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
     return (
 
         
-        <div className="p-6 bg-slate-50 min-h-screen">
+        <div className="p-0 sm:p-2 md:p-6 bg-slate-50 min-h-screen">
             {/* BEST SELLERS / SKU LIST */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative">
-                <div className="p-4 md:p-6 border-b-2 bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                    <h3 className="text-xl font-black text-rose-800 flex items-center gap-3">
+            <div className="bg-white md:rounded-2xl shadow-sm border-x-0 md:border-x border-y border-slate-100 overflow-hidden relative">
+                <div className="p-3 md:p-6 border-b-2 bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <h3 className="text-xl font-black text-rose-800 flex items-center gap-3 px-2 md:px-0">
                         <i className="fa-solid fa-ranking-star text-amber-500"></i>
                         Daftar Performa SKU per Artikel
                     </h3>
-                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <div className="flex flex-row sm:flex-row gap-2 md:gap-3 w-full md:w-auto px-2 md:px-0">
                         <select 
                             value={bestSellerTime} 
                             onChange={e => setBestSellerTime(e.target.value)}
@@ -396,7 +396,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                             {/* ARTICLE HEADER (CLICKABLE) */}
                             <div 
                                 onClick={() => setExpandedArticle(expandedArticle === art.article ? null : art.article)}
-                                className={`p-4 md:p-5 flex items-center justify-between cursor-pointer hover:bg-rose-50 transition-colors ${expandedArticle === art.article ? 'bg-rose-50' : ''}`}
+                                className={`p-3 md:p-5 flex items-center justify-between cursor-pointer hover:bg-rose-50 transition-colors ${expandedArticle === art.article ? 'bg-rose-50' : ''}`}
                             >
                                 <div className="flex items-center gap-2 md:gap-4">
                                     <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-black text-white flex-shrink-0 text-[11px] md:text-base ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
@@ -436,8 +436,8 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                             
                             {/* EXPANDED VARIANTS */}
                             {expandedArticle === art.article && (
-                                <div className="bg-slate-50 p-4 md:p-6 border-t border-rose-100 animate-in fade-in slide-in-from-top-2">
-                                    <div className="sm:hidden flex justify-between mb-4 pb-4 border-b border-slate-200">
+                                <div className="bg-slate-50 p-2 md:p-6 border-t border-rose-100 animate-in fade-in slide-in-from-top-2">
+                                    <div className="sm:hidden flex justify-between mb-2 pb-2 px-2 border-b border-slate-200">
                                         <div>
                                             <div className="text-[10px] font-bold text-slate-400">Total Terjual</div>
                                             <div className="text-base font-black text-emerald-600">{art.totalSales}</div>
@@ -479,18 +479,18 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                             <div className="overflow-x-auto md:overflow-visible bg-white rounded-xl border border-slate-200 shadow-sm w-full">
                                                 <table className="w-full text-center border-collapse table-fixed md:table-auto">
                                                     <thead>
-                                                        <tr className="bg-rose-50 text-rose-800 text-[8px] md:text-xs uppercase tracking-wider font-black border-b-2 border-rose-100">
-                                                            <th className="p-1 md:p-3 text-left border-r border-rose-100">Warna</th>
+                                                        <tr className="bg-rose-50 text-rose-800 text-[10px] md:text-xs uppercase tracking-wider font-black border-b-2 border-rose-100">
+                                                            <th className="p-1.5 md:p-3 text-left border-r border-rose-100">Warna</th>
                                                             {sizes.map(s => (
-                                                                <th key={s} className="p-0.5 md:p-3 border-r border-rose-100 w-auto md:w-16">{s}</th>
+                                                                <th key={s} className="p-1 md:p-3 border-r border-rose-100 w-auto md:w-16">{s}</th>
                                                             ))}
-                                                            <th className="p-1 md:p-3 bg-rose-100 text-rose-900 w-auto md:w-24">Total</th>
+                                                            <th className="p-1.5 md:p-3 bg-rose-100 text-rose-900 w-auto md:w-24">Total</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100 text-sm">
                                                         {colors.map((c, cIdx) => (
                                                             <tr key={cIdx} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="p-1 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[8px] md:text-sm break-all md:break-normal truncate max-w-[40px] md:max-w-none">{c}</td>
+                                                                <td className="p-1.5 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[10px] md:text-sm break-all md:break-normal truncate max-w-[50px] md:max-w-none">{c}</td>
                                                                 {sizes.map(s => {
                                                                     const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
                                                                     const val = v ? (isStockMode ? (parseInt(v.stock) || 0) : v.sales) : null;
@@ -524,18 +524,18 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                         }
 
                                                                         badge = (
-                                                                            <span className={`absolute -top-1 -right-1 md:-top-2 md:-right-2 text-[6px] md:text-[9px] font-black rounded-full px-1 py-0.5 md:px-1.5 md:py-0.5 shadow-sm border z-10 ${badgeColor}`}>
+                                                                            <span className={`absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 text-[8px] md:text-[9px] font-black rounded-full px-1 py-0.5 md:px-1.5 md:py-0.5 shadow-sm border z-10 ${badgeColor}`}>
                                                                                 {badgeContent}
                                                                             </span>
                                                                         );
                                                                     }
 
                                                                     return (
-                                                                        <td key={s} className="p-0.5 md:p-2 border-r border-slate-100">
+                                                                        <td key={s} className="p-1 md:p-2 border-r border-slate-100">
                                                                             {v ? (
-                                                                                <div className={`relative flex items-center justify-center w-full h-full p-0.5 md:p-2 rounded border transition-all ${highlightClass}`}>
+                                                                                <div className={`relative flex items-center justify-center w-full h-full p-1 md:p-2 rounded border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-bold text-[9px] md:text-lg ${textColor}`}>
+                                                                                    <div className={`font-bold text-[11px] md:text-lg ${textColor}`}>
                                                                                         {val}
                                                                                     </div>
                                                                                 </div>
@@ -545,7 +545,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                <td className="p-1 md:p-3 bg-rose-50/50 font-black text-rose-700 text-[9px] md:text-base">
+                                                                <td className="p-1.5 md:p-3 bg-rose-50/50 font-black text-rose-700 text-[10px] md:text-base">
                                                                     {colorTotal[c]}
                                                                 </td>
                                                             </tr>
