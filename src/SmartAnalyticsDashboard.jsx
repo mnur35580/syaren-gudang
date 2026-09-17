@@ -369,7 +369,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                         <select 
                             value={bestSellerTime} 
                             onChange={e => setBestSellerTime(e.target.value)}
-                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl outline-none focus:border-rose-500 text-sm"
+                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
                         >
                             <option value="7days">7 Hari Terakhir</option>
                             <option value="30days">30 Hari Terakhir</option>
@@ -380,7 +380,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                         <select 
                             value={bestSellerSort} 
                             onChange={e => setBestSellerSort(e.target.value)}
-                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl outline-none focus:border-rose-500 text-sm"
+                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
                         >
                             <option value="salesDesc">Paling Laku (Penjualan)</option>
                             <option value="salesAsc">Kurang Laku (Penjualan)</option>
@@ -398,8 +398,8 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 onClick={() => setExpandedArticle(expandedArticle === art.article ? null : art.article)}
                                 className={`p-4 md:p-5 flex items-center justify-between cursor-pointer hover:bg-rose-50 transition-colors ${expandedArticle === art.article ? 'bg-rose-50' : ''}`}
                             >
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white flex-shrink-0 ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
+                                <div className="flex items-center gap-2 md:gap-4">
+                                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-black text-white flex-shrink-0 text-[11px] md:text-base ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
                                         {idx + 1}
                                     </div>
                                     
@@ -414,15 +414,15 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                 <img src={articleImage} alt={art.article} className="w-full h-full object-cover" />
                                             </div>
                                         ) : (
-                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-slate-100 border-2 border-white shadow-sm flex-shrink-0 flex items-center justify-center text-slate-300">
+                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-slate-100 border-2 border-white shadow-sm flex-shrink-0 flex items-center justify-center text-slate-300 text-xs md:text-base">
                                                 <i className="fa-solid fa-image"></i>
                                             </div>
                                         );
                                     })()}
                                     
                                     <div>
-                                        <h4 className="text-base md:text-lg font-black text-slate-800">{art.article}</h4>
-                                        <p className="text-[10px] md:text-xs font-bold text-slate-400 mt-0.5">{art.variants.length} Varian Produk</p>
+                                        <h4 className="text-xs md:text-lg font-black text-slate-800 leading-tight">{art.article}</h4>
+                                        <p className="text-[9px] md:text-xs font-bold text-slate-400 mt-0.5">{art.variants.length} Varian</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-6">
@@ -476,21 +476,21 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                         uniqueVals.sort((a, b) => isAsc ? a - b : b - a);
 
                                         return (
-                                            <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
-                                                <table className="w-full text-center border-collapse min-w-max">
+                                            <div className="overflow-x-auto md:overflow-visible bg-white rounded-xl border border-slate-200 shadow-sm w-full">
+                                                <table className="w-full text-center border-collapse table-fixed md:table-auto">
                                                     <thead>
-                                                        <tr className="bg-rose-50 text-rose-800 text-[10px] md:text-xs uppercase tracking-wider font-black border-b-2 border-rose-100">
-                                                            <th className="p-1.5 md:p-3 text-left border-r border-rose-100">Warna</th>
+                                                        <tr className="bg-rose-50 text-rose-800 text-[8px] md:text-xs uppercase tracking-wider font-black border-b-2 border-rose-100">
+                                                            <th className="p-1 md:p-3 text-left border-r border-rose-100">Warna</th>
                                                             {sizes.map(s => (
-                                                                <th key={s} className="p-1 md:p-3 border-r border-rose-100 w-10 md:w-16">{s}</th>
+                                                                <th key={s} className="p-0.5 md:p-3 border-r border-rose-100 w-auto md:w-16">{s}</th>
                                                             ))}
-                                                            <th className="p-1.5 md:p-3 bg-rose-100 text-rose-900 w-16 md:w-24">Total</th>
+                                                            <th className="p-1 md:p-3 bg-rose-100 text-rose-900 w-auto md:w-24">Total</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-slate-100 text-sm">
                                                         {colors.map((c, cIdx) => (
                                                             <tr key={cIdx} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="p-1.5 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[10px] md:text-sm">{c}</td>
+                                                                <td className="p-1 md:p-3 text-left font-bold text-slate-700 border-r border-slate-100 text-[8px] md:text-sm break-all md:break-normal truncate max-w-[40px] md:max-w-none">{c}</td>
                                                                 {sizes.map(s => {
                                                                     const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
                                                                     const val = v ? (isStockMode ? (parseInt(v.stock) || 0) : v.sales) : null;
@@ -524,18 +524,18 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                         }
 
                                                                         badge = (
-                                                                            <span className={`absolute -top-1.5 -right-1.5 md:-top-2 md:-right-2 text-[7px] md:text-[9px] font-black rounded-full px-1 py-0.5 md:px-1.5 md:py-0.5 shadow-sm border z-10 ${badgeColor}`}>
+                                                                            <span className={`absolute -top-1 -right-1 md:-top-2 md:-right-2 text-[6px] md:text-[9px] font-black rounded-full px-1 py-0.5 md:px-1.5 md:py-0.5 shadow-sm border z-10 ${badgeColor}`}>
                                                                                 {badgeContent}
                                                                             </span>
                                                                         );
                                                                     }
 
                                                                     return (
-                                                                        <td key={s} className="p-1 md:p-2 border-r border-slate-100">
+                                                                        <td key={s} className="p-0.5 md:p-2 border-r border-slate-100">
                                                                             {v ? (
-                                                                                <div className={`relative flex items-center justify-center w-full h-full p-1 md:p-2 rounded-md border transition-all ${highlightClass}`}>
+                                                                                <div className={`relative flex items-center justify-center w-full h-full p-0.5 md:p-2 rounded border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-bold text-sm md:text-lg ${textColor}`}>
+                                                                                    <div className={`font-bold text-[9px] md:text-lg ${textColor}`}>
                                                                                         {val}
                                                                                     </div>
                                                                                 </div>
@@ -545,7 +545,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                         </td>
                                                                     );
                                                                 })}
-                                                                <td className="p-1.5 md:p-3 bg-rose-50/50 font-black text-rose-700 text-[11px] md:text-base">
+                                                                <td className="p-1 md:p-3 bg-rose-50/50 font-black text-rose-700 text-[9px] md:text-base">
                                                                     {colorTotal[c]}
                                                                 </td>
                                                             </tr>
