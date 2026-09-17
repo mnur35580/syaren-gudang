@@ -624,9 +624,9 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                             badgeContent = "👑 1";
                                                                             textColor = "text-rose-700";
                                                                         } else if (salesRank === 2) {
-                                                                            highlightClass = "bg-blue-50 border-blue-300 shadow-sm";
-                                                                            badgeColor = "bg-blue-500 text-white border-blue-600";
-                                                                            textColor = "text-blue-700";
+                                                                            highlightClass = "bg-violet-50 border-violet-300 shadow-sm";
+                                                                            badgeColor = "bg-violet-500 text-white border-violet-600";
+                                                                            textColor = "text-violet-700";
                                                                         } else if (salesRank === 3) {
                                                                             highlightClass = "bg-emerald-50 border-emerald-300 shadow-sm";
                                                                             badgeColor = "bg-emerald-500 text-white border-emerald-600";
@@ -645,7 +645,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                             {v ? (
                                                                                 <div className={`relative flex items-center justify-center w-full h-full p-2 rounded-md border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-black text-base ${textColor}`}>
+                                                                                    <div className={`font-bold text-lg ${textColor}`}>
                                                                                         {v.sales}
                                                                                     </div>
                                                                                 </div>
