@@ -15,6 +15,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
     const [bestSellerTime, setBestSellerTime] = useState('30days'); 
     const [bestSellerSort, setBestSellerSort] = useState('salesDesc');
     const [expandedArticle, setExpandedArticle] = useState(null);
+    const [selectedImage, setSelectedImage] = useState(null);
     
     // Metrics State
     const [globalMetrics, setGlobalMetrics] = useState({
@@ -398,9 +399,27 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 className={`p-4 md:p-5 flex items-center justify-between cursor-pointer hover:bg-rose-50 transition-colors ${expandedArticle === art.article ? 'bg-rose-50' : ''}`}
                             >
                                 <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white flex-shrink-0 ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
                                         {idx + 1}
                                     </div>
+                                    
+                                    {(() => {
+                                        const vImg = art.variants.find(v => v.photo || v.imageUrl || v.image_url || v.image);
+                                        const articleImage = vImg ? (vImg.photo || vImg.imageUrl || vImg.image_url || vImg.image) : null;
+                                        return articleImage ? (
+                                            <div 
+                                                className="w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-sm flex-shrink-0 cursor-zoom-in hover:opacity-80 transition-opacity" 
+                                                onClick={(e) => { e.stopPropagation(); setSelectedImage(articleImage); }}
+                                            >
+                                                <img src={articleImage} alt={art.article} className="w-full h-full object-cover" />
+                                            </div>
+                                        ) : (
+                                            <div className="w-12 h-12 rounded-lg bg-slate-100 border-2 border-white shadow-sm flex-shrink-0 flex items-center justify-center text-slate-300">
+                                                <i className="fa-solid fa-image"></i>
+                                            </div>
+                                        );
+                                    })()}
+                                    
                                     <div>
                                         <h4 className="text-lg font-black text-slate-800">{art.article}</h4>
                                         <p className="text-xs font-bold text-slate-400 mt-0.5">{art.variants.length} Varian Produk</p>
@@ -545,6 +564,14 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                     )}
                 </div>
             </div>
+
+            {/* Image Modal */}
+            {selectedImage && (
+                <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
+                    <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
+                    <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
         </div>
     );
 }
