@@ -584,11 +584,8 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                         });
                                         colors.sort((a, b) => colorSales[b] - colorSales[a]);
                                         
-                                        // Cari nilai penjualan tertinggi ke-1, 2, 3 untuk highlight
+                                        // Cari nilai penjualan tertinggi untuk ranking
                                         const uniqueSales = Array.from(new Set(art.variants.map(v => v.sales).filter(s => s > 0))).sort((a, b) => b - a);
-                                        const rank1 = uniqueSales[0] || -1;
-                                        const rank2 = uniqueSales[1] || -1;
-                                        const rank3 = uniqueSales[2] || -1;
 
                                         return (
                                             <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -609,26 +606,46 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                 {sizes.map(s => {
                                                                     const v = art.variants.find(v => (v.colorName || '-') === c && (v.sizeName || '-') === s);
                                                                     
-                                                                    // Tentukan gaya highlight jika termasuk Top 3
-                                                                    let highlightClass = "";
+                                                                    let highlightClass = "border-transparent";
                                                                     let badge = null;
+                                                                    let textColor = "text-slate-300";
+
                                                                     if (v && v.sales > 0) {
-                                                                        if (v.sales === rank1) {
-                                                                            highlightClass = "bg-yellow-100 border-yellow-300 shadow-inner";
-                                                                            badge = <i className="fa-solid fa-crown text-yellow-500 absolute -top-2 -right-2 text-xs drop-shadow-md transform rotate-12"></i>;
-                                                                        } else if (v.sales === rank2) {
-                                                                            highlightClass = "bg-slate-100 border-slate-300";
-                                                                        } else if (v.sales === rank3) {
-                                                                            highlightClass = "bg-orange-50 border-orange-200";
+                                                                        const salesRank = uniqueSales.indexOf(v.sales) + 1;
+                                                                        let badgeContent = `#${salesRank}`;
+                                                                        let badgeColor = "bg-white text-slate-500 border-slate-200";
+                                                                        
+                                                                        textColor = "text-emerald-600";
+                                                                        highlightClass = "bg-slate-50 border-slate-100";
+                                                                        
+                                                                        if (salesRank === 1) {
+                                                                            highlightClass = "bg-yellow-100 border-yellow-300 shadow-sm";
+                                                                            badgeColor = "bg-yellow-400 text-yellow-900 border-yellow-500";
+                                                                            badgeContent = "👑 1";
+                                                                            textColor = "text-yellow-700";
+                                                                        } else if (salesRank === 2) {
+                                                                            highlightClass = "bg-slate-200 border-slate-300 shadow-sm";
+                                                                            badgeColor = "bg-slate-400 text-white border-slate-500";
+                                                                            textColor = "text-slate-700";
+                                                                        } else if (salesRank === 3) {
+                                                                            highlightClass = "bg-orange-100 border-orange-300 shadow-sm";
+                                                                            badgeColor = "bg-orange-400 text-white border-orange-500";
+                                                                            textColor = "text-orange-800";
                                                                         }
+
+                                                                        badge = (
+                                                                            <span className={`absolute -top-2 -right-2 text-[9px] font-black rounded-full px-1.5 py-0.5 shadow-sm border z-10 ${badgeColor}`}>
+                                                                                {badgeContent}
+                                                                            </span>
+                                                                        );
                                                                     }
 
                                                                     return (
-                                                                        <td key={s} className="p-2 border-r border-slate-100 relative">
+                                                                        <td key={s} className="p-2 border-r border-slate-100">
                                                                             {v ? (
-                                                                                <div className={`flex items-center justify-center w-full h-full p-2 rounded-md transition-all ${highlightClass}`}>
+                                                                                <div className={`relative flex items-center justify-center w-full h-full p-2 rounded-md border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-black text-base ${v.sales > 0 ? (v.sales === rank1 ? 'text-yellow-700' : 'text-emerald-600') : 'text-slate-300'}`}>
+                                                                                    <div className={`font-black text-base ${textColor}`}>
                                                                                         {v.sales}
                                                                                     </div>
                                                                                 </div>
