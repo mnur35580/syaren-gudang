@@ -11,6 +11,11 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
     const [salesHistory, setSalesHistory] = useState([]);
     const [isEditingCapacity, setIsEditingCapacity] = useState(false);
     
+    // States untuk Daftar SKU Terlaris
+    const [bestSellerTime, setBestSellerTime] = useState('30days'); 
+    const [bestSellerSort, setBestSellerSort] = useState('salesDesc');
+    const [expandedArticle, setExpandedArticle] = useState(null);
+    
     // Metrics State
     const [globalMetrics, setGlobalMetrics] = useState({
         dailyProductionCapacity: parseInt(localStorage.getItem('vendorCapacity')) || 1000, 
@@ -249,6 +254,96 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
 
     }, [inventoryData, leadTime]);
     
+    // --- BEST SELLERS / TOP SKU LOGIC ---
+    const bestSellersData = useMemo(() => {
+        if (!inventoryData || inventoryData.length === 0) return [];
+
+        const now = new Date();
+        now.setHours(23, 59, 59, 999);
+        let startDate = new Date(0); // All time (default)
+
+        if (bestSellerTime === '7days') {
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 7);
+            startDate.setHours(0,0,0,0);
+        } else if (bestSellerTime === '30days') {
+            startDate = new Date(now);
+            startDate.setDate(now.getDate() - 30);
+            startDate.setHours(0,0,0,0);
+        } else if (bestSellerTime === 'thisMonth') {
+            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        } else if (bestSellerTime === 'thisYear') {
+            startDate = new Date(now.getFullYear(), 0, 1);
+        }
+
+        // 1. Calculate sales per SKU within the date range
+        const skuSalesMap = {};
+        (transactions || []).forEach(tx => {
+            if ((tx.type === 'OUT' || tx.type === 'REVISI_OUT') && tx.date) {
+                const txDate = new Date(tx.date);
+                if (txDate >= startDate && txDate <= now && tx.sku) {
+                    skuSalesMap[tx.sku] = (skuSalesMap[tx.sku] || 0) + (Number(tx.qty) || 1);
+                }
+            }
+        });
+
+        // 2. Kalkulasi stok riil (all time)
+        const skuStockMap = {};
+        (transactions || []).forEach(t => {
+            if (!t.sku) return;
+            if (t.type === 'IN' || t.type === 'REVISI_IN' || t.type === 'ONLINE_IN' || t.type === 'RETUR_IN') {
+                skuStockMap[t.sku] = (skuStockMap[t.sku] || 0) + Number(t.qty || 0);
+            } else if (t.type === 'OUT' || t.type === 'REVISI_OUT') {
+                skuStockMap[t.sku] = (skuStockMap[t.sku] || 0) - Number(t.qty || 0);
+            }
+        });
+
+        // 3. Group by Article
+        const articleMap = {};
+        inventoryData.forEach(item => {
+            const articleName = item.article || 'Produk Lainnya';
+            if (!articleMap[articleName]) {
+                articleMap[articleName] = {
+                    article: articleName,
+                    totalSales: 0,
+                    totalStock: 0,
+                    variants: []
+                };
+            }
+            
+            const sales = skuSalesMap[item.sku || item.id] || 0;
+            const stock = skuStockMap[item.sku || item.id] || 0;
+            
+            articleMap[articleName].totalSales += sales;
+            articleMap[articleName].totalStock += stock;
+            
+            articleMap[articleName].variants.push({
+                ...item,
+                sales,
+                stock,
+                variantName: `${item.colorName || '-'} ${item.sizeName || '-'}`.trim()
+            });
+        });
+
+        // 4. Convert to array and sort variants inside each article
+        const articleArray = Object.values(articleMap).map(art => {
+            // Varian di dalam selalu diurutkan berdasarkan yang paling laku
+            art.variants.sort((a, b) => b.sales - a.sales); 
+            return art;
+        });
+
+        // 5. Sort the articles based on selected sort option
+        articleArray.sort((a, b) => {
+            if (bestSellerSort === 'salesDesc') return b.totalSales - a.totalSales;
+            if (bestSellerSort === 'salesAsc') return a.totalSales - b.totalSales;
+            if (bestSellerSort === 'stockDesc') return b.totalStock - a.totalStock;
+            if (bestSellerSort === 'stockAsc') return a.totalStock - b.totalStock;
+            return 0;
+        });
+
+        return articleArray;
+    }, [inventoryData, transactions, bestSellerTime, bestSellerSort]);
+
 
     if (isLoading) {
         return (
@@ -400,81 +495,103 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 </div>
             </div>
 
-            {/* RECOMMENDATION TABLE */}
+            {/* BEST SELLERS / SKU LIST */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden relative">
-                <div className="p-6 border-b-2 bg-slate-50 flex items-center justify-between">
+                <div className="p-4 md:p-6 border-b-2 bg-slate-50 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                     <h3 className="text-xl font-black text-rose-800 flex items-center gap-3">
-                        <i className="fa-solid fa-clipboard-list text-emerald-500"></i>
-                        Tabel Rekomendasi Aksi
+                        <i className="fa-solid fa-ranking-star text-amber-500"></i>
+                        Daftar Performa SKU per Artikel
                     </h3>
-                    <button 
-                        onClick={() => {
-                            if(setActiveMenu) {
-                                // 1. Kumpulkan semua item yang butuh di-PO
-                                const draftItems = processedInventory
-                                    .filter(item => item.status === 'Segera Restock!' || item.status === 'Restock Sedikit')
-                                    .map(item => ({
-                                        sku: item.id,
-                                        article: item.article || item.name.split(' - ')[0] || 'Produk',
-                                        colorName: item.colorName || (item.name.split(' - ')[1] ? item.name.split(' - ')[1].split(' ')[0] : '-'),
-                                        sizeName: item.sizeName || (item.name.split(' ').pop() || '-'),
-                                        qty: item.recommendedPO,
-                                        received: 0,
-                                        shipped: 0
-                                    }));
-                                
-                                if(draftItems.length === 0) {
-                                    alert("Saat ini belum ada produk yang perlu direstock!");
-                                    return;
-                                }
-
-                                // 2. Simpan ke draft sementara
-                                localStorage.setItem('smart_mpo_draft', JSON.stringify(draftItems));
-
-                                // 3. Pindah ke halaman MPB
-                                setActiveMenu('mpo_pabrik');
-                            } else {
-                                alert("Fitur navigasi belum diaktifkan di komponen induk");
-                            }
-                        }}
-                        className="bg-rose-500 hover:bg-rose-600 text-white font-black px-6 py-2.5 rounded-xl text-sm transition-all shadow-md flex items-center gap-2 transform hover:scale-105"
-                    >
-                        Buat PO MPO Sekarang <i className="fa-solid fa-arrow-right"></i>
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                        <select 
+                            value={bestSellerTime} 
+                            onChange={e => setBestSellerTime(e.target.value)}
+                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl outline-none focus:border-rose-500 text-sm"
+                        >
+                            <option value="7days">7 Hari Terakhir</option>
+                            <option value="30days">30 Hari Terakhir</option>
+                            <option value="thisMonth">Bulan Ini</option>
+                            <option value="thisYear">Tahun Ini</option>
+                            <option value="allTime">Semua Waktu</option>
+                        </select>
+                        <select 
+                            value={bestSellerSort} 
+                            onChange={e => setBestSellerSort(e.target.value)}
+                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl outline-none focus:border-rose-500 text-sm"
+                        >
+                            <option value="salesDesc">Paling Laku (Penjualan)</option>
+                            <option value="salesAsc">Kurang Laku (Penjualan)</option>
+                            <option value="stockDesc">Stok Terbanyak</option>
+                            <option value="stockAsc">Stok Sedikit / Kosong</option>
+                        </select>
+                    </div>
                 </div>
                 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                        <thead className="bg-white text-slate-500 border-b-2 border-slate-100 text-xs uppercase tracking-wider">
-                            <tr>
-                                <th className="p-4 font-bold">Kode Article</th>
-                                <th className="p-4 font-bold">Nama Produk</th>
-                                <th className="p-4 font-bold text-center">Stok Riil</th>
-                                <th className="p-4 font-bold text-center">Batas ROP</th>
-                                <th className="p-4 font-bold text-center">Status Keamanan</th>
-                                <th className="p-4 font-bold">Rekomendasi Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-50 text-sm">
-                            {processedInventory.map((item, idx) => (
-                                <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                                    <td className="p-4 font-black text-slate-700">{item.id}</td>
-                                    <td className="p-4 font-semibold text-slate-600">{item.name}</td>
-                                    <td className="p-4 text-center font-black text-rose-800">{item.stock}</td>
-                                    <td className="p-4 text-center font-bold text-slate-400">{item.rop}</td>
-                                    <td className="p-4 text-center">
-                                        <span className={`px-3 py-1 rounded-full text-xs ${item.statusColor}`}>{item.status}</span>
-                                    </td>
-                                    <td className="p-4 font-medium text-slate-600">
-                                        {item.status === 'Segera Restock!' && <span className="text-rose-600 flex items-center gap-2"><i className="fa-solid fa-circle-exclamation"></i> Buat PO baru {item.recommendedPO} Pcs</span>}
-                                        {item.status === 'Restock Sedikit' && <span className="text-yellow-600 flex items-center gap-2"><i className="fa-solid fa-cart-plus"></i> PO Santai {item.recommendedPO} Pcs</span>}
-                                        {item.status === 'Aman' && <span className="text-emerald-600 flex items-center gap-2"><i className="fa-solid fa-check"></i> Tidak perlu PO</span>}
-                                        {item.status.includes('Overstock') && <span className="text-rose-600 flex items-center gap-2"><i className="fa-solid fa-fire"></i> Bikin Diskon / Obral!</span>}
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="divide-y divide-slate-100">
+                    {bestSellersData.map((art, idx) => (
+                        <div key={idx} className="bg-white transition-colors">
+                            {/* ARTICLE HEADER (CLICKABLE) */}
+                            <div 
+                                onClick={() => setExpandedArticle(expandedArticle === art.article ? null : art.article)}
+                                className={`p-4 md:p-5 flex items-center justify-between cursor-pointer hover:bg-rose-50 transition-colors ${expandedArticle === art.article ? 'bg-rose-50' : ''}`}
+                            >
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-black text-white ${idx < 3 && bestSellerSort === 'salesDesc' ? 'bg-amber-500 shadow-md shadow-amber-500/30' : 'bg-slate-300'}`}>
+                                        {idx + 1}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-lg font-black text-slate-800">{art.article}</h4>
+                                        <p className="text-xs font-bold text-slate-400 mt-0.5">{art.variants.length} Varian Produk</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-6">
+                                    <div className="text-right hidden sm:block">
+                                        <div className="text-lg font-black text-emerald-600">{art.totalSales} <span className="text-xs text-emerald-600/70">Terjual</span></div>
+                                        <div className="text-xs font-bold text-slate-400 mt-0.5">Sisa Stok: {art.totalStock}</div>
+                                    </div>
+                                    <i className={`fa-solid fa-chevron-${expandedArticle === art.article ? 'up' : 'down'} text-rose-400 text-lg transition-transform`}></i>
+                                </div>
+                            </div>
+                            
+                            {/* EXPANDED VARIANTS */}
+                            {expandedArticle === art.article && (
+                                <div className="bg-slate-50 p-4 md:p-6 border-t border-rose-100 animate-in fade-in slide-in-from-top-2">
+                                    <div className="sm:hidden flex justify-between mb-4 pb-4 border-b border-slate-200">
+                                        <div>
+                                            <div className="text-xs font-bold text-slate-400">Total Terjual</div>
+                                            <div className="text-lg font-black text-emerald-600">{art.totalSales}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-xs font-bold text-slate-400">Sisa Stok</div>
+                                            <div className="text-lg font-black text-slate-700">{art.totalStock}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        {art.variants.map((v, vIdx) => (
+                                            <div key={v.id || vIdx} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm flex items-center justify-between hover:border-rose-300 transition-colors">
+                                                <div>
+                                                    <div className="font-bold text-slate-700 text-sm">{v.variantName}</div>
+                                                    <div className="text-xs text-slate-400 mt-1 font-mono">{v.id || v.sku}</div>
+                                                </div>
+                                                <div className="text-right flex flex-col items-end gap-1">
+                                                    <div className={`px-2 py-0.5 rounded text-xs font-black ${v.sales > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                        <i className="fa-solid fa-arrow-trend-up mr-1"></i> {v.sales} Laku
+                                                    </div>
+                                                    <div className={`px-2 py-0.5 rounded text-xs font-bold ${v.stock <= 5 ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                        {v.stock} Stok
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {bestSellersData.length === 0 && (
+                        <div className="p-8 text-center text-slate-400 font-bold italic">Belum ada data barang atau penjualan.</div>
+                    )}
                 </div>
             </div>
         </div>
