@@ -6380,7 +6380,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 setWaStatus('Menunggu Scan QR');
                 setWaQrCode(data.qr);
             } else {
-                setWaStatus(data.status || 'Terputus');
+                setWaStatus(data.status || 'Menghubungkan...');
                 setWaQrCode(null);
             }
         } catch (error) {
