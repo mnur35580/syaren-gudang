@@ -798,7 +798,7 @@ function App() {
     const renderContent = () => {
         switch (activeMenu) {
             case 'dashboard': return <Dashboard transactions={transactions} qcOrders={qcOrders} mpoOrders={mpoOrders} variants={allVariants} setIsLoading={setIsLoading} showToast={showToast} />;
-            case 'smart_analytics': return <SmartAnalyticsDashboard variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} setActiveMenu={setActiveMenu} />;
+            case 'smart_analytics': return <SmartAnalyticsDashboard variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} qcOrders={qcOrders} setActiveMenu={setActiveMenu} />;
             case 'karyawan': return <ManajemenKaryawan setIsLoading={setIsLoading} showToast={showToast} />;
             case 'upload_produk': return <UploadProduk products={products} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'cetak_label': return <CetakLabel products={products} variants={allVariants} showToast={showToast} />;
@@ -2369,7 +2369,12 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                 .get();
 
             qcSnap.forEach(doc => {
-                batchDelete.delete(doc.ref);
+                const o = doc.data();
+                // Aturan: Hanya hapus yang masih PENDING/TRANSIT dan belum dirilis produksi.
+                // Jika sudah Selesai QC (PACKED) atau Sudah di Kurir (SHIPPED), biarkan tetap ada di database untuk analitik.
+                if ((o.status === 'PENDING' || o.status === 'TRANSIT') && o.isReleasedToProduction !== true) {
+                    batchDelete.delete(doc.ref);
+                }
             });
 
             await batchDelete.commit();
@@ -6445,11 +6450,14 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
         }
     };
 
-    const [range, setRange] = useState('hari');
+    const [range, setRange] = useState('hari ini');
     const [customRange, setCustomRange] = useState({ start: '', end: '' });
     const [isResetting, setIsResetting] = useState(false);
     const [historyModal, setHistoryModal] = useState(null); // { type, title }
     const [selectedSession, setSelectedSession] = useState(null);
+    const [activeModalStatus, setActiveModalStatus] = useState(null);
+    const [modalPage, setModalPage] = useState(1);
+    const [modalSearch, setModalSearch] = useState('');
 
     const getLaporanDefaultStart = () => {
         const now = new Date();
@@ -6493,15 +6501,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
         const now = new Date();
         return kasData.filter(d => {
             const tDate = new Date(d.tanggal);
-            if (range === 'hari') return d.tanggal === toLocalDateStr(now);
+            if (range === 'hari ini') return d.tanggal === toLocalDateStr(now);
             if (range === 'kemarin') {
                 const yesterday = new Date(now);
                 yesterday.setDate(now.getDate() - 1);
                 return d.tanggal === toLocalDateStr(yesterday);
             }
-            if (range === 'minggu') return (now - tDate) / 864e5 <= 7;
-            if (range === 'bulan') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-            if (range === 'tahun') return tDate.getFullYear() === now.getFullYear();
+            if (range === '7 hari terakhir') return (now - tDate) / 864e5 <= 7;
+            if (range === '30 hari terakhir') return (now - tDate) / 864e5 <= 30;
+            if (range === 'bulan ini') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+            if (range === 'tahun ini') return tDate.getFullYear() === now.getFullYear();
+            if (range === 'semua waktu') return true;
             if (range === 'custom' && customRange.start && customRange.end) return tDate >= new Date(customRange.start) && tDate <= new Date(customRange.end + 'T23:59:59');
             return false;
         }).sort((a, b) => {
@@ -6555,15 +6565,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
         return transactions.reduce((acc, t) => {
             const tDate = new Date(t.date);
             let match = false;
-            if (range === 'hari') match = tDate.toDateString() === now.toDateString();
+            if (range === 'hari ini') match = tDate.toDateString() === now.toDateString();
             else if (range === 'kemarin') {
                 const yesterday = new Date(now);
                 yesterday.setDate(now.getDate() - 1);
                 match = tDate.toDateString() === yesterday.toDateString();
             }
-            else if (range === 'minggu') match = (now - tDate) / 864e5 <= 7;
-            else if (range === 'bulan') match = tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-            else if (range === 'tahun') match = tDate.getFullYear() === now.getFullYear();
+            else if (range === '7 hari terakhir') match = (now - tDate) / 864e5 <= 7;
+            else if (range === '30 hari terakhir') match = (now - tDate) / 864e5 <= 30;
+            else if (range === 'bulan ini') match = tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+            else if (range === 'tahun ini') match = tDate.getFullYear() === now.getFullYear();
+            else if (range === 'semua waktu') match = true;
             else if (range === 'custom' && customRange.start && customRange.end) match = tDate >= new Date(customRange.start) && tDate <= new Date(customRange.end + 'T23:59:59');
 
             if (match) {
@@ -6576,48 +6588,64 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     }, [transactions, range, customRange]);
 
     const qcStats = useMemo(() => {
-        return {
-            pending: qcOrders.filter(o => o.status === 'PENDING' && (o.items || []).some(it => it.status === 'PO')).length,
-            transit: qcOrders.filter(o => o.status === 'TRANSIT').length,
-            packed: qcOrders.filter(o => o.status === 'PACKED').length,
-            shipped: qcOrders.filter(o => o.status === 'SHIPPED').length,
-        }
-    }, [qcOrders]);
+        const validOrders = (qcOrders || []).filter(o => !o.isCanceled && o.isReleasedToProduction === false);
 
-    // LOGIKA PINTAR AHMAD: Bandingkan Antrean Masuk dengan Stok Fisik Induk + Siluman
-    const tungguOnline = useMemo(() => {
-        const demandMap = {};
-        (qcOrders || []).filter(o => (o.status === 'PENDING' || o.status === 'TRANSIT') && !o.isCanceled).forEach(order => {
-            (order.items || []).filter(it => (it.prodStatus || it.status) === 'PO').forEach(item => {
-                const fullSku = (item.sysSku || item.sku || '').trim().toUpperCase();
-                const cleanSku = fullSku.split('*')[0].split('#')[0];
-                demandMap[cleanSku] = (demandMap[cleanSku] || 0) + Number(item.qty || 0);
+        // 1. Antrean Masuk = Belum SHIPPED (PENDING, TRANSIT, PACKED) 
+        const antreanOrders = validOrders.filter(o => o.status !== 'SHIPPED');
+        const antreanPcs = antreanOrders.reduce((acc, o) => acc + (o.items || []).reduce((sum, item) => sum + (Number(item.qty) || 1), 0), 0);
+
+        // 2. Tunggu Online = PO items dari pesanan yang belum di QC dan belum SHIPPED
+        const tungguOrders = validOrders.filter(o => o.status === 'PENDING' || o.status === 'TRANSIT');
+        let tungguPcs = 0;
+        let tungguResi = 0;
+        tungguOrders.forEach(o => {
+            let hasPO = false;
+            (o.items || []).forEach(item => {
+                if (item.prodStatus === 'PO' || item.status === 'PO') {
+                    tungguPcs += Number(item.qty || 0);
+                    hasPO = true;
+                }
             });
+            if (hasPO) tungguResi++;
         });
 
-        const virtualStock = {};
-        (transactions || []).forEach(t => {
-            let cleanSku = (t.sku || '').trim().toUpperCase();
-            if (cleanSku.startsWith('*')) cleanSku = cleanSku.substring(1).trim();
-            if (cleanSku.startsWith('#')) cleanSku = cleanSku.substring(1).trim();
+        // 3. Selesai QC = PACKED
+        const packedOrders = (qcOrders || []).filter(o => o.status === 'PACKED' && !o.isCanceled);
+        const packedPcs = packedOrders.reduce((acc, o) => acc + (o.items || []).reduce((sum, item) => sum + (Number(item.qty) || 1), 0), 0);
 
-            if (t.type === 'OUT' && t.note && (t.note.toLowerCase().includes('qc') || t.note.toLowerCase().includes('packing'))) {
-                virtualStock[cleanSku] = (virtualStock[cleanSku] || 0) - t.qty;
+        // 4. Sudah di Kurir = SHIPPED (Filtered by Date Range!)
+        const now = new Date();
+        const shippedOrders = (qcOrders || []).filter(o => {
+            if (o.status !== 'SHIPPED' || o.isCanceled) return false;
+            
+            const dateField = o.shippedAt || o.createdAt;
+            const tDate = dateField ? (typeof dateField.toDate === 'function' ? dateField.toDate() : new Date(dateField)) : new Date(0);
+            
+            let match = false;
+            if (range === 'hari ini' || range === 'hari') match = tDate.toDateString() === now.toDateString();
+            else if (range === 'kemarin') {
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                match = tDate.toDateString() === yesterday.toDateString();
             }
+            else if (range === '7 hari terakhir' || range === 'minggu') match = (now - tDate) / 864e5 <= 7;
+            else if (range === '30 hari terakhir') match = (now - tDate) / 864e5 <= 30;
+            else if (range === 'bulan ini' || range === 'bulan') match = tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+            else if (range === 'tahun ini' || range === 'tahun') match = tDate.getFullYear() === now.getFullYear();
+            else if (range === 'semua waktu') match = true;
+            else if (range === 'custom' && customRange.start && customRange.end) match = tDate >= new Date(customRange.start) && tDate <= new Date(customRange.end + 'T23:59:59');
+            
+            return match;
         });
+        const shippedPcs = shippedOrders.reduce((acc, o) => acc + (o.items || []).reduce((sum, item) => sum + (Number(item.qty) || 1), 0), 0);
 
-        let kekurangan = 0;
-        Object.keys(demandMap).forEach(sku => {
-            const demand = demandMap[sku];
-            const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
-            const realStock = variant ? Number(variant.stock || variant.stok || 0) : 0;
-            const crossDockStock = virtualStock[sku] || 0;
-
-            const totalStock = realStock + crossDockStock;
-            if (demand > totalStock) kekurangan += (demand - totalStock);
-        });
-        return Math.max(0, kekurangan);
-    }, [qcOrders, variants, transactions]);
+        return {
+            antrean: { resi: antreanOrders.length, pcs: antreanPcs },
+            tunggu: { resi: tungguResi, pcs: tungguPcs },
+            packed: { resi: packedOrders.length, pcs: packedPcs },
+            shipped: { resi: shippedOrders.length, pcs: shippedPcs }
+        };
+    }, [qcOrders, range, customRange]);
     // REPORT GENERATION
     const generateLaporan = () => {
         const start = new Date(laporanMulai);
@@ -6750,6 +6778,9 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     // COPY PASTE: Perhitungan Sisa PO Pabrik persis dari Surat Jalan
     const pendingPO = (mpoOrders || []).filter(o => o.status === 'OPEN' || o.status === 'SHIPPED')
         .reduce((acc, po) => acc + (po.items || []).reduce((s, i) => s + Math.max(0, (i.qty || 0) - (i.received || 0)), 0), 0);
+
+    
+    
 
     const handleResetAntrean = async () => {
         if (!(await showConfirm(`PERINGATAN KERAS! ⚠️ \n\nAnda akan menghapus SELURUH data Sistem Pesanan Online (SPO) secara PERMANEN, meliputi:\n1. Semua Antrean QC\n2. Semua Riwayat Pesanan (History)\n3. Semua Draft Antrean Produksi\n\nTindakan ini tidak bisa dibatalkan. Yakin ingin RESET TOTAL?`))) return;
@@ -6908,8 +6939,8 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
 
             <div className="bg-white p-4 md:p-6 rounded-md border border-slate-200 shadow-sm flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
                 <div className="flex flex-wrap gap-2 justify-center md:justify-start">
-                    {['hari', 'kemarin', 'minggu', 'bulan', 'tahun', 'custom'].map(r => (
-                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-4 py-2 rounded-md text-sm md:text-base font-bold capitalize transition-colors ${range === r ? 'bg-rose-900 text-white shadow-md' : 'bg-rose-50 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
+                    {['hari ini', 'kemarin', '7 hari terakhir', '30 hari terakhir', 'bulan ini', 'tahun ini', 'semua waktu', 'custom'].map(r => (
+                        <button key={r} type="button" onClick={() => setRange(r)} className={`flex-1 md:flex-none px-4 md:px-5 py-2.5 rounded-md text-sm md:text-sm font-semibold capitalize transition-colors ${range === r ? 'bg-rose-900 text-white shadow-md' : 'bg-rose-50 text-slate-600 hover:bg-slate-200'}`}>{r}</button>
                     ))}
                 </div>
                 {range === 'custom' && (
@@ -6921,7 +6952,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
                 <StatCard
                     title="Barang Masuk (Produksi)"
                     value={stats.in}
@@ -6938,6 +6969,16 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                     bg="bg-red-100"
                     onClick={() => setHistoryModal({ type: 'OUT', title: 'Riwayat Barang Keluar (Picker)' })}
                 />
+                <div
+                        className="h-full bg-teal-50 border border-teal-200 p-2 md:p-4 rounded-md shadow-sm text-center flex flex-col justify-center cursor-pointer hover:bg-teal-100 transition-colors relative"
+                        onClick={() => { setActiveModalStatus('SHIPPED'); setModalPage(1); setModalSearch(''); }}
+                    >
+                        <div className="text-xl md:text-2xl font-bold text-teal-700">
+                            {qcStats.shipped.pcs} <span className="text-[10px] md:text-xs font-semibold text-teal-500 uppercase">Pcs</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs font-medium text-teal-500 mt-0.5">{qcStats.shipped.resi} Resi</div>
+                        <div className="text-[10px] md:text-xs font-bold text-teal-800 uppercase mt-1.5 leading-tight">Sudah di Kurir {activeModalStatus === 'SHIPPED' ? '(OPEN)' : ''}</div>
+                    </div>
                 {/* KARTU SALDO KAS */}
                 <div
                     onClick={() => setKasModal(true)}
@@ -6966,30 +7007,46 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                         <button onClick={() => { generateLaporan(); setLaporanModal(true); }} className="bg-emerald-100 hover:bg-emerald-600 text-emerald-700 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center gap-2 border border-emerald-200 shadow-sm flex-1 md:flex-none justify-center">
                             <i className="fa-solid fa-clipboard-list"></i> BUAT LAPORAN
                         </button>
-                        <button onClick={handleResetAntrean} disabled={isResetting || qcStats.pending === 0} className="bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center gap-2 border border-rose-200 disabled:opacity-50 shadow-sm flex-1 md:flex-none justify-center">
+                        
+                        <button onClick={handleResetAntrean} disabled={isResetting || qcStats.antrean.pcs === 0} className="bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white px-4 py-2 rounded-md font-black text-sm transition-colors flex items-center gap-2 border border-rose-200 disabled:opacity-50 shadow-sm flex-1 md:flex-none justify-center">
                             {isResetting ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-trash-can"></i>}
                             TARIK / KOSONGKAN
                         </button>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="bg-white border p-4 rounded-md shadow-sm text-center">
-                        <div className="text-lg md:text-2xl md:text-3xl font-black text-slate-400">{qcStats.pending}</div>
-                        <div className="text-xs font-bold text-slate-500 uppercase mt-1">Antrean Masuk</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4">
+                    <div
+                        className="bg-white border p-2 md:p-4 rounded-md shadow-sm text-center flex flex-col justify-center cursor-pointer hover:bg-slate-50 transition-colors relative"
+                        onClick={() => { setActiveModalStatus('PENDING'); setModalPage(1); setModalSearch(''); }}
+                    >
+                        <div className="text-xl md:text-2xl font-bold text-slate-500">
+                            {qcStats.antrean.pcs} <span className="text-[10px] md:text-xs font-semibold text-slate-400 uppercase">Pcs</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs font-medium text-slate-400 mt-0.5">{qcStats.antrean.resi} Resi</div>
+                        <div className="text-[10px] md:text-xs font-bold text-slate-600 uppercase mt-1.5 leading-tight">Antrean Masuk {activeModalStatus === 'PENDING' ? '(OPEN)' : ''}</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-xl md:text-3xl font-black text-rose-600">{tungguOnline}</div>
-                        <div className="text-xs font-bold text-rose-700 uppercase mt-1">Tunggu Pesanan Online</div>
+                    <div
+                        className="bg-amber-50 border border-amber-200 p-2 md:p-4 rounded-md shadow-sm text-center flex flex-col justify-center cursor-pointer hover:bg-amber-100 transition-colors relative"
+                        onClick={() => { setActiveModalStatus('TRANSIT'); setModalPage(1); setModalSearch(''); }}
+                    >
+                        <div className="text-xl md:text-2xl font-bold text-amber-600">
+                            {qcStats.tunggu.pcs} <span className="text-[10px] md:text-xs font-semibold text-amber-500 uppercase">Pcs</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs font-medium text-amber-500 mt-0.5">{qcStats.tunggu.resi} Resi</div>
+                        <div className="text-[10px] md:text-xs font-bold text-amber-700 uppercase mt-1.5 leading-tight">Tunggu Online {activeModalStatus === 'TRANSIT' ? '(OPEN)' : ''}</div>
                     </div>
-                    <div className="bg-rose-50 border border-rose-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-lg md:text-2xl md:text-3xl font-black text-rose-500">{qcStats.packed}</div>
-                        <div className="text-xs font-bold text-rose-600 uppercase mt-1">Selesai QC (Siap Kirim)</div>
+                    <div
+                        className="bg-orange-50 border border-orange-200 p-2 md:p-4 rounded-md shadow-sm text-center flex flex-col justify-center cursor-pointer hover:bg-orange-100 transition-colors relative"
+                        onClick={() => { setActiveModalStatus('PACKED'); setModalPage(1); setModalSearch(''); }}
+                    >
+                        <div className="text-xl md:text-2xl font-bold text-orange-600">
+                            {qcStats.packed.pcs} <span className="text-[10px] md:text-xs font-semibold text-orange-500 uppercase">Pcs</span>
+                        </div>
+                        <div className="text-[10px] md:text-xs font-medium text-orange-500 mt-0.5">{qcStats.packed.resi} Resi</div>
+                        <div className="text-[10px] md:text-xs font-bold text-orange-700 uppercase mt-1.5 leading-tight">Selesai QC {activeModalStatus === 'PACKED' ? '(OPEN)' : ''}</div>
                     </div>
-                    <div className="bg-teal-50 border border-teal-200 p-4 rounded-md shadow-sm text-center">
-                        <div className="text-xl md:text-3xl font-black text-teal-700">{qcStats.shipped}</div>
-                        <div className="text-xs font-bold text-teal-700 uppercase mt-1">Sudah di Kurir</div>
-                    </div>
+                    
                 </div>
 
                 {mpoOrders.filter(o => o.status === 'OPEN' || o.status === 'ARRIVED').length > 0 && (
@@ -7055,15 +7112,17 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                     const tDate = new Date(t.date);
                     const now = new Date();
                     let rangeMatch = false;
-                    if (range === 'hari') rangeMatch = tDate.toDateString() === now.toDateString();
+                    if (range === 'hari ini') rangeMatch = tDate.toDateString() === now.toDateString();
                     else if (range === 'kemarin') {
                         const yesterday = new Date(now);
                         yesterday.setDate(now.getDate() - 1);
                         rangeMatch = tDate.toDateString() === yesterday.toDateString();
                     }
-                    else if (range === 'minggu') rangeMatch = (now - tDate) / 864e5 <= 7;
-                    else if (range === 'bulan') rangeMatch = tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-                    else if (range === 'tahun') rangeMatch = tDate.getFullYear() === now.getFullYear();
+                    else if (range === '7 hari terakhir') rangeMatch = (now - tDate) / 864e5 <= 7;
+                    else if (range === '30 hari terakhir') rangeMatch = (now - tDate) / 864e5 <= 30;
+                    else if (range === 'bulan ini') rangeMatch = tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+                    else if (range === 'tahun ini') rangeMatch = tDate.getFullYear() === now.getFullYear();
+                    else if (range === 'semua waktu') rangeMatch = true;
                     else if (range === 'custom' && customRange.start && customRange.end) rangeMatch = tDate >= new Date(customRange.start) && tDate <= new Date(customRange.end + 'T23:59:59');
 
                     if (!rangeMatch) return false;
@@ -7410,7 +7469,209 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                     </div>
                 </div>
             )}
-        </div>
+                    {/* Modal Detail Pesanan Multi-Status */}
+            {activeModalStatus && (() => {
+                try {
+                    const filteredOrders = qcOrders.filter(o => {
+                        if (o.isCanceled) return false;
+                        
+                        if (activeModalStatus === 'PENDING') {
+                            if (o.status === 'SHIPPED') return false;
+                            if (o.isReleasedToProduction !== false) return false;
+                        } else if (activeModalStatus === 'TRANSIT') {
+                            if (o.status !== 'PENDING' && o.status !== 'TRANSIT') return false;
+                            if (o.isReleasedToProduction !== false) return false;
+                            if (!(o.items || []).some(it => (it.prodStatus || it.status) === 'PO')) return false;
+                        } else {
+                            if (o.status !== activeModalStatus) return false;
+                        }
+                        
+                        if (modalSearch) {
+                            const resi = (o.resi || o.id || '').toLowerCase();
+                            if (!resi.includes(modalSearch.toLowerCase())) return false;
+                        }
+                        return true;
+                    });
+                    const sortedOrders = [...filteredOrders].sort((a,b) => {
+                        const dateField = activeModalStatus === 'SHIPPED' ? 'shippedAt' : (activeModalStatus === 'PACKED' ? 'packedAt' : 'createdAt');
+                        const dateA = a[dateField] ? (typeof a[dateField].toDate === 'function' ? a[dateField].toDate() : new Date(a[dateField])) : new Date(0);
+                        const dateB = b[dateField] ? (typeof b[dateField].toDate === 'function' ? b[dateField].toDate() : new Date(b[dateField])) : new Date(0);
+                        return dateB - dateA;
+                    });
+                    
+                    const ITEMS_PER_PAGE = 30;
+                    const totalPages = Math.ceil(sortedOrders.length / ITEMS_PER_PAGE) || 1;
+                    const safePage = Math.max(1, Math.min(modalPage, totalPages));
+                    const paginatedOrders = sortedOrders.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE);
+
+                    const findVariant = (sku) => {
+                        if(!sku) return null;
+                        const s = sku.trim().toUpperCase();
+                        return variants.find(v => 
+                            (v.sku && v.sku.trim().toUpperCase() === s) || 
+                            (v.id && v.id.trim().toUpperCase() === s) || 
+                            (v.legacySkus && Array.isArray(v.legacySkus) && v.legacySkus.some(l => l && l.trim().toUpperCase() === s))
+                        );
+                    };
+
+                    const theme = {
+                        PENDING: { bg: 'bg-slate-50', text: 'text-slate-800', lightBg: 'bg-slate-100', icon: 'fa-inbox', border: 'border-slate-200', title: 'Detail Antrean Masuk', totalRef: qcStats.antrean.resi, hoverLight: 'hover:bg-slate-200', focusRing: 'focus:border-slate-400' },
+                        TRANSIT: { bg: 'bg-amber-50', text: 'text-amber-800', lightBg: 'bg-amber-100', icon: 'fa-globe', border: 'border-amber-200', title: 'Detail Tunggu Online', totalRef: qcStats.tunggu.resi, hoverLight: 'hover:bg-amber-200', focusRing: 'focus:border-amber-400' },
+                        PACKED: { bg: 'bg-orange-50', text: 'text-orange-800', lightBg: 'bg-orange-100', icon: 'fa-box-check', border: 'border-orange-200', title: 'Detail Selesai QC', totalRef: qcStats.packed.resi, hoverLight: 'hover:bg-orange-200', focusRing: 'focus:border-orange-400' },
+                        SHIPPED: { bg: 'bg-teal-50', text: 'text-teal-800', lightBg: 'bg-teal-100', icon: 'fa-truck-fast', border: 'border-teal-200', title: 'Detail Pesanan Sudah di Kurir', totalRef: qcStats.shipped.resi, hoverLight: 'hover:bg-teal-200', focusRing: 'focus:border-teal-400' }
+                    }[activeModalStatus];
+
+                    const totalPcs = filteredOrders.reduce((acc, o) => acc + (o.items || []).reduce((sum, item) => sum + (Number(item.qty) || 1), 0), 0);
+
+                    const handleDeleteOrder = async (orderId) => {
+                        if(window.confirm('Yakin ingin menghapus resi ini secara permanen?')) {
+                            try {
+                                await db.collection('qc_orders').doc(orderId).delete();
+                            } catch (e) {
+                                alert('Gagal menghapus resi: ' + e.message);
+                            }
+                        }
+                    };
+
+                    const handleBulkDeleteOld = async () => {
+                        const threeDaysAgo = new Date();
+                        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+                        const oldOrders = filteredOrders.filter(o => {
+                            const dateField = activeModalStatus === 'SHIPPED' ? 'shippedAt' : (activeModalStatus === 'PACKED' ? 'packedAt' : 'createdAt');
+                            const orderDate = o[dateField] ? (typeof o[dateField].toDate === 'function' ? o[dateField].toDate() : new Date(o[dateField])) : new Date(0);
+                            return orderDate < threeDaysAgo;
+                        });
+                        if (oldOrders.length === 0) return alert('Tidak ada data lama (lebih dari 3 hari) di status ini.');
+                        if (!window.confirm(`Ditemukan ${oldOrders.length} resi lama (> 3 hari) di status ini.\nYakin ingin menghapusnya secara permanen?`)) return;
+                        
+                        try {
+                            const batch = db.batch();
+                            oldOrders.slice(0, 450).forEach(o => {
+                                batch.delete(db.collection('qc_orders').doc(o.id));
+                            });
+                            await batch.commit();
+                            alert(`Berhasil menghapus ${Math.min(oldOrders.length, 450)} resi lama.`);
+                        } catch (e) {
+                            alert('Gagal menghapus data: ' + e.message);
+                        }
+                    };
+
+                    return (
+                        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                                <div className={`p-4 md:p-6 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${theme.bg} ${theme.border}`}>
+                                    <div>
+                                        <h3 className={`text-lg font-black flex items-center gap-2 ${theme.text}`}>
+                                            <i className={`fa-solid ${theme.icon}`}></i> {theme.title}
+                                        </h3>
+                                        <div className="flex flex-wrap items-center gap-3 mt-1">
+                                            <p className={`text-xs ${theme.text} opacity-80`}>
+                                                Menampilkan {filteredOrders.length} dari {theme.totalRef} Keseluruhan Resi (Total: {totalPcs} Pcs)
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <div className="relative flex-1 sm:w-64">
+                                            <i className="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 opacity-60"></i>
+                                            <input type="text" placeholder="Cari Resi..." value={modalSearch} onChange={e => { setModalSearch(e.target.value); setModalPage(1); }} className={`w-full pl-9 pr-3 py-2 rounded-md border text-sm outline-none transition-colors focus:ring-1 focus:ring-opacity-50 ${theme.border} ${theme.focusRing}`} />
+                                        </div>
+                                        <button onClick={() => setActiveModalStatus(null)} className={`w-9 h-9 shrink-0 flex items-center justify-center rounded-md transition-colors ${theme.lightBg} ${theme.text} ${theme.hoverLight}`}>
+                                            <i className="fa-solid fa-xmark"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
+                                    {filteredOrders.length === 0 ? (
+                                        <div className="text-center py-10 text-slate-400">Belum ada pesanan dalam status ini.</div>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-4">
+                                                {paginatedOrders.map((order, idx) => (
+                                                    <div key={idx} className="bg-white border rounded-xl shadow-sm overflow-hidden">
+                                                        <div className="p-3 bg-slate-50 border-b flex justify-between items-center">
+                                                            <div className="font-bold text-slate-700 flex items-center gap-2"><i className="fa-solid fa-box text-slate-400"></i> Resi: {order.resi || order.id || '-'}</div>
+                                                            <div className="flex items-center gap-2">
+                                                                <div className={`text-xs font-semibold px-2 py-1 rounded ${theme.lightBg} ${theme.text}`}>
+                                                                    {order.shippedAt || order.packedAt || order.createdAt ? (typeof (order.shippedAt || order.packedAt || order.createdAt).toDate === 'function' ? (order.shippedAt || order.packedAt || order.createdAt).toDate() : new Date((order.shippedAt || order.packedAt || order.createdAt))).toLocaleString('id-ID', {day: 'numeric', month: 'short', year:'numeric', hour:'2-digit', minute:'2-digit'}) : '-'}
+                                                                </div>
+                                                                {activeModalStatus !== 'SHIPPED' && (
+                                                                    <button onClick={() => handleDeleteOrder(order.id)} className="w-6 h-6 flex items-center justify-center bg-rose-100 text-rose-600 rounded hover:bg-rose-600 hover:text-white transition-colors" title="Hapus Resi (Nyangkut)">
+                                                                        <i className="fa-solid fa-trash-can text-[10px]"></i>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="p-3">
+                                                            <table className="w-full text-left text-xs md:text-sm">
+                                                                <thead className="bg-slate-50 text-slate-500">
+                                                                    <tr>
+                                                                        <th className="p-2 font-bold rounded-l-lg border-b">Artikel</th>
+                                                                        <th className="p-2 font-bold border-b">Warna</th>
+                                                                        <th className="p-2 font-bold border-b">Size</th>
+                                                                        <th className="p-2 font-bold rounded-r-lg text-right border-b w-24">Qty</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {(order.items || []).map((it, itIdx) => {
+                                                                        const fullSku = it.sysSku || it.sku || '';
+                                                                        const v = findVariant(fullSku);
+                                                                        return (
+                                                                        <tr key={itIdx} className="hover:bg-slate-50/50">
+                                                                            <td className="p-2 text-slate-700 font-medium">{v ? (v.article || '-') : (fullSku || '-')}</td>
+                                                                            <td className="p-2 text-slate-600">{v ? (v.colorName || v.warna || '-') : '-'}</td>
+                                                                            <td className="p-2 text-slate-600">{v ? (v.sizeName || v.ukuran || '-') : '-'}</td>
+                                                                            <td className="p-2 text-emerald-600 font-black text-right">{it.qty || 1} Pcs</td>
+                                                                        </tr>
+                                                                        );
+                                                                    })}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            
+                                            {/* Pagination UI */}
+                                            {totalPages > 1 && (
+                                                <div className="mt-8 flex justify-center items-center gap-4">
+                                                    <button 
+                                                        onClick={() => setModalPage(p => Math.max(1, p - 1))}
+                                                        disabled={safePage === 1}
+                                                        className={`w-10 h-10 rounded-full flex items-center justify-center border disabled:opacity-30 shadow-sm transition-colors ${theme.border} ${theme.text} ${theme.hoverLight}`}
+                                                    >
+                                                        <i className="fa-solid fa-chevron-left"></i>
+                                                    </button>
+                                                    <span className={`text-sm font-bold px-4 py-2 rounded-lg border ${theme.lightBg} ${theme.text} ${theme.border}`}>
+                                                        Halaman {safePage} dari {totalPages}
+                                                    </span>
+                                                    <button 
+                                                        onClick={() => setModalPage(p => Math.min(totalPages, p + 1))}
+                                                        disabled={safePage === totalPages}
+                                                        className={`w-10 h-10 rounded-full flex items-center justify-center border disabled:opacity-30 shadow-sm transition-colors ${theme.border} ${theme.text} ${theme.hoverLight}`}
+                                                    >
+                                                        <i className="fa-solid fa-chevron-right"></i>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                } catch (err) {
+                    return (
+                        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+                            <div className="bg-white rounded-xl shadow-2xl p-6 max-w-lg w-full text-center">
+                                <h3 className="text-xl font-bold text-red-600 mb-2">Terjadi Kesalahan</h3>
+                                <p className="text-slate-600 mb-4">{err.message}</p>
+                                <button onClick={() => setActiveModalStatus(null)} className="bg-slate-200 px-4 py-2 rounded hover:bg-slate-300">Tutup</button>
+                            </div>
+                        </div>
+                    );
+                }
+            })()}
+</div>
     );
 }
 
@@ -12608,3 +12869,9 @@ function LoginPage({ onLogin }) {
 
 export default App;
 
+
+// Force HMR refresh
+
+// Force HMR refresh
+
+// Force HMR refresh

@@ -4,7 +4,7 @@ import {
   BarChart, Bar, Cell
 } from 'recharts';
 
-export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [], transactions = [], setActiveMenu }) {
+export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [], transactions = [], qcOrders = [], setActiveMenu }) {
     // --- STATES UNTUK DATA DINAMIS ---
     const [isLoading, setIsLoading] = useState(true);
     const [inventoryData, setInventoryData] = useState([]);
@@ -14,6 +14,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
     // States untuk Daftar SKU Terlaris
     const [bestSellerTime, setBestSellerTime] = useState('30days'); 
     const [bestSellerSort, setBestSellerSort] = useState('salesDesc');
+    const [bestSellerCustomRange, setBestSellerCustomRange] = useState({ start: '', end: '' });
     const [expandedArticle, setExpandedArticle] = useState(null);
     const [selectedImage, setSelectedImage] = useState(null);
     
@@ -259,31 +260,68 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
     const bestSellersData = useMemo(() => {
         if (!inventoryData || inventoryData.length === 0) return [];
 
-        const now = new Date();
-        now.setHours(23, 59, 59, 999);
+        const current = new Date();
+        current.setHours(23, 59, 59, 999);
         let startDate = new Date(0); // All time (default)
+        let endDate = new Date(current);
 
-        if (bestSellerTime === '7days') {
-            startDate = new Date(now);
-            startDate.setDate(now.getDate() - 7);
+        if (bestSellerTime === 'today') {
+            startDate = new Date(current);
+            startDate.setHours(0,0,0,0);
+        } else if (bestSellerTime === 'yesterday') {
+            startDate = new Date(current);
+            startDate.setDate(current.getDate() - 1);
+            startDate.setHours(0,0,0,0);
+            endDate = new Date(startDate);
+            endDate.setHours(23, 59, 59, 999);
+        } else if (bestSellerTime === '7days') {
+            startDate = new Date(current);
+            startDate.setDate(current.getDate() - 7);
             startDate.setHours(0,0,0,0);
         } else if (bestSellerTime === '30days') {
-            startDate = new Date(now);
-            startDate.setDate(now.getDate() - 30);
+            startDate = new Date(current);
+            startDate.setDate(current.getDate() - 30);
             startDate.setHours(0,0,0,0);
         } else if (bestSellerTime === 'thisMonth') {
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            startDate = new Date(current.getFullYear(), current.getMonth(), 1);
         } else if (bestSellerTime === 'thisYear') {
-            startDate = new Date(now.getFullYear(), 0, 1);
+            startDate = new Date(current.getFullYear(), 0, 1);
+        } else if (bestSellerTime === 'custom' && bestSellerCustomRange.start && bestSellerCustomRange.end) {
+            startDate = new Date(bestSellerCustomRange.start);
+            startDate.setHours(0,0,0,0);
+            endDate = new Date(bestSellerCustomRange.end);
+            endDate.setHours(23, 59, 59, 999);
         }
 
-        // 1. Calculate sales per SKU within the date range
+        // 1. Calculate sales per SKU within the date range (Berdasarkan status SHIPPED)
         const skuSalesMap = {};
-        (transactions || []).forEach(tx => {
-            if ((tx.type === 'OUT' || tx.type === 'REVISI_OUT') && tx.date) {
-                const txDate = new Date(tx.date);
-                if (txDate >= startDate && txDate <= now && tx.sku) {
-                    skuSalesMap[tx.sku] = (skuSalesMap[tx.sku] || 0) + (Number(tx.qty) || 1);
+        (qcOrders || []).forEach(order => {
+            if (order.status === 'SHIPPED') {
+                let txDate = null;
+                
+                if (order.shippedAt) {
+                    txDate = new Date(order.shippedAt);
+                } else {
+                    // Jika data lama tidak punya shippedAt, abaikan dari grafik harian/mingguan
+                    // agar tidak merusak akurasi data Handover. Hanya ikutkan di Semua Waktu.
+                    if (bestSellerTime !== 'allTime') return;
+                    
+                    const fallbackDate = order.createdAt || order.date;
+                    if (fallbackDate) txDate = new Date(fallbackDate);
+                }
+
+                if (txDate) {
+                    if (txDate >= startDate && txDate <= endDate && order.items) {
+                        order.items.forEach(item => {
+                            const fullSku = (item.sysSku || item.sku || '').trim().toUpperCase();
+                            const cleanSku = fullSku.split('*')[0].split('#')[0];
+                            if (cleanSku) {
+                                if (!skuSalesMap[cleanSku]) skuSalesMap[cleanSku] = { pcs: 0, resiSet: new Set() };
+                                skuSalesMap[cleanSku].pcs += (Number(item.qty) || 1);
+                                skuSalesMap[cleanSku].resiSet.add(order.resi || order.id);
+                            }
+                        });
+                    }
                 }
             }
         });
@@ -292,10 +330,11 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
         const skuStockMap = {};
         (transactions || []).forEach(t => {
             if (!t.sku) return;
+            const tSku = t.sku.trim().toUpperCase();
             if (t.type === 'IN' || t.type === 'REVISI_IN' || t.type === 'ONLINE_IN' || t.type === 'RETUR_IN') {
-                skuStockMap[t.sku] = (skuStockMap[t.sku] || 0) + Number(t.qty || 0);
+                skuStockMap[tSku] = (skuStockMap[tSku] || 0) + Number(t.qty || 0);
             } else if (t.type === 'OUT' || t.type === 'REVISI_OUT') {
-                skuStockMap[t.sku] = (skuStockMap[t.sku] || 0) - Number(t.qty || 0);
+                skuStockMap[tSku] = (skuStockMap[tSku] || 0) - Number(t.qty || 0);
             }
         });
 
@@ -307,20 +346,44 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                 articleMap[articleName] = {
                     article: articleName,
                     totalSales: 0,
+                    totalResiSet: new Set(),
                     totalStock: 0,
                     variants: []
                 };
             }
             
-            const sales = skuSalesMap[item.sku || item.id] || 0;
-            const stock = skuStockMap[item.sku || item.id] || 0;
+            let sales = 0;
+            let resiSet = new Set();
+            let stock = 0;
+            const keysToLookup = new Set();
+            if (item.sku) keysToLookup.add(item.sku.trim().toUpperCase());
+            if (item.id) keysToLookup.add(item.id.trim().toUpperCase());
+            if (item.legacySkus && Array.isArray(item.legacySkus)) {
+                item.legacySkus.forEach(l => {
+                    if (l) keysToLookup.add(l.trim().toUpperCase());
+                });
+            }
+            
+            keysToLookup.forEach(k => {
+                if (skuSalesMap[k]) {
+                    sales += skuSalesMap[k].pcs;
+                    skuSalesMap[k].resiSet.forEach(r => resiSet.add(r));
+                    skuSalesMap[k] = null; // Prevent double counting
+                }
+                if (skuStockMap[k]) {
+                    stock += skuStockMap[k];
+                    skuStockMap[k] = 0; // Prevent double counting
+                }
+            });
             
             articleMap[articleName].totalSales += sales;
+            resiSet.forEach(r => articleMap[articleName].totalResiSet.add(r));
             articleMap[articleName].totalStock += stock;
             
             articleMap[articleName].variants.push({
                 ...item,
                 sales,
+                resiCount: resiSet.size,
                 stock,
                 variantName: `${item.colorName || '-'} ${item.sizeName || '-'}`.trim()
             });
@@ -330,7 +393,10 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
         const articleArray = Object.values(articleMap).map(art => {
             // Varian di dalam selalu diurutkan berdasarkan yang paling laku
             art.variants.sort((a, b) => b.sales - a.sales); 
-            return art;
+            return {
+                ...art,
+                totalResi: art.totalResiSet.size
+            };
         });
 
         // 5. Sort the articles based on selected sort option
@@ -343,7 +409,7 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
         });
 
         return articleArray;
-    }, [inventoryData, transactions, bestSellerTime, bestSellerSort]);
+    }, [inventoryData, transactions, qcOrders, bestSellerTime, bestSellerSort]);
 
 
     if (isLoading) {
@@ -365,28 +431,40 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                         <i className="fa-solid fa-ranking-star text-amber-500"></i>
                         Daftar Performa SKU per Artikel
                     </h3>
-                    <div className="flex flex-row sm:flex-row gap-2 md:gap-3 w-full md:w-auto px-2 md:px-0">
-                        <select 
-                            value={bestSellerTime} 
-                            onChange={e => setBestSellerTime(e.target.value)}
-                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
-                        >
-                            <option value="7days">7 Hari Terakhir</option>
-                            <option value="30days">30 Hari Terakhir</option>
-                            <option value="thisMonth">Bulan Ini</option>
-                            <option value="thisYear">Tahun Ini</option>
-                            <option value="allTime">Semua Waktu</option>
-                        </select>
-                        <select 
-                            value={bestSellerSort} 
-                            onChange={e => setBestSellerSort(e.target.value)}
-                            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
-                        >
-                            <option value="salesDesc">Paling Laku (Penjualan)</option>
-                            <option value="salesAsc">Kurang Laku (Penjualan)</option>
-                            <option value="stockDesc">Stok Terbanyak</option>
-                            <option value="stockAsc">Stok Sedikit / Kosong</option>
-                        </select>
+                    <div className="flex flex-col md:flex-row gap-2 md:gap-3 items-end md:items-center w-full md:w-auto px-2 md:px-0">
+                        <div className="flex flex-row sm:flex-row gap-2 md:gap-3 w-full md:w-auto">
+                            <select 
+                                value={bestSellerTime} 
+                                onChange={e => setBestSellerTime(e.target.value)}
+                                className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
+                            >
+                                <option value="today">Hari Ini</option>
+                                <option value="yesterday">Kemarin</option>
+                                <option value="7days">7 Hari Terakhir</option>
+                                <option value="30days">30 Hari Terakhir</option>
+                                <option value="thisMonth">Bulan Ini</option>
+                                <option value="thisYear">Tahun Ini</option>
+                                <option value="allTime">Semua Waktu</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                            <select 
+                                value={bestSellerSort} 
+                                onChange={e => setBestSellerSort(e.target.value)}
+                                className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-3 py-1.5 md:px-4 md:py-2 rounded-lg md:rounded-xl outline-none focus:border-rose-500 text-[11px] md:text-sm"
+                            >
+                                <option value="salesDesc">Paling Laku (Penjualan)</option>
+                                <option value="salesAsc">Kurang Laku (Penjualan)</option>
+                                <option value="stockDesc">Stok Terbanyak</option>
+                                <option value="stockAsc">Stok Sedikit / Kosong</option>
+                            </select>
+                        </div>
+                        {bestSellerTime === 'custom' && (
+                            <div className="flex flex-row gap-2 items-center bg-slate-50 p-1.5 md:p-2 rounded-lg border w-full md:w-auto">
+                                <input type="date" className="w-full sm:w-auto bg-white border rounded-md p-1.5 md:p-2 text-[11px] md:text-sm outline-none focus:ring-2 focus:ring-rose-500 font-semibold text-slate-700" onChange={e => setBestSellerCustomRange({ ...bestSellerCustomRange, start: e.target.value })} />
+                                <span className="text-slate-400 font-bold hidden sm:inline">-</span>
+                                <input type="date" className="w-full sm:w-auto bg-white border rounded-md p-1.5 md:p-2 text-[11px] md:text-sm outline-none focus:ring-2 focus:ring-rose-500 font-semibold text-slate-700" onChange={e => setBestSellerCustomRange({ ...bestSellerCustomRange, end: e.target.value })} />
+                            </div>
+                        )}
                     </div>
                 </div>
                 
@@ -427,7 +505,10 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                 </div>
                                 <div className="flex items-center gap-6">
                                     <div className="text-right hidden sm:block">
-                                        <div className="text-lg font-black text-emerald-600">{art.totalSales} <span className="text-xs text-emerald-600/70">Terjual</span></div>
+                                        <div className="text-lg font-black text-emerald-600 flex items-baseline gap-1 justify-end">
+                                            {art.totalSales} <span className="text-xs text-emerald-600/70 uppercase">Pcs</span>
+                                        </div>
+                                        <div className="text-[10px] font-bold text-emerald-600/60 mt-0.5">({art.totalResi || 0} Resi)</div>
                                         <div className="text-xs font-bold text-slate-400 mt-0.5">Sisa Stok: {art.totalStock}</div>
                                     </div>
                                     <i className={`fa-solid fa-chevron-${expandedArticle === art.article ? 'up' : 'down'} text-rose-400 text-lg transition-transform`}></i>
@@ -440,7 +521,10 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                     <div className="sm:hidden flex justify-between mb-2 pb-2 px-2 border-b border-slate-200">
                                         <div>
                                             <div className="text-[10px] font-bold text-slate-400">Total Terjual</div>
-                                            <div className="text-base font-black text-emerald-600">{art.totalSales}</div>
+                                            <div className="text-base font-black text-emerald-600 flex items-baseline gap-1">
+                                                {art.totalSales} <span className="text-[10px] text-emerald-600/70 uppercase">Pcs</span>
+                                            </div>
+                                            <div className="text-[9px] font-bold text-emerald-600/60">({art.totalResi || 0} Resi)</div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-[10px] font-bold text-slate-400">Sisa Stok</div>
@@ -535,8 +619,11 @@ export default function SmartAnalyticsDashboard({ variants = [], mpoOrders = [],
                                                                             {v ? (
                                                                                 <div className={`relative flex flex-col md:flex-row items-center justify-center w-full h-full p-0.5 md:p-2 rounded border transition-all ${highlightClass}`}>
                                                                                     {badge}
-                                                                                    <div className={`font-bold text-[10px] md:text-lg leading-none md:leading-normal ${textColor}`}>
-                                                                                        {val}
+                                                                                    <div className={`font-bold text-[10px] md:text-lg leading-none md:leading-normal flex flex-col items-center ${textColor}`}>
+                                                                                        <span>{val}</span>
+                                                                                        {!isStockMode && v.resiCount > 0 && (
+                                                                                            <span className="text-[6px] md:text-[9px] opacity-70 mt-0.5">({v.resiCount} Rsi)</span>
+                                                                                        )}
                                                                                     </div>
                                                                                 </div>
                                                                             ) : (
