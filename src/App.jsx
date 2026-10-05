@@ -5289,7 +5289,8 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
         setCurrentResi('');
 
         // 1. CEK APAKAH YANG DI-SCAN ADALAH RESI
-        const orderFound = qcOrders.find(o => o.id.toUpperCase() === scannedVal);
+        const isResiMatch = (dbId, scanVal) => dbId === scanVal || (dbId.startsWith(scanVal) && dbId.length <= scanVal.length + 2) || (scanVal.startsWith(dbId) && scanVal.length <= dbId.length + 2);
+        const orderFound = qcOrders.find(o => isResiMatch(o.id.toUpperCase(), scannedVal));
 
         if (orderFound && orderFound.status === 'SHIPPED') {
             playError();
@@ -5300,7 +5301,7 @@ function QcPacking({ variants, qcOrders, setIsLoading, showToast }) {
 
         if (orderFound) {
             // KONDISI A: Scan resi yang SAMA dengan yang aktif (Pemicu Koreksi Rusak)
-            if (activeOrder && activeOrder.id.toUpperCase() === scannedVal) {
+            if (activeOrder && isResiMatch(activeOrder.id.toUpperCase(), scannedVal)) {
                 setIsDefectMode(true);
                 setIsDone(false); // Buka kunci jika sebelumnya sudah selesai
                 playTTS('scan barang yang rusak');
@@ -5727,7 +5728,8 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
         const val = scannedText.trim().toUpperCase();
         if (!val) return;
 
-        if (stagedListRef.current.some(s => s.id === val)) {
+        const isResiMatch = (dbId, scanVal) => dbId === scanVal || (dbId.startsWith(scanVal) && dbId.length <= scanVal.length + 2) || (scanVal.startsWith(dbId) && scanVal.length <= dbId.length + 2);
+        if (stagedListRef.current.some(s => isResiMatch(s.id, val))) {
             playError(); return showToast('error', 'Resi / Chart ini sudah ada dalam daftar.');
         }
 
@@ -5742,7 +5744,7 @@ function HandoverKurir({ qcOrders, setIsLoading, showToast }) {
             return;
         }
 
-        const order = qcOrders.find(o => o.id.toUpperCase() === val);
+        const order = qcOrders.find(o => isResiMatch(o.id.toUpperCase(), val));
         if (!order) { playError(); return showToast('error', 'Resi tidak dikenali di sistem.'); }
         if (order.status === 'SHIPPED') { playError(); return showToast('error', 'Paket ini sudah dikirim sebelumnya.'); }
         // QC check dihapus — semua status selain SHIPPED bisa masuk ke daftar handover
