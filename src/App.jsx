@@ -2556,12 +2556,17 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     // Ini yang di-scan saat QC/handover kurir - BUKAN No.Pesanan
                     const resiMatches = [...rawPageText.matchAll(/(?:Resi\s*:?\s*)([A-Z]+ID[A-Z0-9]{10,})/gi)];
                     const pageResiList = [...new Set(resiMatches.map(m => {
-                        const partial = m[1].toUpperCase();
-                        const fullResiTokens = [...new Set([...rawPageText.matchAll(/\b([A-Z]+ID[A-Z0-9]{10,})\b/gi)].map(x => x[1].toUpperCase()))];
-                        const fuller = fullResiTokens
-                            .filter(t => t.length > partial.length && t.length <= partial.length + 2 && t.startsWith(partial))
-                            .sort((a, b) => b.length - a.length)[0];
-                        return fuller || partial;
+                        let partial = m[1].toUpperCase();
+                        const afterIndex = m.index + m[0].length;
+                        const afterStr = rawPageText.substring(afterIndex, afterIndex + 35);
+                        const boundaryMatch = afterStr.match(/^(.*?)(?:No\.?\s*Pesanan|Batas|Dikirim|Penerima|Cetak|$)/i);
+                        if (boundaryMatch) {
+                            const extraText = boundaryMatch[1].trim();
+                            if (extraText.length > 0 && extraText.length <= 2 && /^[A-Z0-9]+$/i.test(extraText)) {
+                                partial += extraText.toUpperCase();
+                            }
+                        }
+                        return partial;
                     }))];
 
                     // Fallback: gunakan No.Pesanan jika tidak ada kode SPXID/resi kurir
