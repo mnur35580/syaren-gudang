@@ -2399,7 +2399,7 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
             return showToast('error', 'Maaf, Anda tidak memiliki akses untuk menghapus antrean PO.');
         }
 
-        const confirmed = confirm(`PERINGATAN!\n\nAnda akan menghapus SEMUA antrian PO (${poDrafts.length} batch) yang belum dikirim ke produksi.\nTindakan ini tidak bisa dibatalkan!\n\nYakin ingin mereset/menghapus antrian ini?`);
+        const confirmed = await showConfirm(`PERINGATAN!\n\nAnda akan menghapus SEMUA antrian PO (${poDrafts.length} batch) yang belum dikirim ke produksi.\nTindakan ini tidak bisa dibatalkan!\n\nYakin ingin mereset/menghapus antrian ini?`);
         if (!confirmed) return;
 
         setPoDraftLoading(true);
@@ -2555,7 +2555,14 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
                     // Cari NOMOR RESI Shopee (format: Resi:SPXIDXXX atau SPXIDXXX di barcode samping)
                     // Ini yang di-scan saat QC/handover kurir - BUKAN No.Pesanan
                     const resiMatches = [...rawPageText.matchAll(/(?:Resi\s*:?\s*)([A-Z]+ID[A-Z0-9]{10,})/gi)];
-                    const pageResiList = [...new Set(resiMatches.map(m => m[1].toUpperCase()))];
+                    const pageResiList = [...new Set(resiMatches.map(m => {
+                        const partial = m[1].toUpperCase();
+                        const fullResiTokens = [...new Set([...rawPageText.matchAll(/\b([A-Z]+ID[A-Z0-9]{10,})\b/gi)].map(x => x[1].toUpperCase()))];
+                        const fuller = fullResiTokens
+                            .filter(t => t.length > partial.length && t.length <= partial.length + 2 && t.startsWith(partial))
+                            .sort((a, b) => b.length - a.length)[0];
+                        return fuller || partial;
+                    }))];
 
                     // Fallback: gunakan No.Pesanan jika tidak ada kode SPXID/resi kurir
                     if (pageResiList.length === 0) {
@@ -4098,12 +4105,19 @@ function GeneratorRekapanAHD({ variants, transactions, manualOrders, setIsLoadin
         try {
             const batchTimestamp = Date.now();
             const batch = db.batch();
+            // PENTING: Ambil data langsung dari db untuk menghindari error scope React state
+            const qcSnapRef = await db.collection('qc_orders').get();
+            const realQcOrders = qcSnapRef.docs.map(d => ({ id: d.id, ...d.data() }));
+
             analysisResult.qcOrdersQueue.forEach(order => {
+                const existingOrder = realQcOrders.find(o => o.id === order.id);
+                const newStatus = (existingOrder && ['PACKED', 'SHIPPED'].includes(existingOrder.status)) ? existingOrder.status : 'PENDING';
+                
                 const docRef = db.collection('qc_orders').doc(order.id);
                 // LOGIKA BARU: Pasang gembok (isReleasedToProduction: false), Simpan Sesi, dan batchTimestamp
                 batch.set(docRef, {
                     ...order,
-                    status: 'PENDING',
+                    status: newStatus,
                     poDate: order.poDate || poDraftDate,
                     session: order.session || poSession,
                     batchTimestamp: order.batchTimestamp || batchTimestamp,
@@ -6588,7 +6602,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     }, [transactions, range, customRange]);
 
     const qcStats = useMemo(() => {
-        const validOrders = (qcOrders || []).filter(o => !o.isCanceled && o.isReleasedToProduction === false);
+        const validOrders = (qcOrders || []).filter(o => !o.isCanceled && o.isReleasedToProduction !== true);
 
         // 1. Antrean Masuk = Belum SHIPPED (PENDING, TRANSIT, PACKED) 
         const antreanOrders = validOrders.filter(o => o.status !== 'SHIPPED');
