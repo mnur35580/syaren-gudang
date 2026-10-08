@@ -6474,6 +6474,7 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
     const [activeModalStatus, setActiveModalStatus] = useState(null);
     const [modalPage, setModalPage] = useState(1);
     const [modalSearch, setModalSearch] = useState('');
+    const [poDashboardPage, setPoDashboardPage] = useState(1);
 
     const getLaporanDefaultStart = () => {
         const now = new Date();
@@ -7086,37 +7087,69 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {mpoOrders.filter(o => ['OPEN', 'SHIPPED', 'ARRIVED'].includes(o.status)).sort((a, b) => b.poNumber - a.poNumber).slice(0, 5).map(po => {
-                                        const totalOrderQty = po.items.reduce((acc, curr) => acc + curr.qty, 0);
-                                        // MENGGUNAKAN DATA RECEIVED AGAR MENJADI 0 / 2 PCS
-                                        const totalRcvQty = po.items.reduce((acc, curr) => acc + (curr.received || 0), 0);
-                                        const isArrived = po.status === 'ARRIVED';
-                                        return (
-                                            <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="p-3 md:p-4 font-black text-rose-800">{po.id}</td>
-                                                <td className="p-3 md:p-4 font-bold text-slate-600">
-                                                    {(() => {
-                                                        const curDate = toLocalDateStr();
-                                                        const dt = po.targetDate || curDate;
-                                                        if (dt === curDate) return <span className="text-rose-600 font-black animate-pulse">HARI INI</span>;
-                                                        if (dt < curDate) return <span className="text-red-500 font-black">TERLAMBAT ({dt})</span>;
-                                                        return dt;
-                                                    })()}
-                                                </td>
-                                                <td className="p-3 md:p-4 text-center">
-                                                    <div className="font-bold text-sm mb-1 text-rose-600">{totalRcvQty} / {totalOrderQty} Pcs</div>
-                                                    <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
-                                                        <div className={`bg-${isArrived ? 'teal-500' : 'rose-500'} h-1.5 rounded-full`} style={{ width: `${Math.round((totalRcvQty / totalOrderQty) * 100) || 0}%` }}></div>
-                                                    </div>
-                                                </td>
-                                                <td className="p-3 md:p-4 text-center">
-                                                    <span className={`bg-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-700 text-xs font-black uppercase px-2 py-1 rounded-md`}>{po.status}</span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                    {(() => {
+                                        const validPOs = mpoOrders.filter(o => ['OPEN', 'SHIPPED', 'ARRIVED'].includes(o.status)).sort((a, b) => b.poNumber - a.poNumber);
+                                        return validPOs.slice((poDashboardPage - 1) * 10, poDashboardPage * 10).map(po => {
+                                            const totalOrderQty = po.items.reduce((acc, curr) => acc + curr.qty, 0);
+                                            // MENGGUNAKAN DATA RECEIVED AGAR MENJADI 0 / 2 PCS
+                                            const totalRcvQty = po.items.reduce((acc, curr) => acc + (curr.received || 0), 0);
+                                            const isArrived = po.status === 'ARRIVED';
+                                            return (
+                                                <tr key={po.id} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="p-3 md:p-4 font-black text-rose-800">{po.id}</td>
+                                                    <td className="p-3 md:p-4 font-bold text-slate-600">
+                                                        {(() => {
+                                                            const curDate = toLocalDateStr();
+                                                            const dt = po.targetDate || curDate;
+                                                            if (dt === curDate) return <span className="text-rose-600 font-black animate-pulse">HARI INI</span>;
+                                                            if (dt < curDate) return <span className="text-red-500 font-black">TERLAMBAT ({dt})</span>;
+                                                            return dt;
+                                                        })()}
+                                                    </td>
+                                                    <td className="p-3 md:p-4 text-center">
+                                                        <div className="font-bold text-sm mb-1 text-rose-600">{totalRcvQty} / {totalOrderQty} Pcs</div>
+                                                        <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                                            <div className={`bg-${isArrived ? 'teal-500' : 'rose-500'} h-1.5 rounded-full`} style={{ width: `${Math.round((totalRcvQty / totalOrderQty) * 100) || 0}%` }}></div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-3 md:p-4 text-center">
+                                                        <span className={`bg-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (po.status === 'SHIPPED' ? 'blue' : 'rose')}-700 text-xs font-black uppercase px-2 py-1 rounded-md`}>{po.status}</span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        });
+                                    })()}
                                 </tbody>
                             </table>
+                            {/* Pagination Controls */}
+                            {(() => {
+                                const validPOs = mpoOrders.filter(o => ['OPEN', 'SHIPPED', 'ARRIVED'].includes(o.status));
+                                const totalPages = Math.ceil(validPOs.length / 10) || 1;
+                                if (totalPages <= 1) return null;
+                                return (
+                                    <div className="p-3 md:p-4 border-t border-slate-100 flex items-center justify-between bg-white">
+                                        <div className="text-xs md:text-sm font-bold text-slate-500">
+                                            Halaman {poDashboardPage} dari {totalPages}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                disabled={poDashboardPage === 1}
+                                                onClick={() => setPoDashboardPage(p => Math.max(1, p - 1))}
+                                                className="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-bold hover:bg-rose-100 hover:text-rose-600 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                                            >
+                                                <i className="fa-solid fa-chevron-left mr-1"></i> Prev
+                                            </button>
+                                            <button 
+                                                disabled={poDashboardPage === totalPages}
+                                                onClick={() => setPoDashboardPage(p => Math.min(totalPages, p + 1))}
+                                                className="px-3 py-1.5 rounded bg-slate-100 text-slate-600 font-bold hover:bg-rose-100 hover:text-rose-600 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                                            >
+                                                Next <i className="fa-solid fa-chevron-right ml-1"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
                 )}
