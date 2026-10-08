@@ -8212,20 +8212,6 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
             const batchId = 'B-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
             const operatorName = currentUser?.nama || currentUser?.username || 'Gudang';
 
-            const poUpdates = {};
-            if (isMasuk) {
-                dataTerbaru.forEach(item => {
-                    if (item.fullBarcode.includes('#')) {
-                        const parts = item.fullBarcode.split('#');
-                        const poNumber = parts[1];
-                        const poId = 'PO' + poNumber;
-                        const sku = parts[0].length > 8 ? parts[0].slice(0, -8) : parts[0];
-                        if (!poUpdates[poId]) poUpdates[poId] = {};
-                        poUpdates[poId][sku] = (poUpdates[poId][sku] || 0) + item.qty;
-                    }
-                });
-            }
-
             const batch = db.batch();
             dataTerbaru.forEach(item => {
                 const tData = {
@@ -8237,26 +8223,8 @@ function TransaksiScan({ type, variants, transactions, setIsLoading, showToast, 
                 batch.set(tRef, tData);
             });
 
-            // Update dokumen PO secara sequential sebelum commit
-            for (const poId of Object.keys(poUpdates)) {
-                const poRef = db.collection('purchase_orders').doc(poId);
-                const poDoc = await poRef.get();
-                if (poDoc.exists) {
-                    const poData = poDoc.data();
-                    let allReceived = true;
-                    const newItems = poData.items.map(pit => {
-                        const receivedQty = poUpdates[poId][pit.sku] || 0;
-                        const newReceived = (pit.received || 0) + receivedQty;
-                        if (newReceived < pit.qty) allReceived = false;
-                        return { ...pit, received: newReceived };
-                    });
-                    batch.update(poRef, {
-                        items: newItems,
-                        status: allReceived ? 'ARRIVED' : 'OPEN',
-                        updatedAt: new Date().toISOString()
-                    });
-                }
-            }
+            // PO TIDAK LAGI DIUPDATE DARI SINI
+            // Update PO hanya dilakukan melalui Produksi Bengkel -> Penerimaan Syaren Official
 
             await batch.commit();
             setScannedItems([]); scannedItemsRef.current = []; localStorage.removeItem(draftKey);
@@ -11108,7 +11076,17 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                     <div onClick={() => setExpandedPO(isExpanded ? null : po.id)} className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center bg-rose-50/30">
                                         <div>
                                             <div className="font-black text-lg text-rose-800"><i className="fa-solid fa-file-invoice mr-2 text-rose-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-2">({po.targetDate})</span></div>
-                                            <div className="text-sm font-bold mt-1 ml-6">{isDone ? <span className="text-teal-600"><i className="fa-solid fa-check-double mr-1"></i>Selesai Diterima ({totalReceived}/{totalQty})</span> : <span className="text-rose-600">Diterima Gudang: {totalReceived} / {totalQty} Pcs <span className="text-xs bg-rose-100 text-rose-600 px-2 py-0.5 rounded-md ml-2 border border-rose-200 font-black">Kurang {totalQty - totalReceived}</span></span>}</div>
+                                            <div className="text-sm font-bold mt-1 ml-6">
+                                                {isDone ? (
+                                                    totalReceived > totalQty ? (
+                                                        <span className="text-purple-600 font-black"><i className="fa-solid fa-triangle-exclamation mr-1"></i>Selesai & Berlebih ({totalReceived}/{totalQty})</span>
+                                                    ) : (
+                                                        <span className="text-teal-600"><i className="fa-solid fa-check-double mr-1"></i>Selesai Diterima ({totalReceived}/{totalQty})</span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-rose-600">Diterima Gudang: {totalReceived} / {totalQty} Pcs <span className="text-xs bg-rose-100 text-rose-600 px-2 py-0.5 rounded-md ml-2 border border-rose-200 font-black">Kurang {totalQty - totalReceived}</span></span>
+                                                )}
+                                            </div>
                                         </div>
                                         <div className="text-slate-400 bg-white w-10 h-10 flex items-center justify-center rounded-full border shadow-sm"><i className={`fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-xl`}></i></div>
                                     </div>
@@ -11138,9 +11116,31 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                                                         const cell = articleGroups[article][color][sz];
                                                                         if (!cell || cell.qty === 0) return <td key={sz} className={`${cellPadding} text-center text-slate-300 border-r border-slate-100`}>-</td>;
                                                                         const isCellDone = cell.received >= cell.qty;
-                                                                        return <td key={sz} className={`${cellPadding} text-center font-bold border-r border-slate-100`}>{isCellDone ? <span className="text-teal-500">{cell.qty}</span> : <span><span className="text-rose-600 font-black">{cell.received}</span><span className="text-slate-400">/{cell.qty}</span></span>}</td>;
+                                                                        return (
+                                                                            <td key={sz} className={`${cellPadding} text-center font-bold border-r border-slate-100`}>
+                                                                                {isCellDone ? (
+                                                                                    cell.received > cell.qty ? (
+                                                                                        <span className="text-purple-600 font-black">{cell.received}/{cell.qty}</span>
+                                                                                    ) : (
+                                                                                        <span className="text-teal-500">{cell.qty}</span>
+                                                                                    )
+                                                                                ) : (
+                                                                                    <span><span className="text-rose-600 font-black">{cell.received}</span><span className="text-slate-400">/{cell.qty}</span></span>
+                                                                                )}
+                                                                            </td>
+                                                                        );
                                                                     })}
-                                                                    <td className={`${cellPadding} text-center font-black bg-rose-50/50`}>{isRowDone ? <span className="text-teal-600">{rowTotal}</span> : <span><span className="text-rose-600">{rowReceived}</span><span className="text-slate-400">/{rowTotal}</span></span>}</td>
+                                                                    <td className={`${cellPadding} text-center font-black bg-rose-50/50`}>
+                                                                        {isRowDone ? (
+                                                                            rowReceived > rowTotal ? (
+                                                                                <span className="text-purple-600">{rowReceived}/{rowTotal}</span>
+                                                                            ) : (
+                                                                                <span className="text-teal-600">{rowTotal}</span>
+                                                                            )
+                                                                        ) : (
+                                                                            <span><span className="text-rose-600">{rowReceived}</span><span className="text-slate-400">/{rowTotal}</span></span>
+                                                                        )}
+                                                                    </td>
                                                                 </tr>
                                                             );
                                                         });
