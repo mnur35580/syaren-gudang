@@ -11020,7 +11020,7 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
         return acc;
     }, 0);
 
-    const mpoToDisplay = filteredMpo.filter(o => o.status === 'OPEN' || o.status === 'SHIPPED');
+    const mpoToDisplay = filteredMpo.filter(o => o.status === 'OPEN' || o.status === 'SHIPPED').sort((a, b) => (b.poNumber || 0) - (a.poNumber || 0));
 
     return (
         <div className="bg-white p-4 md:p-6 rounded-md border shadow-sm mb-4 no-print animate-in zoom-in duration-300">
