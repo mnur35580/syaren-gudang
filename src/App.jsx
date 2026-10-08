@@ -810,7 +810,7 @@ function App() {
             case 'qc_packing': return <QcPacking variants={allVariants} qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'handover_kurir': return <HandoverKurir qcOrders={qcOrders} setIsLoading={setIsLoading} showToast={showToast} />;
             case 'kas_operasional': return <KasOperasional showToast={showToast} />;
-            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} omzetDiscount={omzetDiscount} localDiscount={localDiscount} setLocalDiscount={setLocalDiscount} handleUpdateDiscount={handleUpdateDiscount} />;
+            case 'laporan_stok': return <LaporanStok variants={allVariants} transactions={transactions} products={products} currentUser={currentUser} setIsLoading={setIsLoading} showToast={showToast} omzetDiscount={omzetDiscount} localDiscount={localDiscount} setLocalDiscount={setLocalDiscount} handleUpdateDiscount={handleUpdateDiscount} mpoOrders={mpoOrders} />;
             case 'pantau_stok': return <PantauStok variants={allVariants} transactions={transactions} showToast={showToast} />;
             case 'stok_opname': return <StokOpname key="opname" variants={allVariants} transactions={transactions} setIsLoading={setIsLoading} showToast={showToast} currentUser={currentUser} />;
             case 'mpo_pabrik': return <ManajemenMPO variants={allVariants} mpoOrders={mpoOrders} transactions={transactions} showToast={showToast} setIsLoading={setIsLoading} />;
@@ -7096,7 +7096,12 @@ function Dashboard({ transactions, qcOrders, mpoOrders = [], variants = [], setI
                                             const isArrived = po.status === 'ARRIVED';
                                             return (
                                                 <tr key={po.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="p-3 md:p-4 font-black text-rose-800">{po.id}</td>
+                                                    <td className="p-3 md:p-4 font-black text-rose-800">
+                                                        {po.id}
+                                                        {po.bengkelName && (
+                                                            <div className="text-[10px] md:text-xs font-bold text-rose-600 mt-1 uppercase"><i className="fa-solid fa-industry mr-1"></i> {po.bengkelName}</div>
+                                                        )}
+                                                    </td>
                                                     <td className="p-3 md:p-4 font-bold text-slate-600">
                                                         {(() => {
                                                             const curDate = toLocalDateStr();
@@ -9028,11 +9033,12 @@ function CetakLabel({ products, variants, showToast }) {
 }
 
 // 5. Laporan Stok (Diperbarui untuk mengakomodasi Data Revisi)
-function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast, omzetDiscount, localDiscount, setLocalDiscount, handleUpdateDiscount }) {
+function LaporanStok({ variants, transactions, products, currentUser, setIsLoading, showToast, omzetDiscount, localDiscount, setLocalDiscount, handleUpdateDiscount, mpoOrders }) {
     const [showResetModal, setShowResetModal] = useState(false);
     const [resetPass, setResetPass] = useState('');
     const [isFullScreenLaporan, setIsFullScreenLaporan] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
+    const [selectedPoDetail, setSelectedPoDetail] = useState(null);
 
     const calculatedStock = variants.map(v => {
         const legacy = v.legacySkus || [];
@@ -9041,7 +9047,23 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
             if (t.type === 'OUT' || t.type === 'REVISI_OUT') return sum - t.qty;
             return sum;
         }, 0);
-        return { ...v, stock };
+        
+        const pendingPoDetails = [];
+        const pendingPoQty = (mpoOrders || []).reduce((acc, po) => {
+            if (po.status === 'OPEN' || po.status === 'SHIPPED') {
+                const pendingForVariant = po.items.filter(i => i.sku === v.sku || legacy.includes(i.sku)).reduce((sum, item) => {
+                    const pend = item.qty - (item.received || 0);
+                    return sum + (pend > 0 ? pend : 0);
+                }, 0);
+                if (pendingForVariant > 0) {
+                    pendingPoDetails.push({ poNumber: po.id, bengkelName: po.bengkelName, qty: pendingForVariant });
+                    return acc + pendingForVariant;
+                }
+            }
+            return acc;
+        }, 0);
+
+        return { ...v, stock, pendingPoQty, pendingPoDetails };
     });
 
     const totalPhysicalStock = calculatedStock.reduce((acc, curr) => acc + curr.stock, 0);
@@ -9250,7 +9272,21 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                                         {allSizeNames.map(sz => {
                                             const matchedSize = row.sizes.find(s => s.sizeName === sz);
                                             const qty = matchedSize ? matchedSize.stock : 0;
-                                            return <td key={sz} className={`p-1 sm:p-5 text-center text-[10px] sm:text-base border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>{qty > 0 ? qty : '-'}</td>
+                                            const pending = matchedSize ? (matchedSize.pendingPoQty || 0) : 0;
+                                            return (
+                                                <td key={sz} className={`p-1 sm:p-5 text-center border-r border-slate-100 ${qty <= 0 ? 'text-slate-300 font-medium' : 'text-rose-800 font-black bg-slate-50'}`}>
+                                                    <div className="text-[10px] sm:text-base">{qty > 0 ? qty : '-'}</div>
+                                                    {pending > 0 && (
+                                                        <div 
+                                                            className="text-[8px] sm:text-[10px] text-slate-400 hover:text-rose-500 font-bold whitespace-nowrap mt-0.5 cursor-pointer underline decoration-dotted underline-offset-2 transition-colors"
+                                                            onClick={() => setSelectedPoDetail({ details: matchedSize.pendingPoDetails, title: `${row.article} - ${row.colorName} - ${sz}` })}
+                                                            title="Klik untuk melihat detail PO"
+                                                        >
+                                                            + {pending} PO
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            )
                                         })}
                                         <td className="hidden sm:table-cell p-5 text-center font-black text-lg text-rose-600 bg-rose-50/50 border-l-2 border-white">{totalPerColor}</td>
                                         <td className="hidden sm:table-cell p-5 text-right font-bold text-slate-600 border-r border-slate-100 text-sm">{totalBeli > 0 ? formatRp(totalBeli) : '-'}</td>
@@ -9268,6 +9304,35 @@ function LaporanStok({ variants, transactions, products, currentUser, setIsLoadi
                 <div className="fixed inset-0 z-[100000] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedImage(null)}>
                     <button type="button" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white hover:text-rose-400 transition-colors bg-black/50 w-12 h-12 rounded-full flex items-center justify-center"><i className="fa-solid fa-xmark text-lg md:text-2xl"></i></button>
                     <img src={selectedImage} alt="Preview" className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl" onClick={e => e.stopPropagation()} />
+                </div>
+            )}
+            
+            {/* Modal Detail PO */}
+            {selectedPoDetail && (
+                <div className="fixed inset-0 z-[100000] bg-black/60 flex flex-col items-center justify-center p-4 backdrop-blur-sm" onClick={() => setSelectedPoDetail(null)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="bg-slate-50 p-4 border-b flex justify-between items-center">
+                            <h3 className="font-black text-rose-800 text-sm md:text-base"><i className="fa-solid fa-industry mr-2 text-rose-500"></i>Detail Sisa PO Pabrik</h3>
+                            <button type="button" onClick={() => setSelectedPoDetail(null)} className="text-slate-400 hover:text-rose-500 transition-colors"><i className="fa-solid fa-xmark text-xl"></i></button>
+                        </div>
+                        <div className="p-4 bg-white">
+                            <div className="text-center mb-4 pb-4 border-b border-dashed border-slate-200">
+                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Varian Produk</div>
+                                <div className="font-black text-slate-700 text-lg">{selectedPoDetail.title}</div>
+                            </div>
+                            <div className="space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar">
+                                {selectedPoDetail.details.map((dt, idx) => (
+                                    <div key={idx} className="flex justify-between items-center bg-slate-50 border border-slate-100 p-3 rounded-lg">
+                                        <div className="flex flex-col">
+                                            <span className="font-black text-rose-700 text-sm">{dt.poNumber}</span>
+                                            <span className="text-xs font-bold text-slate-500 uppercase mt-0.5"><i className="fa-solid fa-user-gear mr-1"></i> {dt.bengkelName || 'Tanpa Nama'}</span>
+                                        </div>
+                                        <div className="font-black text-slate-800 text-lg bg-white px-3 py-1 rounded border shadow-sm">{dt.qty} <span className="text-[10px] font-bold text-slate-400">Pcs</span></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -9609,7 +9674,16 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                 return sum;
             }, 0);
             
-            const needed = target - variantStock;
+            const pendingPoQty = (mpoOrders || []).reduce((acc, po) => {
+                if (po.status === 'OPEN' || po.status === 'SHIPPED') {
+                    const pendItems = po.items.filter(i => i.sku === v.sku || (v.legacySkus || []).includes(i.sku));
+                    const pending = pendItems.reduce((sum, item) => sum + Math.max(0, item.qty - (item.received || 0)), 0);
+                    return acc + pending;
+                }
+                return acc;
+            }, 0);
+            
+            const needed = target - variantStock - pendingPoQty;
             newQtys[v.sku] = needed > 0 ? needed : 0;
         });
         setQtys(newQtys);
@@ -10025,7 +10099,7 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
         return `${y.split('').map(mapChar).join('')}-${m.split('').map(mapChar).join('')}`;
     };
 
-    const cetakBarcodePO = (po) => {
+    const cetakBarcodePO = async (po) => {
         // ---- Kumpulkan SEMUA label ke array terlebih dahulu ----
         const BATCH_SIZE = 80;
         const allLabelHtmls = [];
@@ -10121,6 +10195,17 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
 
         if (totalBatches > 1) {
             showToast('success', `${allLabelHtmls.length} label dibagi menjadi ${totalBatches} tab cetak (maks 80/tab).`);
+        }
+
+        if (!po.printedAt) {
+            try {
+                await db.collection('purchase_orders').doc(po.id).update({
+                    isPrinted: true,
+                    printedAt: new Date().toISOString()
+                });
+            } catch (err) {
+                console.error("Gagal update status print PO", err);
+            }
         }
     };
 
@@ -10303,9 +10388,23 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                         <img src={v.photo} className="w-10 h-10 sm:w-14 sm:h-14 object-cover rounded-lg sm:rounded-md border shadow-sm shrink-0 cursor-pointer hover:scale-105 transition-transform" onClick={() => setSelectedImage(v.photo)} />
                                         <div className="min-w-0">
                                             <div className="text-[11px] sm:text-base font-black text-rose-800 truncate">{v.article}</div>
-                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight">
-                                                {v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull; <span className="text-emerald-600 font-black">Stok: {variantStock}</span>
-                                                {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
+                                            <div className="text-[9px] sm:text-xs font-bold text-slate-500 mt-0.5 sm:mt-1 whitespace-normal leading-tight flex flex-wrap gap-1 items-start">
+                                                <span className="mt-0.5">{v.colorName} &bull; <span className="text-rose-500 font-black">{v.sizeName}</span> &bull;</span>
+                                                <div className="flex flex-col">
+                                                    <span className={variantStock > 0 ? "text-emerald-600 font-black" : "text-slate-400 font-black"}>Stok: {variantStock}</span>
+                                                    {(() => {
+                                                        const pendingPoQty = (mpoOrders || []).reduce((acc, po) => {
+                                                            if (po.status === 'OPEN' || po.status === 'SHIPPED') {
+                                                                const pendItems = po.items.filter(i => i.sku === v.sku || (v.legacySkus || []).includes(i.sku));
+                                                                const pending = pendItems.reduce((sum, item) => sum + Math.max(0, item.qty - (item.received || 0)), 0);
+                                                                return acc + pending;
+                                                            }
+                                                            return acc;
+                                                        }, 0);
+                                                        return pendingPoQty > 0 ? <span className="text-slate-400 font-black text-[9px] sm:text-[10px]">+ {pendingPoQty} PO</span> : null;
+                                                    })()}
+                                                </div>
+                                                {v.legacySkus && <span className="hidden sm:inline text-[9px] text-slate-400 font-normal ml-1 mt-0.5">(Old: {Array.isArray(v.legacySkus) ? v.legacySkus.join(", ") : "ERR"})</span>}
                                             </div>
                                         </div>
                                     </div>
@@ -10389,20 +10488,29 @@ function ManajemenMPO({ variants, mpoOrders = [], transactions = [], showToast, 
                                             <div className="mt-1"><span className={`bg-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-100 text-${isArrived ? 'teal' : (isShipped ? 'blue' : 'rose')}-700 text-[8px] sm:text-[10px] font-black uppercase px-2 py-1 rounded-md tracking-wider`}>{po.status}</span></div>
                                         </td>
                                         <td className="p-3 sm:p-5 leading-relaxed align-top">
+                                            {po.bengkelName && <div className="text-[10px] sm:text-sm font-black text-rose-600 mb-1 uppercase"><i className="fa-solid fa-industry mr-1"></i> {po.bengkelName}</div>}
                                             <div className="text-[10px] sm:text-sm font-bold text-slate-700"><i className="fa-regular fa-calendar text-slate-400 mr-1"></i> PO: {po.poDate || po.createdAt?.split('T')[0] || '-'}</div>
                                             <div className="text-[10px] sm:text-sm font-bold text-slate-700 mt-1"><i className="fa-regular fa-calendar-check mr-1 text-slate-400"></i> Target: {po.targetDate}</div>
                                             <div className="text-[9px] sm:text-xs font-semibold text-slate-500 mt-1.5">{totalOrderQty} pcs dipesan</div>
                                         </td>
-                                        <td className="p-3 sm:p-5 text-center align-top space-x-1 sm:space-x-2">
-                                            <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
-                                                <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
-                                            </button>
-                                            <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
-                                                <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
-                                            </button>
-                                            <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
-                                                <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
-                                            </button>
+                                        <td className="p-3 sm:p-5 text-center align-top">
+                                            <div className="space-x-1 sm:space-x-2 flex items-center justify-center">
+                                                <button type="button" onClick={() => cetakMPO(po, 'print')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-white text-slate-600 hover:bg-rose-50 shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Cetak Surat Pesanan">
+                                                    <i className="fa-solid fa-print sm:mr-1"></i> <span className="hidden sm:inline">SP</span>
+                                                </button>
+                                                <button type="button" onClick={() => cetakMPO(po, 'download')} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold" title="Download SP Image">
+                                                    <i className="fa-solid fa-image sm:mr-1"></i> <span className="hidden sm:inline">IMG</span>
+                                                </button>
+                                                <button type="button" onClick={() => cetakBarcodePO(po)} disabled={isArrived} className="px-2 sm:px-3 py-2 rounded-lg sm:rounded-md border bg-rose-100 text-rose-700 hover:bg-rose-500 hover:text-white shadow-sm transition-colors text-[9px] sm:text-xs font-bold disabled:opacity-50" title="Cetak Label Barcode">
+                                                    <i className="fa-solid fa-barcode sm:mr-1"></i> <span className="hidden sm:inline">LBL</span>
+                                                </button>
+                                            </div>
+                                            {po.isPrinted && (
+                                                <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 bg-teal-50 border border-teal-200 text-teal-700 rounded-md font-bold text-[9px] sm:text-[10px] uppercase">
+                                                    <i className="fa-solid fa-check-double"></i>
+                                                    <span>Dicetak {po.printedAt ? new Date(po.printedAt).toLocaleString('id-ID', {day: 'numeric', month: 'short', year:'numeric', hour:'2-digit', minute:'2-digit'}).replace(',', '').replace(/\./g, ':') : ''}</span>
+                                                </div>
+                                            )}
                                         </td>
                                         <td className="p-3 sm:p-5 text-right whitespace-nowrap align-top">
                                             <button type="button" onClick={() => deletePO(po.id)} className="w-9 h-9 bg-white border shadow-sm rounded-md hover:bg-rose-500 hover:text-white border-rose-200 text-rose-500 transition-colors">
@@ -11075,7 +11183,10 @@ function DashboardProduksi({ currentUser, mpoOrders, qcOrders, variants, transac
                                 <div key={po.id} className="bg-white border rounded-md shadow-sm overflow-hidden">
                                     <div onClick={() => setExpandedPO(isExpanded ? null : po.id)} className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex justify-between items-center bg-rose-50/30">
                                         <div>
-                                            <div className="font-black text-lg text-rose-800"><i className="fa-solid fa-file-invoice mr-2 text-rose-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-2">({po.targetDate})</span></div>
+                                            <div className="font-black text-lg text-rose-800 flex flex-wrap items-center gap-2">
+                                                <span><i className="fa-solid fa-file-invoice mr-2 text-rose-500"></i>PO {po.poNumber} <span className="text-sm font-bold text-slate-500 ml-1">({po.targetDate})</span></span>
+                                                {po.bengkelName && <span className="bg-rose-100 text-rose-700 text-xs px-2 py-1 rounded-md font-bold uppercase"><i className="fa-solid fa-industry mr-1"></i> {po.bengkelName}</span>}
+                                            </div>
                                             <div className="text-sm font-bold mt-1 ml-6">
                                                 {isDone ? (
                                                     totalReceived > totalQty ? (
