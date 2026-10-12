@@ -11489,10 +11489,77 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     const detectBarcodeType = detectGlobalBarcodeType;
 
     const beep = (ok) => {
-        const url = ok
-            ? 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'
-            : 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3';
-        new Audio(url).play().catch(() => { });
+        if (ok) playSuccess();
+        else playError();
+    };
+
+    // Helper: Validasi kuota PO (Target Qty vs Sudah Diterima/Dikirim + Keranjang Scan)
+    const checkPoQuota = (fullBarcode, currentScannedMap, mode = 'receive') => {
+        if (!fullBarcode.includes('#')) return { ok: true };
+        const poStr = fullBarcode.split('#')[1];
+        const poNum = fullBarcode.startsWith('$') ? parseInt(poStr, 36) : parseInt(poStr, 10);
+        if (isNaN(poNum)) return { ok: false, message: `Format nomor PO tidak valid (#${poStr})` };
+
+        const poDoc = (mpoOrders || []).find(o => o.poNumber === poNum);
+        if (!poDoc) {
+            return { ok: false, message: `DITOLAK! PO Pabrik #${poStr} tidak ditemukan di sistem!` };
+        }
+
+        const sku = parseSku(fullBarcode);
+        const variant = (variants || []).find(v => v.sku === sku || (v.legacySkus || []).includes(sku));
+
+        const targetPoItem = (poDoc.items || []).find(pit => {
+            const pitSku = (pit.sku || '').trim().toUpperCase();
+            if (pitSku === sku) return true;
+            if (variant) {
+                if ((variant.legacySkus || []).map(s => s.toUpperCase()).includes(pitSku)) return true;
+                if (pit.article === variant.article && pit.colorName === variant.colorName && String(pit.sizeName) === String(variant.sizeName)) return true;
+            }
+            return false;
+        });
+
+        if (!targetPoItem) {
+            const itemLabel = variant ? `${variant.article} ${variant.colorName} ${variant.sizeName}` : sku;
+            return { ok: false, message: `DITOLAK! Barang [${itemLabel}] tidak ada di pesanan PO #${poNum}!` };
+        }
+
+        // Hitung berapa pcs untuk varian ini yang SUDAH ADA di keranjang scan sesi ini
+        let currentBatchQty = 0;
+        for (const [bCode, bQty] of Object.entries(currentScannedMap || {})) {
+            if (bCode.includes('#')) {
+                const bPoStr = bCode.split('#')[1];
+                const bPoNum = bCode.startsWith('$') ? parseInt(bPoStr, 36) : parseInt(bPoStr, 10);
+                if (bPoNum === poNum) {
+                    const bSku = parseSku(bCode);
+                    const bVar = (variants || []).find(v => v.sku === bSku || (v.legacySkus || []).includes(bSku));
+                    const isMatch = (bSku === (targetPoItem.sku || '').trim().toUpperCase()) ||
+                        (bVar && bVar.article === targetPoItem.article && bVar.colorName === targetPoItem.colorName && String(bVar.sizeName) === String(targetPoItem.sizeName));
+                    if (isMatch) currentBatchQty += bQty;
+                }
+            }
+        }
+
+        const baselineQty = mode === 'send'
+            ? Number(targetPoItem.shipped || targetPoItem.received || 0)
+            : Number(targetPoItem.received || 0);
+        const targetQty = Number(targetPoItem.qty || 0);
+        const totalAkanDiproses = baselineQty + currentBatchQty + 1; // +1 untuk scan saat ini
+
+        if (totalAkanDiproses > targetQty) {
+            const actionText = mode === 'send' ? 'dikirim' : 'diterima';
+            return {
+                ok: false,
+                message: `DITOLAK! PO #${poNum} [${targetPoItem.article} ${targetPoItem.colorName} ${targetPoItem.sizeName}] sudah pas ${actionText} (${baselineQty + currentBatchQty}/${targetQty} Pcs). Tidak boleh scan lebih!`
+            };
+        }
+
+        return {
+            ok: true,
+            poNum,
+            targetPoItem,
+            currentTotal: totalAkanDiproses,
+            targetQty
+        };
     };
 
     // -------- ID CARD SCAN HANDLERS --------
@@ -11539,6 +11606,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     // LOGIKA PENGIRIM (DILENGKAPI PROTEKSI F01 / F07)
     const processScanPengirim = (raw) => {
+        setScanInputPengirim('');
+        if (scanRefPengirim.current) scanRefPengirim.current.focus();
         if (!activeSender) { showToast('error', 'Scan ID Card Pengirim terlebih dahulu!'); return; }
         const fullBarcode = raw.trim().toUpperCase();
         const itemType = detectBarcodeType(fullBarcode);
@@ -11588,6 +11657,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 showToast('error', `DITOLAK! PO Pabrik #${poStr} (Decoded: ${poNum}) tidak ditemukan.`);
                 return;
             }
+            const quotaCheck = checkPoQuota(fullBarcode, scannedItemsPengirim, 'send');
+            if (!quotaCheck.ok) {
+                beep(false);
+                showToast('error', quotaCheck.message);
+                return;
+            }
         }
 
         setScannedItemsPengirim(prev => ({ ...prev, [fullBarcode]: (prev[fullBarcode] || 0) + 1 }));
@@ -11599,8 +11674,10 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     const handleScanFormPengirim = (e) => {
         e.preventDefault();
-        if (!scanInputPengirim.trim()) return;
-        processScanPengirim(scanInputPengirim);
+        const val = scanInputPengirim.trim();
+        if (!val) return;
+        setScanInputPengirim('');
+        processScanPengirim(val);
     };
 
     const handleKirimSJ = async () => {
@@ -11676,6 +11753,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
     }, []);
 
     const processScanPenerima = (raw) => {
+        setScanInputPenerima('');
+        if (scanRefPenerima.current) scanRefPenerima.current.focus();
         if (!activeReceiver) { showToast('error', 'Scan ID Card Penerima terlebih dahulu!'); return; }
         if (!activeDraft) { showToast('error', 'Pilih Surat Jalan yang ingin diverifikasi!'); return; }
 
@@ -11703,6 +11782,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             if (isNaN(poNum)) {
                 beep(false);
                 showToast('error', `DITOLAK! Format PO salah (#${poStr})`);
+                return;
+            }
+            const quotaCheck = checkPoQuota(fullBarcode, scannedItemsPenerima, 'receive');
+            if (!quotaCheck.ok) {
+                beep(false);
+                showToast('error', quotaCheck.message);
                 return;
             }
         }
@@ -11743,6 +11828,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     // ---- DIRECT SCAN PROCESSOR (Syaren Official - Langsung Tanpa Surat Jalan) ----
     const processScanDirect = (raw) => {
+        setScanInputPenerima('');
+        if (scanRefPenerima.current) scanRefPenerima.current.focus();
         if (!activeReceiver) { showToast('error', 'Scan ID Card Penerima terlebih dahulu!'); return; }
         const fullBarcode = raw.trim().toUpperCase();
         const itemType = detectBarcodeType(fullBarcode);
@@ -11767,6 +11854,12 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 showToast('error', `DITOLAK! PO Pabrik #${poStr} tidak ditemukan di sistem.`);
                 return;
             }
+            const quotaCheck = checkPoQuota(fullBarcode, scannedItemsPenerima, 'receive');
+            if (!quotaCheck.ok) {
+                beep(false);
+                showToast('error', quotaCheck.message);
+                return;
+            }
         }
         setScannedItemsPenerima(prev => ({ ...prev, [fullBarcode]: (prev[fullBarcode] || 0) + 1 }));
         setScannedTypesDirect(prev => ({ ...prev, [fullBarcode]: itemType }));
@@ -11777,9 +11870,11 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
 
     const handleScanFormPenerima = (e) => {
         e.preventDefault();
-        if (!scanInputPenerima.trim()) return;
-        if (isDirectScanMode) processScanDirect(scanInputPenerima);
-        else processScanPenerima(scanInputPenerima);
+        const val = scanInputPenerima.trim();
+        if (!val) return;
+        setScanInputPenerima('');
+        if (isDirectScanMode) processScanDirect(val);
+        else processScanPenerima(val);
     };
 
     const handleKonfirmasi = async () => {
@@ -11799,7 +11894,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             const mpoUpdates = {};
             for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
                 if (barcode.includes('#')) {
-                    const poNumber = parseInt(barcode.split('#')[1], 10);
+                    const poStr = barcode.split('#')[1];
+                    const poNumber = barcode.startsWith('$') ? parseInt(poStr, 36) : parseInt(poStr, 10);
                     if (!mpoUpdates[poNumber]) mpoUpdates[poNumber] = {};
                     const cleanSku = parseSku(barcode);
                     mpoUpdates[poNumber][cleanSku] = (mpoUpdates[poNumber][cleanSku] || 0) + qty;
@@ -11811,9 +11907,19 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 if (poDoc) {
                     let allReceived = true;
                     const newItems = (poDoc.items || []).map(pit => {
-                        const safeSku = (pit.sku || '').trim().toUpperCase();
-                        const addQty = mpoUpdates[poNum][safeSku] || 0;
-                        const newReceived = (pit.received || 0) + addQty;
+                        const pitSku = (pit.sku || '').trim().toUpperCase();
+                        let addQty = 0;
+                        for (const [updSku, q] of Object.entries(mpoUpdates[poNum])) {
+                            if (updSku === pitSku) {
+                                addQty += q;
+                            } else {
+                                const variant = (variants || []).find(v => v.sku === updSku || (v.legacySkus || []).includes(updSku));
+                                if (variant && variant.article === pit.article && variant.colorName === pit.colorName && String(variant.sizeName) === String(pit.sizeName)) {
+                                    addQty += q;
+                                }
+                            }
+                        }
+                        const newReceived = Math.min(pit.qty, (pit.received || 0) + addQty);
                         if (newReceived < pit.qty) allReceived = false;
                         return { ...pit, received: newReceived };
                     });
@@ -12125,7 +12231,8 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
             const mpoUpdates = {};
             for (const [barcode, qty] of Object.entries(scannedItemsPenerima)) {
                 if (barcode.includes('#')) {
-                    const poNumber = parseInt(barcode.split('#')[1], 10);
+                    const poStr = barcode.split('#')[1];
+                    const poNumber = barcode.startsWith('$') ? parseInt(poStr, 36) : parseInt(poStr, 10);
                     if (!mpoUpdates[poNumber]) mpoUpdates[poNumber] = {};
                     const cleanSku = parseSku(barcode);
                     mpoUpdates[poNumber][cleanSku] = (mpoUpdates[poNumber][cleanSku] || 0) + qty;
@@ -12136,9 +12243,19 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                 if (poDoc) {
                     let allReceived = true;
                     const newItems = (poDoc.items || []).map(pit => {
-                        const safeSku = (pit.sku || '').trim().toUpperCase();
-                        const addQty = mpoUpdates[poNum][safeSku] || 0;
-                        const newReceived = (pit.received || 0) + addQty;
+                        const pitSku = (pit.sku || '').trim().toUpperCase();
+                        let addQty = 0;
+                        for (const [updSku, q] of Object.entries(mpoUpdates[poNum])) {
+                            if (updSku === pitSku) {
+                                addQty += q;
+                            } else {
+                                const variant = (variants || []).find(v => v.sku === updSku || (v.legacySkus || []).includes(updSku));
+                                if (variant && variant.article === pit.article && variant.colorName === pit.colorName && String(variant.sizeName) === String(pit.sizeName)) {
+                                    addQty += q;
+                                }
+                            }
+                        }
+                        const newReceived = Math.min(pit.qty, (pit.received || 0) + addQty);
                         if (newReceived < pit.qty) allReceived = false;
                         return { ...pit, received: newReceived };
                     });
@@ -12557,7 +12674,7 @@ function CekSuratJalan({ currentUser, mpoOrders, qcOrders, variants, transaction
                                                 <div className="text-xs text-slate-500 font-bold">{variant ? variant.colorName : ''}</div>
                                                 <span className={`inline-block mt-1 text-[10px] font-black uppercase px-2 py-0.5 rounded ${itemType === 'ONLINE' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                                                     <i className={`fa-solid ${itemType === 'ONLINE' ? 'fa-cart-shopping' : 'fa-industry'} mr-1`}></i>
-                                                    {itemType === 'ONLINE' ? 'ONLINE ORDER' : 'PO PABRIK'}
+                                                    {itemType === 'ONLINE' ? 'ONLINE ORDER' : `PO PABRIK #${barcode.split('#')[1] || ''}`}
                                                 </span>
                                             </div>
                                             <div className="flex items-center gap-3">
